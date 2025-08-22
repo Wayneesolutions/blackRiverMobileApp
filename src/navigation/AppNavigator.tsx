@@ -9,6 +9,9 @@ import DashboardScreen from '../screens/dashboard/DashboardScreen';
 import LoginScreen from '../screens/auth/LoginScreen';
 import OtpScreen from '../screens/auth/OTPScreen';
 
+import Header from "../../src/components/common/Header"
+import Footer from "../../src/components/common/Footer"
+
 // Types
 export type MainTabParamList = {
     Dashboard: undefined;
@@ -54,112 +57,85 @@ const TrailerScreen = () => <PlaceholderScreen title="Trailer Management" />;
 const DocumentsScreen = () => <PlaceholderScreen title="Documents" />;
 const SettingsScreen = () => <PlaceholderScreen title="Settings" />;
 
-function AuthNavigator() {
-    return (
-        <RootStack.Navigator screenOptions={{ headerShown: false }}>
-            <RootStack.Screen name="Login" component={LoginScreen} />
-        </RootStack.Navigator>
-    );
-}
-
 function MainTabNavigator() {
     return (
-        <MainTab.Navigator
-            screenOptions={({ route }) => ({
-                tabBarIcon: ({ focused, color, size }) => {
-                    let iconName: keyof typeof Ionicons.glyphMap;
+        <View style={{ flex: 1 }}>
+            {/* ✅ Custom Header */}
+            <Header />
 
-                    switch (route.name) {
-                        case 'Dashboard':
-                            iconName = focused ? 'home' : 'home-outline';
-                            break;
-                        case 'Vehicle':
-                            iconName = focused ? 'car' : 'car-outline';
-                            break;
-                        case 'Trailer':
-                            iconName = focused ? 'business' : 'business-outline';
-                            break;
-                        case 'Documents':
-                            iconName = focused ? 'document-text' : 'document-text-outline';
-                            break;
-                        case 'Settings':
-                            iconName = focused ? 'settings' : 'settings-outline';
-                            break;
-                        default:
-                            iconName = 'home-outline';
-                    }
+            <View style={{ flex: 1 }}>
+                <MainTab.Navigator
+                    initialRouteName="Dashboard"
+                    screenOptions={{
+                        headerShown: false, // hide native header
+                        tabBarStyle: { display: "none" }, // hide default tab bar
+                    }}
+                >
+                    <MainTab.Screen name="Dashboard" component={DashboardScreen} />
+                    <MainTab.Screen name="Vehicle" component={VehicleScreen} />
+                    <MainTab.Screen name="Trailer" component={TrailerScreen} />
+                    <MainTab.Screen name="Documents" component={DocumentsScreen} />
+                    <MainTab.Screen name="Settings" component={SettingsScreen} />
+                </MainTab.Navigator>
+            </View>
 
-                    return <Ionicons name={iconName} size={size} color={color} />;
-                },
-                tabBarActiveTintColor: '#6B46C1',
-                tabBarInactiveTintColor: '#6B7280',
-                tabBarStyle: {
-                    backgroundColor: '#FFFFFF',
-                    borderTopWidth: 1,
-                    borderTopColor: '#E5E7EB',
-                    paddingBottom: 8,
-                    paddingTop: 8,
-                    height: 68,
-                },
-                tabBarLabelStyle: {
-                    fontSize: 12,
-                    fontWeight: '600',
-                },
-                headerStyle: {
-                    backgroundColor: '#6B46C1',
-                },
-                headerTintColor: '#FFFFFF',
-                headerTitleStyle: {
-                    fontWeight: 'bold',
-                },
-            })}
-        >
-            <MainTab.Screen
-                name="Dashboard"
-                component={DashboardScreen}
-                options={{ title: 'Black River', headerShown: false }}
-            />
-            <MainTab.Screen
-                name="Vehicle"
-                component={VehicleScreen}
-                options={{ title: 'Vehicles' }}
-            />
-            <MainTab.Screen
-                name="Trailer"
-                component={TrailerScreen}
-                options={{ title: 'Trailers' }}
-            />
-            <MainTab.Screen
-                name="Documents"
-                component={DocumentsScreen}
-                options={{ title: 'Documents' }}
-            />
-            <MainTab.Screen
-                name="Settings"
-                component={SettingsScreen}
-                options={{ title: 'Settings' }}
-            />
-        </MainTab.Navigator>
+            {/* ✅ Custom Footer (your replacement for tabs) */}
+            <Footer />
+        </View>
     );
 }
 
 export default function AppNavigator() {
-    // Start with login screen, then navigate to main app after authentication
-    const [isAuthenticated, setIsAuthenticated] = useState(false);
+    // For testing purposes, let's start with authenticated state
+    // Change this to false when you want to test login flow
+    const [isAuthenticated, setIsAuthenticated] = useState(true);
 
+    if (!isAuthenticated) {
+        // Authentication flow
+        return (
+            <RootStack.Navigator screenOptions={{ headerShown: false }}>
+                <RootStack.Screen name="Login" component={LoginScreen} />
+                <RootStack.Screen name="OTP">
+                    {(props) => <OtpScreen {...props} setIsAuthenticated={setIsAuthenticated} />}
+                </RootStack.Screen>
+            </RootStack.Navigator>
+        );
+    }
+
+    // Main app flow - when authenticated
     return (
-        <RootStack.Navigator screenOptions={{ headerShown: false }}>
-            {!isAuthenticated ? (
-                <>
-                    <RootStack.Screen name="Login" component={LoginScreen} />
-                    <RootStack.Screen name="OTP">
-                        {(props) => <OtpScreen {...props} setIsAuthenticated={setIsAuthenticated} />}
-                    </RootStack.Screen>
-                </>
-            ) : null}
-
-            {/* ✅ Always keep MainTabs registered */}
+        <RootStack.Navigator 
+            screenOptions={{ headerShown: false }}
+            initialRouteName="MainTabs"
+        >
             <RootStack.Screen name="MainTabs" component={MainTabNavigator} />
+            
+            {/* Modal Screens */}
+            <RootStack.Screen 
+                name="SOS" 
+                component={() => <PlaceholderScreen title="SOS Emergency" />}
+                options={{ presentation: 'modal' }}
+            />
+            <RootStack.Screen 
+                name="AssetIncidents" 
+                component={() => <PlaceholderScreen title="Asset Incidents" />}
+                options={{ presentation: 'modal' }}
+            />
+            <RootStack.Screen 
+                name="PayrollDetails" 
+                component={() => <PlaceholderScreen title="Payroll Details" />}
+                options={{ presentation: 'modal' }}
+            />
+            <RootStack.Screen 
+                name="LoadMap" 
+                component={() => <PlaceholderScreen title="Load Map" />}
+                options={{ presentation: 'modal' }}
+            />
+            <RootStack.Screen 
+                name="RoadsideCheck" 
+                component={() => <PlaceholderScreen title="Roadside Check" />}
+                options={{ presentation: 'modal' }}
+            />
         </RootStack.Navigator>
     );
 }
@@ -170,7 +146,6 @@ const styles = StyleSheet.create({
         justifyContent: 'center',
         alignItems: 'center',
         backgroundColor: '#F8FAFC',
-        padding: 20,
     },
     placeholderText: {
         fontSize: 24,

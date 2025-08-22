@@ -24,7 +24,7 @@ export default function LoginScreen({ navigation }: Props) {
   const [showPassword, setShowPassword] = useState(false);
 
   const handleLogin = () => {
-    const validEmail = "admin@gmail.com";
+    const validEmail = "testuser@gmail.com";
     const validPassword = "123456";
 
     if (!email || !password) {

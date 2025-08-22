@@ -1,330 +1,323 @@
-import React from 'react';
+import React, { useState } from "react";
 import {
-  View,
-  Text,
-  StyleSheet,
-  ScrollView,
-  TouchableOpacity,
-  Dimensions,
-} from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
-import { Ionicons } from '@expo/vector-icons';
+    View,
+    Text,
+    StyleSheet,
+    ScrollView,
+    TouchableOpacity,
+    Image,
+    Dimensions,
+} from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
+import { Ionicons } from "@expo/vector-icons";
+import activeTrip from "../../../assets/icons/active trip.png";
+import completeTrip from "../../../assets/icons/complete trip.png";
+import pendingTrip from "../../../assets/icons/pending trip.png";
+import vehicle from "../../../assets/icons/vehicle.png";
+import trailer from "../../../assets/icons/trailer.png";
+import sos from "../../../assets/icons/sos.png";
+import assest from "../../../assets/icons/aasest.png";
+import settings from "../../../assets/icons/settings.png";
+import payroll from "../../../assets/icons/payroll.png";
+import document from "../../../assets/icons/document.png";
+import loadMap from "../../../assets/icons/map.png";
+import roadSide from "../../../assets/icons/road side check.png"
 
-const { width } = Dimensions.get('window');
-
-interface DashboardItemProps {
-  title: string;
-  icon: keyof typeof Ionicons.glyphMap;
-  color: string;
-  onPress: () => void;
-  count?: number;
-}
-
-const DashboardItem: React.FC<DashboardItemProps> = ({
-  title,
-  icon,
-  color,
-  onPress,
-  count,
-}) => (
-  <TouchableOpacity style={[styles.dashboardItem, { borderLeftColor: color }]} onPress={onPress}>
-    <View style={styles.itemContent}>
-      <View style={styles.itemHeader}>
-        <Ionicons name={icon} size={32} color={color} />
-        {count !== undefined && (
-          <View style={[styles.badge, { backgroundColor: color }]}>
-            <Text style={styles.badgeText}>{count}</Text>
-          </View>
-        )}
-      </View>
-      <Text style={styles.itemTitle}>{title}</Text>
-    </View>
-  </TouchableOpacity>
-);
+const { width } = Dimensions.get("window");
 
 export default function DashboardScreen() {
-  const dashboardItems: DashboardItemProps[] = [
-    {
-      title: 'Vehicle',
-      icon: 'car',
-      color: '#6B46C1',
-      count: 12,
-      onPress: () => console.log('Vehicle pressed'),
-    },
-    {
-      title: 'Trailer',
-      icon: 'business',
-      color: '#8B5CF6',
-      count: 8,
-      onPress: () => console.log('Trailer pressed'),
-    },
-    {
-      title: 'SOS',
-      icon: 'warning',
-      color: '#EF4444',
-      onPress: () => console.log('SOS pressed'),
-    },
-    {
-      title: 'Asset Inc',
-      icon: 'shield-checkmark',
-      color: '#F59E0B',
-      count: 3,
-      onPress: () => console.log('Asset Inc pressed'),
-    },
-    {
-      title: 'Settings',
-      icon: 'settings',
-      color: '#6B7280',
-      onPress: () => console.log('Settings pressed'),
-    },
-    {
-      title: 'Payroll',
-      icon: 'card',
-      color: '#10B981',
-      onPress: () => console.log('Payroll pressed'),
-    },
-    {
-      title: 'Document',
-      icon: 'document-text',
-      color: '#3B82F6',
-      count: 24,
-      onPress: () => console.log('Document pressed'),
-    },
-    {
-      title: 'Load Map',
-      icon: 'map',
-      color: '#8B5CF6',
-      onPress: () => console.log('Load Map pressed'),
-    },
-    {
-      title: 'Roadside Check',
-      icon: 'checkmark-circle',
-      color: '#059669',
-      onPress: () => console.log('Roadside Check pressed'),
-    },
-  ];
+    const [showAllWishList, setShowAllWishList] = useState(false);
 
-  return (
-    <SafeAreaView style={styles.container}>
-      {/* Header */}
-      <View style={styles.header}>
-        <View style={styles.headerContent}>
-          <View style={styles.userInfo}>
-            <View style={styles.avatar}>
-              <Ionicons name="person" size={24} color="#FFFFFF" />
-            </View>
-            <View>
-              <Text style={styles.welcomeText}>Welcome back,</Text>
-              <Text style={styles.userName}>John Doe</Text>
-            </View>
-          </View>
-          <TouchableOpacity style={styles.notificationButton}>
-            <Ionicons name="notifications" size={24} color="#FFFFFF" />
-            <View style={styles.notificationBadge}>
-              <Text style={styles.notificationCount}>3</Text>
-            </View>
-          </TouchableOpacity>
-        </View>
-      </View>
+    const wishListItems = [
+        { id: 1, name: "Vehicle", icon: vehicle, color: "#906AD1" },
+        { id: 2, name: "Trailer", icon: trailer, color: "#FF9797" },
+        { id: 3, name: "SOS", icon: sos, color: "#FFCC00" },
+        { id: 4, name: "Asset Ins", icon: assest, color: "#D74848" },
+        { id: 5, name: "Settings", icon: settings, color: "#2CDBFA" },
+        { id: 6, name: "Payroll", icon: payroll, color: "#441783" },
+        { id: 7, name: "Document", icon: document, color: "#C79EFF" },
+        { id: 8, name: "Load Map", icon: loadMap, color: "#831775" },
+        { id: 9, name: "Road Side Check", icon: roadSide, color: "#E61DCC" },
+    ];
 
-      {/* Dashboard Content */}
-      <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
-        <View style={styles.sectionHeader}>
-          <Text style={styles.sectionTitle}>Quick Access</Text>
-          <Text style={styles.sectionSubtitle}>Manage your fleet operations</Text>
-        </View>
+    const renderWishItem = (item:any) => (
+     <TouchableOpacity 
+  key={item.id} 
+  style={[styles.wishItem, { backgroundColor: item.color }]}
+>
+  <Image 
+    source={item.icon} 
+    style={[
+      styles.wishIcon, 
+      item.name === "Vehicle" && { width: 39, height: 27 },
+      item.name === "Road Side Check" && { width: 27, height: 21 }
+    ]} 
+  />
+  <Text style={styles.wishText}>{item.name}</Text>
+</TouchableOpacity>
 
-        <View style={styles.grid}>
-          {dashboardItems.map((item, index) => (
-            <DashboardItem
-              key={index}
-              title={item.title}
-              icon={item.icon}
-              color={item.color}
-              count={item.count}
-              onPress={item.onPress}
-            />
-          ))}
-        </View>
+    );
 
-        {/* Status Cards */}
-        <View style={styles.statusSection}>
-          <Text style={styles.sectionTitle}>Today's Overview</Text>
-          
-          <View style={styles.statusCards}>
-            <View style={[styles.statusCard, { backgroundColor: '#EFF6FF' }]}>
-              <Ionicons name="car-sport" size={24} color="#3B82F6" />
-              <Text style={styles.statusNumber}>24</Text>
-              <Text style={styles.statusLabel}>Active Routes</Text>
+    const renderHorizontalWishList = () => (
+        <ScrollView 
+            horizontal 
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={styles.horizontalScrollContent}
+        >
+            {wishListItems.map(renderWishItem)}
+        </ScrollView>
+    );
+
+    const renderGridWishList = () => (
+        <View>
+            {/* First Row */}
+            <View style={styles.wishGrid}>
+                {wishListItems.slice(0, 4).map(renderWishItem)}
             </View>
-            
-            <View style={[styles.statusCard, { backgroundColor: '#F0FDF4' }]}>
-              <Ionicons name="checkmark-circle" size={24} color="#10B981" />
-              <Text style={styles.statusNumber}>18</Text>
-              <Text style={styles.statusLabel}>Completed</Text>
+            {/* Second Row */}
+            <View style={styles.wishGrid}>
+                {wishListItems.slice(4, 8).map(renderWishItem)}
             </View>
-            
-            <View style={[styles.statusCard, { backgroundColor: '#FEF3C7' }]}>
-              <Ionicons name="time" size={24} color="#F59E0B" />
-              <Text style={styles.statusNumber}>6</Text>
-              <Text style={styles.statusLabel}>Pending</Text>
-            </View>
-          </View>
+            {/* Third Row (if more items) */}
+            {wishListItems.length > 8 && (
+                <View style={styles.wishGrid}>
+                    {wishListItems.slice(8).map(renderWishItem)}
+                </View>
+            )}
         </View>
-      </ScrollView>
-    </SafeAreaView>
-  );
+    );
+
+    return (
+        <SafeAreaView style={styles.container}>
+            <ScrollView showsVerticalScrollIndicator={false}>
+                {/* Profile Card */}
+                <View style={styles.profileCard}>
+                    <View style={styles.profileContent}>
+                        <View style={styles.profileInfo}>
+                            <Text style={styles.driverLabel}>Driver</Text>
+                            <View style={styles.nameRow}>
+                                <Text style={styles.driverName}>Rajvinder</Text>
+                                <View style={styles.statusBadge}>
+                                    <Text style={styles.statusText}>Active</Text>
+                                </View>
+                            </View>
+                            <Text style={styles.tripLabel}>Total Trip</Text>
+                            <Text style={styles.miles}>600 Miles</Text>
+                        </View>
+                        <Image
+                            source={{ uri: "https://randomuser.me/api/portraits/men/75.jpg" }}
+                            style={styles.avatar}
+                        />
+                    </View>
+                </View>
+
+                {/* Daily Task Report */}
+                <View style={styles.section}>
+                    <View style={styles.sectionHeader}>
+                        <Text style={styles.sectionTitle}>Daily task report</Text>
+                        <TouchableOpacity>
+                            <Text style={styles.linkText}>+New Trip</Text>
+                        </TouchableOpacity>
+                    </View>
+
+                    <View style={styles.taskContainer}>
+                        <View style={styles.taskCard}>
+                            <View style={styles.taskIconContainer}>
+                                <Image source={activeTrip} style={styles.taskIcon} />
+                            </View>
+                            <Text style={styles.taskText}>Active Trips</Text>
+                        </View>
+                        
+                        <View style={styles.taskCard}>
+                            <View style={[styles.taskIconContainer, { backgroundColor: "#FF6B6B" }]}>
+                                <Image source={completeTrip} style={styles.taskIcon} />
+                            </View>
+                            <Text style={styles.taskText}>Complete Trips</Text>
+                        </View>
+                        
+                        <View style={styles.taskCard}>
+                            <View style={[styles.taskIconContainer, { backgroundColor: "#8B4513" }]}>
+                                <Image source={pendingTrip} style={styles.taskIcon} />
+                            </View>
+                            <Text style={styles.taskText}>Pending Trips</Text>
+                        </View>
+                    </View>
+                </View>
+
+                {/* Wish List */}
+                <View style={styles.section}>
+                    <View style={styles.sectionHeader}>
+                        <Text style={styles.sectionTitle}>Wish List</Text>
+                        <TouchableOpacity onPress={() => setShowAllWishList(!showAllWishList)}>
+                            <Text style={styles.linkText}>
+                                {showAllWishList ? "Hide" : "See All"}
+                            </Text>
+                        </TouchableOpacity>
+                    </View>
+
+                    {showAllWishList ? renderGridWishList() : renderHorizontalWishList()}
+                </View>
+            </ScrollView>
+        </SafeAreaView>
+    );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#F8FAFC',
-  },
-  header: {
-    backgroundColor: '#6B46C1',
-    paddingHorizontal: 20,
-    paddingVertical: 16,
-  },
-  headerContent: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  userInfo: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  avatar: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
-    backgroundColor: 'rgba(255, 255, 255, 0.2)',
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginRight: 12,
-  },
-  welcomeText: {
-    color: 'rgba(255, 255, 255, 0.8)',
-    fontSize: 14,
-  },
-  userName: {
-    color: '#FFFFFF',
-    fontSize: 18,
-    fontWeight: 'bold',
-  },
-  notificationButton: {
-    position: 'relative',
-  },
-  notificationBadge: {
-    position: 'absolute',
-    top: -6,
-    right: -6,
-    backgroundColor: '#EF4444',
-    borderRadius: 10,
-    minWidth: 20,
-    height: 20,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  notificationCount: {
-    color: '#FFFFFF',
-    fontSize: 12,
-    fontWeight: 'bold',
-  },
-  content: {
-    flex: 1,
-    paddingHorizontal: 20,
-  },
-  sectionHeader: {
-    marginTop: 20,
-    marginBottom: 16,
-  },
-  sectionTitle: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    color: '#1F2937',
-    marginBottom: 4,
-  },
-  sectionSubtitle: {
-    fontSize: 16,
-    color: '#6B7280',
-  },
-  grid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    justifyContent: 'space-between',
-  },
-  dashboardItem: {
-    width: (width - 60) / 2,
-    backgroundColor: '#FFFFFF',
-    borderRadius: 12,
-    padding: 20,
-    marginBottom: 16,
-    borderLeftWidth: 4,
-    elevation: 2,
-    shadowColor: '#000',
-    shadowOffset: {
-      width: 0,
-      height: 1,
+    container: { 
+        flex: 1, 
+        backgroundColor: "white" 
     },
-    shadowOpacity: 0.22,
-    shadowRadius: 2.22,
-  },
-  itemContent: {
-    alignItems: 'flex-start',
-  },
-  itemHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'flex-start',
-    width: '100%',
-    marginBottom: 12,
-  },
-  badge: {
-    borderRadius: 12,
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    minWidth: 24,
-    alignItems: 'center',
-  },
-  badgeText: {
-    color: '#FFFFFF',
-    fontSize: 12,
-    fontWeight: 'bold',
-  },
-  itemTitle: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#1F2937',
-  },
-  statusSection: {
-    marginTop: 24,
-    marginBottom: 32,
-  },
-  statusCards: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginTop: 16,
-  },
-  statusCard: {
-    flex: 1,
-    backgroundColor: '#FFFFFF',
-    borderRadius: 12,
-    padding: 16,
-    alignItems: 'center',
-    marginHorizontal: 4,
-  },
-  statusNumber: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    color: '#1F2937',
-    marginTop: 8,
-  },
-  statusLabel: {
-    fontSize: 12,
-    color: '#6B7280',
-    marginTop: 4,
-    textAlign: 'center',
-  },
+    profileCard: {
+        backgroundColor: "#8B5CF6",
+        borderRadius: 20,
+        margin: 20,
+        padding: 20,
+        elevation: 4,
+        shadowColor: "#000",
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.1,
+        shadowRadius: 4,
+    },
+    profileContent: {
+        flexDirection: "row",
+        justifyContent: "space-between",
+        alignItems: "center",
+    },
+    profileInfo: {
+        flex: 1,
+    },
+    driverLabel: {
+        color: "#E1D5F7",
+        fontSize: 14,
+        marginBottom: 4,
+    },
+    nameRow: {
+        flexDirection: "row",
+        alignItems: "center",
+        marginBottom: 8,
+    },
+    driverName: { 
+        fontSize: 20, 
+        color: "#fff", 
+        fontWeight: "bold",
+        marginRight: 10,
+    },
+    statusBadge: {
+        backgroundColor: "#10B981",
+        paddingHorizontal: 8,
+        paddingVertical: 2,
+        borderRadius: 12,
+    },
+    statusText: {
+        color: "#fff",
+        fontSize: 12,
+        fontWeight: "600",
+    },
+    tripLabel: { 
+        color: "#E1D5F7", 
+        fontSize: 14,
+        marginBottom: 4,
+    },
+    miles: { 
+        color: "#fff", 
+        fontSize: 18, 
+        fontWeight: "600" 
+    },
+    avatar: { 
+        width: 80, 
+        height: 80, 
+        borderRadius: 20,
+        borderWidth: 3,
+        borderColor: "#fff",
+    },
+    section: { 
+        marginHorizontal: 20, 
+        marginBottom: 20 
+    },
+    sectionHeader: { 
+        flexDirection: "row", 
+        justifyContent: "space-between", 
+        alignItems: "center",
+        marginBottom: 16 
+    },
+    sectionTitle: { 
+        fontSize: 18, 
+        fontWeight: "bold", 
+        color: "#1F2937" 
+    },
+    linkText: { 
+        color: "#10B981", 
+        fontWeight: "600",
+        fontSize: 14,
+    },
+    taskContainer: {
+        backgroundColor: "#fff",
+        borderRadius: 16,
+        padding: 16,
+        elevation: 2,
+        shadowColor: "#000",
+        shadowOffset: { width: 0, height: 1 },
+        shadowOpacity: 0.05,
+        shadowRadius: 2,
+    },
+    taskCard: {
+        flexDirection: "row",
+        alignItems: "center",
+        paddingVertical: 12,
+        borderBottomWidth: 1,
+        borderBottomColor: "#F3F4F6",
+    },
+    taskIconContainer: {
+        width: 40,
+        height: 40,
+        borderRadius: 12,
+        backgroundColor: "#FFB3B3",
+        justifyContent: "center",
+        alignItems: "center",
+        marginRight: 16,
+    },
+    taskText: { 
+        fontSize: 16, 
+        fontWeight: "500", 
+        color: "#1F2937",
+        flex: 1,
+    },
+    horizontalScrollContent: {
+        paddingRight: 20,
+    },
+    wishGrid: { 
+        flexDirection: "row", 
+        justifyContent: "space-between", 
+        marginBottom: 12 
+    },
+    wishItem: {
+        width: (width - 60) / 4,
+        aspectRatio: 1,
+        borderRadius: 16,
+        justifyContent: "center",
+        alignItems: "center",
+        marginHorizontal: 2,
+        elevation: 2,
+        shadowColor: "#000",
+        shadowOffset: { width: 0, height: 1 },
+        shadowOpacity: 0.1,
+        shadowRadius: 2,
+    },
+    wishText: { 
+        color: "#fff", 
+        fontSize: 12, 
+        marginTop: 8, 
+        fontWeight: "600",
+        textAlign: "center",
+    },
+    taskIcon: {
+        width: 24,
+        height: 24,
+        tintColor: "#fff",
+    },
+    wishIcon: {
+        width: 28,
+        height: 28,
+        tintColor: "#fff",
+    },
 });
