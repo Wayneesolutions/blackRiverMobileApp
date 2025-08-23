@@ -1,3 +1,4 @@
+// src/screens/auth/LoginScreen.js
 import React, { useState } from "react";
 import {
   View,
@@ -9,37 +10,78 @@ import {
   Platform,
   Alert,
   Image,
+  ActivityIndicator,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { NativeStackScreenProps } from "@react-navigation/native-stack";
-import { RootStackParamList } from "../../navigation/AppNavigator"; // adjust path
-import shape from "../../../assets/images/shape.png"; // purple shape
+import { RootStackParamList } from "../../navigation/AppNavigator";
+import shape from "../../../assets/images/shape.png";
 
-type Props = NativeStackScreenProps<RootStackParamList, "Login">;
+type Props = NativeStackScreenProps<RootStackParamList, "Login"> & {
+  onAuthSuccess: (userData?: any) => void;
+};
 
-export default function LoginScreen({ navigation }: Props) {
+export default function LoginScreen({ navigation, onAuthSuccess }: Props) {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
 
-  const handleLogin = () => {
-    const validEmail = "testuser@gmail.com";
-    const validPassword = "123456";
+  // Demo credentials - in production, this would be handled by your API
+  const DEMO_CREDENTIALS = {
+    email: "testuser@gmail.com",
+    password: "123456"
+  };
 
-    if (!email || !password) {
-      Alert.alert("Error", "Please enter both email and password");
+  const handleLogin = async () => {
+    if (isLoading) return;
+
+    // Validation
+    if (!email.trim() || !password.trim()) {
+      Alert.alert("Validation Error", "Please enter both email and password");
       return;
     }
 
-    if (email === validEmail && password === validPassword) {
-      navigation.navigate("OTP"); // 👈 navigate to OTP screen
-    } else {
+    // Email format validation
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(email)) {
+      Alert.alert("Validation Error", "Please enter a valid email address");
+      return;
+    }
+
+    setIsLoading(true);
+
+    try {
+      // Simulate API call delay
+      await new Promise(resolve => setTimeout(resolve, 1000));
+
+      // Check credentials
+      if (email === DEMO_CREDENTIALS.email && password === DEMO_CREDENTIALS.password) {
+        // Navigate to OTP screen for verification
+        navigation.navigate("OTP");
+      } else {
+        Alert.alert(
+          "Login Failed",
+          `Invalid credentials.\n\nDemo credentials:\nEmail: ${DEMO_CREDENTIALS.email}\nPassword: ${DEMO_CREDENTIALS.password}`,
+          [{ text: "OK", style: "default" }]
+        );
+      }
+    } catch (error) {
+      console.error("Login error:", error);
       Alert.alert(
         "Error",
-        "Invalid credentials. Use admin@fleetgo.com / 123456"
+        "An error occurred during login. Please try again.",
+        [{ text: "OK", style: "default" }]
       );
+    } finally {
+      setIsLoading(false);
     }
+  };
+
+  const handleDemoLogin = () => {
+    setEmail(DEMO_CREDENTIALS.email);
+    setPassword(DEMO_CREDENTIALS.password);
   };
 
   return (
@@ -58,17 +100,30 @@ export default function LoginScreen({ navigation }: Props) {
 
         {/* Bottom White Section */}
         <View style={styles.formCard}>
-          <TextInput
-            style={styles.input}
-            placeholder="Email"
-            placeholderTextColor="#999"
-            value={email}
-            onChangeText={setEmail}
-            keyboardType="email-address"
-            autoCapitalize="none"
-          />
+          <View style={styles.welcomeSection}>
+            <Text style={styles.welcomeTitle}>Welcome Back</Text>
 
-          <View style={styles.passwordContainer}>
+          </View>
+
+          {/* Email Input */}
+          <View style={styles.inputContainer}>
+            <Ionicons name="mail-outline" size={20} color="#999" style={styles.inputIcon} />
+            <TextInput
+              style={styles.input}
+              placeholder="Email"
+              placeholderTextColor="#999"
+              value={email}
+              onChangeText={setEmail}
+              keyboardType="email-address"
+              autoCapitalize="none"
+              autoCorrect={false}
+              editable={!isLoading}
+            />
+          </View>
+
+          {/* Password Input */}
+          <View style={styles.inputContainer}>
+            <Ionicons name="lock-closed-outline" size={20} color="#999" style={styles.inputIcon} />
             <TextInput
               style={[styles.input, { flex: 1 }]}
               placeholder="Password"
@@ -76,10 +131,12 @@ export default function LoginScreen({ navigation }: Props) {
               value={password}
               onChangeText={setPassword}
               secureTextEntry={!showPassword}
+              editable={!isLoading}
             />
             <TouchableOpacity
               onPress={() => setShowPassword(!showPassword)}
               style={styles.eyeIcon}
+              disabled={isLoading}
             >
               <Ionicons
                 name={showPassword ? "eye-outline" : "eye-off-outline"}
@@ -89,9 +146,32 @@ export default function LoginScreen({ navigation }: Props) {
             </TouchableOpacity>
           </View>
 
-          <TouchableOpacity style={styles.loginButton} onPress={handleLogin}>
-            <Text style={styles.loginButtonText}>Log In</Text>
+          {/* Demo Credentials Button */}
+          <TouchableOpacity
+            style={styles.demoButton}
+            onPress={handleDemoLogin}
+            disabled={isLoading}
+          >
+            <Text style={styles.demoButtonText}>Use Demo Credentials</Text>
           </TouchableOpacity>
+
+          {/* Login Button */}
+          <TouchableOpacity
+            style={[
+              styles.loginButton,
+              isLoading && styles.loginButtonDisabled
+            ]}
+            onPress={handleLogin}
+            disabled={isLoading}
+          >
+            {isLoading ? (
+              <ActivityIndicator color="#fff" size="small" />
+            ) : (
+              <Text style={styles.loginButtonText}>Log In</Text>
+            )}
+          </TouchableOpacity>
+
+
         </View>
       </KeyboardAvoidingView>
     </SafeAreaView>
@@ -99,7 +179,10 @@ export default function LoginScreen({ navigation }: Props) {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: "#fff" },
+  container: {
+    flex: 1,
+    backgroundColor: "#fff"
+  },
   topSection: {
     flex: 1,
     backgroundColor: "#906AD1",
@@ -137,7 +220,7 @@ const styles = StyleSheet.create({
     position: "absolute",
     backgroundColor: "white",
     left: 15,
-    bottom: 20,
+    bottom: 10,
     padding: 2,
   },
   formCard: {
@@ -147,32 +230,86 @@ const styles = StyleSheet.create({
     borderTopRightRadius: 30,
     padding: 24,
   },
-  input: {
+  welcomeSection: {
+    marginBottom: 32,
+    alignItems: "center",
+  },
+  welcomeTitle: {
+    fontSize: 24,
+    fontWeight: "bold",
+    color: "#1F2937",
+    marginBottom: 4,
+  },
+  welcomeSubtitle: {
+    fontSize: 16,
+    color: "#6B7280",
+  },
+  inputContainer: {
+    flexDirection: "row",
+    alignItems: "center",
     borderWidth: 1,
     borderColor: "#E5E5E5",
-    borderRadius: 8,
-    paddingHorizontal: 16,
-    paddingVertical: 14,
-    fontSize: 16,
-    color: "#333",
+    borderRadius: 12,
     backgroundColor: "#FAFAFA",
     marginBottom: 16,
+    paddingHorizontal: 16,
   },
-  passwordContainer: { flexDirection: "row", alignItems: "center" },
-  eyeIcon: { position: "absolute", right: 16, padding: 4 },
+  inputIcon: {
+    marginRight: 12,
+  },
+  input: {
+    flex: 1,
+    paddingVertical: 16,
+    fontSize: 16,
+    color: "#333",
+  },
+  eyeIcon: {
+    padding: 4,
+    marginLeft: 8,
+  },
+  demoButton: {
+    alignItems: "center",
+    paddingVertical: 8,
+    marginBottom: 16,
+  },
+  demoButtonText: {
+    fontSize: 14,
+    color: "#906AD1",
+    fontWeight: "600",
+  },
   loginButton: {
     backgroundColor: "#906AD1",
     borderRadius: 15,
-    paddingVertical: 12,
+    paddingVertical: 16,
     alignItems: "center",
     justifyContent: "center",
-    marginTop: 26,
-    width: 250,
-    alignSelf: "center",
+    marginTop: 8,
+    shadowColor: "#906AD1",
+    shadowOffset: {
+      width: 0,
+      height: 4,
+    },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 6,
+  },
+  loginButtonDisabled: {
+    backgroundColor: "#C4B5FD",
+    shadowOpacity: 0,
+    elevation: 0,
   },
   loginButtonText: {
-    fontSize: 22,
+    fontSize: 18,
     fontWeight: "bold",
     color: "#fff",
+  },
+  additionalOptions: {
+    marginTop: 24,
+    alignItems: "center",
+  },
+  linkText: {
+    fontSize: 16,
+    color: "#906AD1",
+    fontWeight: "500",
   },
 });

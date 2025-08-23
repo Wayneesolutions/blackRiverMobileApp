@@ -23,14 +23,21 @@ import document from "../../../assets/icons/document.png";
 import loadMap from "../../../assets/icons/map.png";
 import roadSide from "../../../assets/icons/road side check.png"
 
+import { useNavigation } from '@react-navigation/native';
+import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import { RootStackParamList } from '../../navigation/AppNavigator';
+
+type NavigationProp = NativeStackNavigationProp<RootStackParamList>;
+
 const { width } = Dimensions.get("window");
 
 export default function DashboardScreen() {
+    const navigation = useNavigation<NavigationProp>();
     const [showAllWishList, setShowAllWishList] = useState(false);
 
     const wishListItems = [
-        { id: 1, name: "Vehicle", icon: vehicle, color: "#906AD1" },
-        { id: 2, name: "Trailer", icon: trailer, color: "#FF9797" },
+        { id: 1, name: "Vehicle", icon: vehicle, color: "#906AD1", route: "Vehicle" },
+        { id: 2, name: "Trailer", icon: trailer, color: "#FF9797" ,route:"Trailer"},
         { id: 3, name: "SOS", icon: sos, color: "#FFCC00" },
         { id: 4, name: "Asset Ins", icon: assest, color: "#D74848" },
         { id: 5, name: "Settings", icon: settings, color: "#2CDBFA" },
@@ -40,27 +47,44 @@ export default function DashboardScreen() {
         { id: 9, name: "Road Side Check", icon: roadSide, color: "#E61DCC" },
     ];
 
-    const renderWishItem = (item:any) => (
-     <TouchableOpacity 
-  key={item.id} 
-  style={[styles.wishItem, { backgroundColor: item.color }]}
->
-  <Image 
-    source={item.icon} 
-    style={[
-      styles.wishIcon, 
-      item.name === "Vehicle" && { width: 39, height: 27 },
-      item.name === "Road Side Check" && { width: 27, height: 21 }
-    ]} 
-  />
-  <Text style={styles.wishText}>{item.name}</Text>
-</TouchableOpacity>
+    const handleWishItemPress = (item: any) => {
+        if (item.route) {
+            navigation.navigate(item.route);
+        }
+        // You can add other navigation logic here for other items
+        // Example:
+        // switch (item.name) {
+        //     case "Trailer":
+        //         navigation.navigate("Trailer");
+        //         break;
+        //     case "Settings":
+        //         navigation.navigate("Settings");
+        //         break;
+        //     // Add more cases as needed
+        // }
+    };
 
+    const renderWishItem = (item: any) => (
+        <TouchableOpacity
+            key={item.id}
+            style={[styles.wishItem, { backgroundColor: item.color }]}
+            onPress={() => handleWishItemPress(item)}
+        >
+            <Image
+                source={item.icon}
+                style={[
+                    styles.wishIcon,
+                    item.name === "Vehicle" && { width: 39, height: 27 },
+                    item.name === "Road Side Check" && { width: 27, height: 21 }
+                ]}
+            />
+            <Text style={styles.wishText}>{item.name}</Text>
+        </TouchableOpacity>
     );
 
     const renderHorizontalWishList = () => (
-        <ScrollView 
-            horizontal 
+        <ScrollView
+            horizontal
             showsHorizontalScrollIndicator={false}
             contentContainerStyle={styles.horizontalScrollContent}
         >
@@ -115,8 +139,8 @@ export default function DashboardScreen() {
                 <View style={styles.section}>
                     <View style={styles.sectionHeader}>
                         <Text style={styles.sectionTitle}>Daily task report</Text>
-                        <TouchableOpacity>
-                            <Text style={styles.linkText}>+New Trip</Text>
+                        <TouchableOpacity onPress={() => navigation.navigate("NewTrip")}>
+                            <Text style={styles.linkText}>+ New Trip</Text>
                         </TouchableOpacity>
                     </View>
 
@@ -127,14 +151,14 @@ export default function DashboardScreen() {
                             </View>
                             <Text style={styles.taskText}>Active Trips</Text>
                         </View>
-                        
+
                         <View style={styles.taskCard}>
                             <View style={[styles.taskIconContainer, { backgroundColor: "#FF6B6B" }]}>
                                 <Image source={completeTrip} style={styles.taskIcon} />
                             </View>
                             <Text style={styles.taskText}>Complete Trips</Text>
                         </View>
-                        
+
                         <View style={styles.taskCard}>
                             <View style={[styles.taskIconContainer, { backgroundColor: "#8B4513" }]}>
                                 <Image source={pendingTrip} style={styles.taskIcon} />
@@ -163,9 +187,9 @@ export default function DashboardScreen() {
 }
 
 const styles = StyleSheet.create({
-    container: { 
-        flex: 1, 
-        backgroundColor: "white" 
+    container: {
+        flex: 1,
+        backgroundColor: "white"
     },
     profileCard: {
         backgroundColor: "#8B5CF6",
@@ -196,9 +220,9 @@ const styles = StyleSheet.create({
         alignItems: "center",
         marginBottom: 8,
     },
-    driverName: { 
-        fontSize: 20, 
-        color: "#fff", 
+    driverName: {
+        fontSize: 20,
+        color: "#fff",
         fontWeight: "bold",
         marginRight: 10,
     },
@@ -213,40 +237,40 @@ const styles = StyleSheet.create({
         fontSize: 12,
         fontWeight: "600",
     },
-    tripLabel: { 
-        color: "#E1D5F7", 
+    tripLabel: {
+        color: "#E1D5F7",
         fontSize: 14,
         marginBottom: 4,
     },
-    miles: { 
-        color: "#fff", 
-        fontSize: 18, 
-        fontWeight: "600" 
+    miles: {
+        color: "#fff",
+        fontSize: 18,
+        fontWeight: "600"
     },
-    avatar: { 
-        width: 80, 
-        height: 80, 
+    avatar: {
+        width: 80,
+        height: 80,
         borderRadius: 20,
         borderWidth: 3,
         borderColor: "#fff",
     },
-    section: { 
-        marginHorizontal: 20, 
-        marginBottom: 20 
+    section: {
+        marginHorizontal: 20,
+        marginBottom: 20
     },
-    sectionHeader: { 
-        flexDirection: "row", 
-        justifyContent: "space-between", 
+    sectionHeader: {
+        flexDirection: "row",
+        justifyContent: "space-between",
         alignItems: "center",
-        marginBottom: 16 
+        marginBottom: 16
     },
-    sectionTitle: { 
-        fontSize: 18, 
-        fontWeight: "bold", 
-        color: "#1F2937" 
+    sectionTitle: {
+        fontSize: 18,
+        fontWeight: "bold",
+        color: "#1F2937"
     },
-    linkText: { 
-        color: "#10B981", 
+    linkText: {
+        color: "#10B981",
         fontWeight: "600",
         fontSize: 14,
     },
@@ -276,19 +300,19 @@ const styles = StyleSheet.create({
         alignItems: "center",
         marginRight: 16,
     },
-    taskText: { 
-        fontSize: 16, 
-        fontWeight: "500", 
+    taskText: {
+        fontSize: 16,
+        fontWeight: "500",
         color: "#1F2937",
         flex: 1,
     },
     horizontalScrollContent: {
         paddingRight: 20,
     },
-    wishGrid: { 
-        flexDirection: "row", 
-        justifyContent: "space-between", 
-        marginBottom: 12 
+    wishGrid: {
+        flexDirection: "row",
+        justifyContent: "space-between",
+        marginBottom: 12
     },
     wishItem: {
         width: (width - 60) / 4,
@@ -303,10 +327,10 @@ const styles = StyleSheet.create({
         shadowOpacity: 0.1,
         shadowRadius: 2,
     },
-    wishText: { 
-        color: "#fff", 
-        fontSize: 12, 
-        marginTop: 8, 
+    wishText: {
+        color: "#fff",
+        fontSize: 12,
+        marginTop: 8,
         fontWeight: "600",
         textAlign: "center",
     },
