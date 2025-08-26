@@ -15,7 +15,7 @@ import completeTrip from "../../../assets/icons/complete trip.png";
 import pendingTrip from "../../../assets/icons/pending trip.png";
 import vehicle from "../../../assets/icons/vehicle.png";
 import trailer from "../../../assets/icons/trailer.png";
-import sos from "../../../assets/icons/sos.png";
+import hos from "../../../assets/icons/sos.png";
 import assest from "../../../assets/icons/aasest.png";
 import settings from "../../../assets/icons/settings.png";
 import payroll from "../../../assets/icons/payroll.png";
@@ -38,13 +38,12 @@ export default function DashboardScreen() {
     const wishListItems = [
         { id: 1, name: "Vehicle", icon: vehicle, color: "#906AD1", route: "Vehicle" },
         { id: 2, name: "Trailer", icon: trailer, color: "#FF9797" ,route:"Trailer"},
-        { id: 3, name: "SOS", icon: sos, color: "#FFCC00" },
-        { id: 4, name: "Asset Ins", icon: assest, color: "#D74848" },
-        { id: 5, name: "Settings", icon: settings, color: "#2CDBFA" },
-        { id: 6, name: "Payroll", icon: payroll, color: "#441783" },
-        { id: 7, name: "Document", icon: document, color: "#C79EFF" },
-        { id: 8, name: "Load Map", icon: loadMap, color: "#831775" },
-        { id: 9, name: "Road Side Check", icon: roadSide, color: "#E61DCC" },
+        { id: 3, name: "HOS", icon: hos, color: "#FFCC00" ,route: "HOS" },
+        { id: 4, name: "Asset Ins", icon: assest, color: "#D74848",route:"AssetIncidents" },
+        { id: 5, name: "Settings", icon: settings, color: "#2CDBFA",route:"Settings" },
+        { id: 6, name: "Document", icon: document, color: "#C79EFF" , route:"Documents"},
+        { id: 7, name: "Load Map", icon: loadMap, color: "#831775" },
+        { id: 8, name: "Tranfer", icon: vehicle, color: "#E61DCC", route:"Transfer" },
     ];
 
     const handleWishItemPress = (item: any) => {
@@ -75,7 +74,7 @@ export default function DashboardScreen() {
                 style={[
                     styles.wishIcon,
                     item.name === "Vehicle" && { width: 39, height: 27 },
-                    item.name === "Road Side Check" && { width: 27, height: 21 }
+                    item.name === "Tranfer" && { width: 39, height: 27 }
                 ]}
             />
             <Text style={styles.wishText}>{item.name}</Text>

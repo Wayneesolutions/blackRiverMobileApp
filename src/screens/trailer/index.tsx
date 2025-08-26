@@ -30,7 +30,7 @@ const TrailerFinder = () => {
     },
   ];
 
-  const getStatusStyle = (status) => {
+  const getStatusStyle = (status:any) => {
     switch (status) {
       case 'ready':
         return styles.readyText;
@@ -41,7 +41,7 @@ const TrailerFinder = () => {
     }
   };
 
-  const getStatusText = (status) => {
+  const getStatusText = (status:any) => {
     switch (status) {
       case 'ready':
         return 'Ready to Load';

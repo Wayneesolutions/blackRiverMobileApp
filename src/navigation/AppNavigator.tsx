@@ -15,6 +15,11 @@ import Footer from "../../src/components/common/Footer"
 import NewTripScreen from '../screens/newTrip/index';
 import VehicleScreen from "../screens/vehicle/index";
 import TrailerScreen from "../screens/trailer/index";
+import HosScreen from "../screens/hos/index"
+import AssetIncidentsScreen from "../screens/assestins/index"
+import SettingsScreen from "../screens/settings/index"
+import DocumentsScreen from "../screens/documents/index"
+import TransferScreen from "../screens/transfer/index"
 
 
 // Constants for storage keys
@@ -30,8 +35,11 @@ export type MainTabParamList = {
     NewTrip: undefined;
     Vehicle: undefined;
     Trailer: undefined;
+    HOS: undefined;
+    AssetIncidents: undefined;
     Documents: undefined;
     Settings: undefined;
+    Transfer: undefined;
 };
 
 export type RootStackParamList = {
@@ -40,15 +48,12 @@ export type RootStackParamList = {
     MainTabs: undefined;
     NewTrip: undefined;
     Vehicle: undefined;
-    Trailer:undefined;
-    SOS: undefined;
+    Trailer: undefined;
+    HOS: undefined;
     AssetIncidents: undefined;
-    PayrollDetails: undefined;
-    LoadMap: undefined;
-    RoadsideCheck: undefined;
-    DocumentViewer: { documentId: string };
-    VehicleDetails: { vehicleId: string };
-    TrailerDetails: { trailerId: string };
+    Settings: undefined;
+    Transfer: undefined;
+    Documents: undefined;
 };
 
 const MainTab = createBottomTabNavigator<MainTabParamList>();
@@ -118,8 +123,8 @@ const PlaceholderScreen: React.FC<{ title: string }> = ({ title }) => (
     </View>
 );
 
-const DocumentsScreen = () => <PlaceholderScreen title="Documents" />;
-const SettingsScreen = () => <PlaceholderScreen title="Settings" />;
+
+
 
 // Main Tab Navigator with Authentication Context
 function MainTabNavigator({ onLogout }) {
@@ -139,8 +144,12 @@ function MainTabNavigator({ onLogout }) {
                     <MainTab.Screen name="NewTrip" component={NewTripScreen} />
                     <MainTab.Screen name="Vehicle" component={VehicleScreen} />
                     <MainTab.Screen name="Trailer" component={TrailerScreen} />
+                    <MainTab.Screen name="HOS" component={HosScreen} />
+                    <MainTab.Screen name="AssetIncidents" component={AssetIncidentsScreen} />
+
                     <MainTab.Screen name="Documents" component={DocumentsScreen} />
                     <MainTab.Screen name="Settings" component={SettingsScreen} />
+                    <MainTab.Screen name="Transfer" component={TransferScreen} />
                 </MainTab.Navigator>
             </View>
             <Footer />
@@ -255,7 +264,7 @@ export default function AppNavigator() {
 
             {/* Modal Screens */}
             <RootStack.Screen
-                name="SOS"
+                name="HOS"
                 options={{ presentation: 'modal' }}
             >
                 {() => <PlaceholderScreen title="SOS Emergency" />}
@@ -266,24 +275,8 @@ export default function AppNavigator() {
             >
                 {() => <PlaceholderScreen title="Asset Incidents" />}
             </RootStack.Screen>
-            <RootStack.Screen
-                name="PayrollDetails"
-                options={{ presentation: 'modal' }}
-            >
-                {() => <PlaceholderScreen title="Payroll Details" />}
-            </RootStack.Screen>
-            <RootStack.Screen
-                name="LoadMap"
-                options={{ presentation: 'modal' }}
-            >
-                {() => <PlaceholderScreen title="Load Map" />}
-            </RootStack.Screen>
-            <RootStack.Screen
-                name="RoadsideCheck"
-                options={{ presentation: 'modal' }}
-            >
-                {() => <PlaceholderScreen title="Roadside Check" />}
-            </RootStack.Screen>
+
+
         </RootStack.Navigator>
     );
 }
