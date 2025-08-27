@@ -23,6 +23,8 @@ import document from "../../../assets/icons/document.png";
 import loadMap from "../../../assets/icons/map.png";
 import fuel from "../../../assets/icons/fuel.png"
 
+
+
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { RootStackParamList } from '../../navigation/AppNavigator';
@@ -37,14 +39,14 @@ export default function DashboardScreen() {
 
     const wishListItems = [
         { id: 1, name: "Vehicle", icon: vehicle, color: "#906AD1", route: "Vehicle" },
-        { id: 2, name: "Trailer", icon: trailer, color: "#FF9797" ,route:"Trailer"},
-        { id: 3, name: "HOS", icon: hos, color: "#FFCC00" ,route: "HOS" },
-        { id: 4, name: "Asset Ins", icon: assest, color: "#D74848",route:"AssetIncidents" },
-        { id: 5, name: "Settings", icon: settings, color: "#2CDBFA",route:"Settings" },
-        { id: 6, name: "Document", icon: document, color: "#C79EFF" , route:"Documents"},
-        { id: 7, name: "Load Map", icon: loadMap, color: "#831775", route:"LoadMap" },
-        { id: 8, name: "Tranfer", icon: vehicle, color: "#E61DCC", route:"Transfer" },
-         { id: 9, name: "Fuel", icon: fuel, color: "#04AA30", route:"Fuel" },
+        { id: 2, name: "Trailer", icon: trailer, color: "#FF9797", route: "Trailer" },
+        { id: 3, name: "HOS", icon: hos, color: "#FFCC00", route: "HOS" },
+        { id: 4, name: "Asset Ins", icon: assest, color: "#D74848", route: "AssetIncidents" },
+        { id: 5, name: "Settings", icon: settings, color: "#2CDBFA", route: "Settings" },
+        { id: 6, name: "Document", icon: document, color: "#C79EFF", route: "Documents" },
+        { id: 7, name: "Load Map", icon: loadMap, color: "#831775", route: "LoadMap" },
+        { id: 8, name: "Tranfer", icon: vehicle, color: "#E61DCC", route: "Transfer" },
+        { id: 9, name: "Fuel", icon: fuel, color: "#04AA30", route: "Fuel" },
     ];
 
     const handleWishItemPress = (item: any) => {
@@ -145,26 +147,35 @@ export default function DashboardScreen() {
                     </View>
 
                     <View style={styles.taskContainer}>
-                        <View style={styles.taskCard}>
+                        <TouchableOpacity
+                            style={styles.taskCard}
+                            onPress={() => navigation.navigate("ActiveTrips")}
+                        >
                             <View style={styles.taskIconContainer}>
                                 <Image source={activeTrip} style={styles.taskIcon} />
                             </View>
                             <Text style={styles.taskText}>Active Trips</Text>
-                        </View>
+                        </TouchableOpacity>
 
-                        <View style={styles.taskCard}>
+                        <TouchableOpacity
+                            style={styles.taskCard}
+                            onPress={() => navigation.navigate("CompleteTrips")}
+                        >
                             <View style={[styles.taskIconContainer, { backgroundColor: "#FF6B6B" }]}>
                                 <Image source={completeTrip} style={styles.taskIcon} />
                             </View>
                             <Text style={styles.taskText}>Complete Trips</Text>
-                        </View>
+                        </TouchableOpacity>
 
-                        <View style={styles.taskCard}>
+                        <TouchableOpacity
+                            style={styles.taskCard}
+                            onPress={() => navigation.navigate("PendingTrips")}
+                        >
                             <View style={[styles.taskIconContainer, { backgroundColor: "#8B4513" }]}>
                                 <Image source={pendingTrip} style={styles.taskIcon} />
                             </View>
                             <Text style={styles.taskText}>Pending Trips</Text>
-                        </View>
+                        </TouchableOpacity>
                     </View>
                 </View>
 

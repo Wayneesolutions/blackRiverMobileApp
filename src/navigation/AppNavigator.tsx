@@ -22,6 +22,9 @@ import DocumentsScreen from "../screens/documents/index"
 import LoadMapScreen from "../screens/maps/index"
 import TransferScreen from "../screens/transfer/index"
 import FuelScreen from "../screens/fuel/index"
+import ActiveTrips from "../screens/dashboard/ActiveTrips";
+import CompleteTrips from "../screens/dashboard/CompleteTrips";
+import PendingTrips from "../screens/dashboard/PendingTrips";
 
 
 // Constants for storage keys
@@ -44,6 +47,9 @@ export type MainTabParamList = {
     Transfer: undefined;
     LoadMap: undefined;
     Fuel: undefined;
+    ActiveTrips: undefined;
+    CompleteTrips: undefined;
+    PendingTrips: undefined;
 };
 
 export type RootStackParamList = {
@@ -60,6 +66,9 @@ export type RootStackParamList = {
     Documents: undefined;
     LoadMap: undefined;
     Fuel: undefined;
+    ActiveTrips: undefined;
+    CompleteTrips: undefined;
+    PendingTrips: undefined;
 };
 
 const MainTab = createBottomTabNavigator<MainTabParamList>();
@@ -158,6 +167,9 @@ function MainTabNavigator({ onLogout }) {
                     <MainTab.Screen name="LoadMap" component={LoadMapScreen} />
                     <MainTab.Screen name="Transfer" component={TransferScreen} />
                     <MainTab.Screen name="Fuel" component={FuelScreen} />
+                    <MainTab.Screen name="ActiveTrips" component={ActiveTrips} />
+                    <MainTab.Screen name="CompleteTrips" component={CompleteTrips} />
+                    <MainTab.Screen name="PendingTrips" component={PendingTrips} />
                 </MainTab.Navigator>
             </View>
             <Footer />
