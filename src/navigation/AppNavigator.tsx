@@ -19,7 +19,9 @@ import HosScreen from "../screens/hos/index"
 import AssetIncidentsScreen from "../screens/assestins/index"
 import SettingsScreen from "../screens/settings/index"
 import DocumentsScreen from "../screens/documents/index"
+import LoadMapScreen from "../screens/maps/index"
 import TransferScreen from "../screens/transfer/index"
+import FuelScreen from "../screens/fuel/index"
 
 
 // Constants for storage keys
@@ -40,6 +42,8 @@ export type MainTabParamList = {
     Documents: undefined;
     Settings: undefined;
     Transfer: undefined;
+    LoadMap: undefined;
+    Fuel: undefined;
 };
 
 export type RootStackParamList = {
@@ -54,6 +58,8 @@ export type RootStackParamList = {
     Settings: undefined;
     Transfer: undefined;
     Documents: undefined;
+    LoadMap: undefined;
+    Fuel: undefined;
 };
 
 const MainTab = createBottomTabNavigator<MainTabParamList>();
@@ -149,7 +155,9 @@ function MainTabNavigator({ onLogout }) {
 
                     <MainTab.Screen name="Documents" component={DocumentsScreen} />
                     <MainTab.Screen name="Settings" component={SettingsScreen} />
+                    <MainTab.Screen name="LoadMap" component={LoadMapScreen} />
                     <MainTab.Screen name="Transfer" component={TransferScreen} />
+                    <MainTab.Screen name="Fuel" component={FuelScreen} />
                 </MainTab.Navigator>
             </View>
             <Footer />

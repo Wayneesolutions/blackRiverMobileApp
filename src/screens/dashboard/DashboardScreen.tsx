@@ -21,7 +21,7 @@ import settings from "../../../assets/icons/settings.png";
 import payroll from "../../../assets/icons/payroll.png";
 import document from "../../../assets/icons/document.png";
 import loadMap from "../../../assets/icons/map.png";
-import roadSide from "../../../assets/icons/road side check.png"
+import fuel from "../../../assets/icons/fuel.png"
 
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
@@ -42,8 +42,9 @@ export default function DashboardScreen() {
         { id: 4, name: "Asset Ins", icon: assest, color: "#D74848",route:"AssetIncidents" },
         { id: 5, name: "Settings", icon: settings, color: "#2CDBFA",route:"Settings" },
         { id: 6, name: "Document", icon: document, color: "#C79EFF" , route:"Documents"},
-        { id: 7, name: "Load Map", icon: loadMap, color: "#831775" },
+        { id: 7, name: "Load Map", icon: loadMap, color: "#831775", route:"LoadMap" },
         { id: 8, name: "Tranfer", icon: vehicle, color: "#E61DCC", route:"Transfer" },
+         { id: 9, name: "Fuel", icon: fuel, color: "#04AA30", route:"Fuel" },
     ];
 
     const handleWishItemPress = (item: any) => {
