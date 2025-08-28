@@ -20,17 +20,19 @@ interface Vehicle {
 interface Document {
   id: string;
   name: string;
-  type: 'vehicle' | 'cross_border' | 'driver' | 'permit';
+  type: 'vehicle' | 'cross_border' | 'driver' | 'permit' | 'trailer' | 'transport_goods' | 'eld';
   status: 'valid' | 'expired' | 'expiring_soon';
   expiryDate: string;
   issueDate: string;
   documentNumber?: string;
 }
 
+type TabKey = 'vehicle' | 'cross_border' | 'driver' | 'permits' | 'trailer' | 'transport_goods' | 'eld';
+
 const DocumentsScreen = () => {
   const [selectedVehicle, setSelectedVehicle] = useState<Vehicle | null>(null);
   const [showVehicleModal, setShowVehicleModal] = useState(false);
-  const [activeTab, setActiveTab] = useState<'vehicle' | 'cross_border' | 'driver' | 'permits'>('vehicle');
+  const [activeTab, setActiveTab] = useState<TabKey>('vehicle');
 
   // Static vehicle data
   const vehicles: Vehicle[] = [
@@ -42,12 +44,32 @@ const DocumentsScreen = () => {
 
   // Static document data based on selected vehicle
   const getDocuments = (vehicleId: string | null, type: string): Document[] => {
-    if (!vehicleId) {
+    // Driver documents are always available regardless of vehicle selection
+    if (type === 'driver') {
       return [
-        { id: '1', name: 'Commercial Driver License', type: 'driver', status: 'valid', expiryDate: '2025-12-15', issueDate: '2021-12-15', documentNumber: 'CDL-123456' },
-        { id: '2', name: 'Medical Certificate', type: 'driver', status: 'expiring_soon', expiryDate: '2025-09-30', issueDate: '2023-09-30', documentNumber: 'MED-789012' },
-        { id: '3', name: 'HAZMAT Endorsement', type: 'driver', status: 'valid', expiryDate: '2026-03-20', issueDate: '2022-03-20', documentNumber: 'HAZ-345678' },
+        { id: 'd1', name: 'Commercial Driver License', type: 'driver', status: 'valid', expiryDate: '2025-12-15', issueDate: '2021-12-15', documentNumber: 'CDL-123456' },
+        { id: 'd2', name: 'Medical Certificate', type: 'driver', status: 'expiring_soon', expiryDate: '2025-09-30', issueDate: '2023-09-30', documentNumber: 'MED-789012' },
+        { id: 'd3', name: 'HAZMAT Endorsement', type: 'driver', status: 'valid', expiryDate: '2026-03-20', issueDate: '2022-03-20', documentNumber: 'HAZ-345678' },
+        { id: 'd4', name: 'Passport', type: 'driver', status: 'valid', expiryDate: '2028-05-10', issueDate: '2018-05-10', documentNumber: 'PP-987654321' },
+        { id: 'd5', name: 'TWIC Card', type: 'driver', status: 'valid', expiryDate: '2026-09-15', issueDate: '2021-09-15', documentNumber: 'TWIC-555444' },
+        { id: 'd6', name: 'Driver Hours of Service Record', type: 'driver', status: 'valid', expiryDate: '2025-12-31', issueDate: '2025-01-01', documentNumber: 'HOS-789123' },
       ];
+    }
+
+    // ELD documents are always available regardless of vehicle selection
+    if (type === 'eld') {
+      return [
+        { id: 'eld1', name: 'ELD Device Registration', type: 'eld', status: 'valid', expiryDate: '2026-12-31', issueDate: '2022-01-01', documentNumber: 'ELD-REG-001' },
+        { id: 'eld2', name: 'ELD Compliance Certificate', type: 'eld', status: 'valid', expiryDate: '2025-11-30', issueDate: '2023-11-30', documentNumber: 'ELD-COMP-002' },
+        { id: 'eld3', name: 'Driver Training Certificate', type: 'eld', status: 'expiring_soon', expiryDate: '2025-09-15', issueDate: '2023-09-15', documentNumber: 'ELD-TRAIN-003' },
+        { id: 'eld4', name: 'ELD Malfunction Report', type: 'eld', status: 'valid', expiryDate: '2025-12-31', issueDate: '2025-08-01', documentNumber: 'ELD-MAL-004' },
+        { id: 'eld5', name: 'Hours of Service Data Transfer', type: 'eld', status: 'valid', expiryDate: '2025-12-31', issueDate: '2025-01-01', documentNumber: 'ELD-DATA-005' },
+      ];
+    }
+
+    // Vehicle-specific documents
+    if (!vehicleId) {
+      return [];
     }
 
     const baseDocuments: Record<string, Document[]> = {
@@ -57,6 +79,7 @@ const DocumentsScreen = () => {
         { id: 'v3', name: 'Safety Inspection', type: 'vehicle', status: 'expiring_soon', expiryDate: '2025-09-05', issueDate: '2024-09-05', documentNumber: `SAF-${vehicleId}003` },
         { id: 'v4', name: 'Emission Test', type: 'vehicle', status: 'valid', expiryDate: '2026-01-20', issueDate: '2024-01-20', documentNumber: `EMI-${vehicleId}004` },
         { id: 'v5', name: 'Vehicle Title', type: 'vehicle', status: 'valid', expiryDate: '2030-12-31', issueDate: '2020-01-01', documentNumber: `TTL-${vehicleId}005` },
+        { id: 'v6', name: 'DOT Number Certificate', type: 'vehicle', status: 'valid', expiryDate: '2026-06-30', issueDate: '2024-06-30', documentNumber: `DOT-${vehicleId}006` },
       ],
       cross_border: [
         { id: 'cb1', name: 'FAST Card', type: 'cross_border', status: 'valid', expiryDate: '2027-08-15', issueDate: '2022-08-15', documentNumber: `FAST-${vehicleId}001` },
@@ -64,19 +87,31 @@ const DocumentsScreen = () => {
         { id: 'cb3', name: 'Customs Bond', type: 'cross_border', status: 'expired', expiryDate: '2025-07-20', issueDate: '2024-07-20', documentNumber: `CB-${vehicleId}003` },
         { id: 'cb4', name: 'Border Crossing Permit', type: 'cross_border', status: 'valid', expiryDate: '2025-11-10', issueDate: '2024-11-10', documentNumber: `BCP-${vehicleId}004` },
         { id: 'cb5', name: 'International Fuel Tax Agreement', type: 'cross_border', status: 'valid', expiryDate: '2025-12-31', issueDate: '2025-01-01', documentNumber: `IFTA-${vehicleId}005` },
-      ],
-      driver: [
-        { id: 'd1', name: 'Commercial Driver License', type: 'driver', status: 'valid', expiryDate: '2025-12-15', issueDate: '2021-12-15', documentNumber: 'CDL-123456' },
-        { id: 'd2', name: 'Medical Certificate', type: 'driver', status: 'expiring_soon', expiryDate: '2025-09-30', issueDate: '2023-09-30', documentNumber: 'MED-789012' },
-        { id: 'd3', name: 'HAZMAT Endorsement', type: 'driver', status: 'valid', expiryDate: '2026-03-20', issueDate: '2022-03-20', documentNumber: 'HAZ-345678' },
-        { id: 'd4', name: 'Passport', type: 'driver', status: 'valid', expiryDate: '2028-05-10', issueDate: '2018-05-10', documentNumber: 'PP-987654321' },
-        { id: 'd5', name: 'TWIC Card', type: 'driver', status: 'valid', expiryDate: '2026-09-15', issueDate: '2021-09-15', documentNumber: 'TWIC-555444' },
+        { id: 'cb6', name: 'C-TPAT Certificate', type: 'cross_border', status: 'valid', expiryDate: '2026-03-31', issueDate: '2023-03-31', documentNumber: `CTPAT-${vehicleId}006` },
       ],
       permits: [
         { id: 'p1', name: 'Oversize Load Permit', type: 'permit', status: 'valid', expiryDate: '2025-10-31', issueDate: '2025-08-01', documentNumber: `OSL-${vehicleId}001` },
         { id: 'p2', name: 'Hazardous Materials Permit', type: 'permit', status: 'valid', expiryDate: '2026-02-28', issueDate: '2025-02-28', documentNumber: `HMP-${vehicleId}002` },
         { id: 'p3', name: 'Interstate Commerce Permit', type: 'permit', status: 'expired', expiryDate: '2025-07-15', issueDate: '2024-07-15', documentNumber: `ICP-${vehicleId}003` },
         { id: 'p4', name: 'Weight Distance Tax Permit', type: 'permit', status: 'valid', expiryDate: '2025-12-31', issueDate: '2025-01-01', documentNumber: `WDT-${vehicleId}004` },
+        { id: 'p5', name: 'Operating Authority', type: 'permit', status: 'valid', expiryDate: '2026-12-31', issueDate: '2024-01-01', documentNumber: `OA-${vehicleId}005` },
+      ],
+      trailer: [
+        { id: 't1', name: 'Trailer Registration', type: 'trailer', status: 'valid', expiryDate: '2025-12-15', issueDate: '2023-12-15', documentNumber: `TREG-${vehicleId}001` },
+        { id: 't2', name: 'Trailer Insurance', type: 'trailer', status: 'valid', expiryDate: '2025-10-31', issueDate: '2024-10-31', documentNumber: `TINS-${vehicleId}002` },
+        { id: 't3', name: 'Trailer Inspection Certificate', type: 'trailer', status: 'expiring_soon', expiryDate: '2025-09-20', issueDate: '2024-09-20', documentNumber: `TINSP-${vehicleId}003` },
+        { id: 't4', name: 'Trailer Title', type: 'trailer', status: 'valid', expiryDate: '2030-12-31', issueDate: '2020-01-01', documentNumber: `TTTL-${vehicleId}004` },
+        { id: 't5', name: 'Refrigeration Unit Certificate', type: 'trailer', status: 'valid', expiryDate: '2025-11-30', issueDate: '2024-11-30', documentNumber: `REFR-${vehicleId}005` },
+        { id: 't6', name: 'Trailer Safety Inspection', type: 'trailer', status: 'valid', expiryDate: '2026-01-15', issueDate: '2025-01-15', documentNumber: `TSAF-${vehicleId}006` },
+      ],
+      transport_goods: [
+        { id: 'tg1', name: 'Bill of Lading Template', type: 'transport_goods', status: 'valid', expiryDate: '2025-12-31', issueDate: '2024-01-01', documentNumber: `BOL-${vehicleId}001` },
+        { id: 'tg2', name: 'Cargo Insurance Certificate', type: 'transport_goods', status: 'valid', expiryDate: '2025-11-30', issueDate: '2024-11-30', documentNumber: `CINS-${vehicleId}002` },
+        { id: 'tg3', name: 'Freight Broker Authority', type: 'transport_goods', status: 'valid', expiryDate: '2026-06-30', issueDate: '2024-06-30', documentNumber: `FBA-${vehicleId}003` },
+        { id: 'tg4', name: 'Temperature Control Certificate', type: 'transport_goods', status: 'expiring_soon', expiryDate: '2025-09-10', issueDate: '2024-09-10', documentNumber: `TEMP-${vehicleId}004` },
+        { id: 'tg5', name: 'Cargo Manifest', type: 'transport_goods', status: 'valid', expiryDate: '2025-12-31', issueDate: '2025-01-01', documentNumber: `MANI-${vehicleId}005` },
+        { id: 'tg6', name: 'Dangerous Goods Declaration', type: 'transport_goods', status: 'valid', expiryDate: '2025-10-31', issueDate: '2024-10-31', documentNumber: `DGD-${vehicleId}006` },
+        { id: 'tg7', name: 'Customs Declaration Form', type: 'transport_goods', status: 'valid', expiryDate: '2025-12-31', issueDate: '2025-01-01', documentNumber: `CDF-${vehicleId}007` },
       ],
     };
 
@@ -104,7 +139,21 @@ const DocumentsScreen = () => {
   const handleVehicleSelect = (vehicle: Vehicle) => {
     setSelectedVehicle(vehicle);
     setShowVehicleModal(false);
+    // Switch to vehicle tab when a vehicle is selected
+    if (activeTab !== 'driver' && activeTab !== 'eld') {
+      setActiveTab('vehicle');
+    }
   };
+
+  const tabs = [
+    { key: 'vehicle' as TabKey, label: 'Vehicle', disabled: !selectedVehicle },
+    { key: 'trailer' as TabKey, label: 'Trailer', disabled: !selectedVehicle },
+    { key: 'cross_border' as TabKey, label: 'Cross Border', disabled: !selectedVehicle },
+    { key: 'transport_goods' as TabKey, label: 'Transport Goods', disabled: !selectedVehicle },
+    { key: 'driver' as TabKey, label: 'Driver' },
+    { key: 'permits' as TabKey, label: 'Permits', disabled: !selectedVehicle },
+    { key: 'eld' as TabKey, label: 'ELD' },
+  ];
 
   const renderVehicleModal = () => (
     <Modal
@@ -192,11 +241,17 @@ const DocumentsScreen = () => {
     const documents = getDocuments(selectedVehicle?.id || null, activeTab);
     
     if (documents.length === 0) {
+      const tabLabel = tabs.find(tab => tab.key === activeTab)?.label || activeTab;
       return (
         <View style={styles.emptyState}>
           <Text style={styles.emptyStateText}>
-            No {activeTab.replace('_', ' ')} documents found
+            No {tabLabel.toLowerCase()} documents found
           </Text>
+          {!selectedVehicle && activeTab !== 'driver' && activeTab !== 'eld' && (
+            <Text style={styles.emptyStateSubtext}>
+              Select a vehicle to view {tabLabel.toLowerCase()} documents
+            </Text>
+          )}
         </View>
       );
     }
@@ -214,7 +269,7 @@ const DocumentsScreen = () => {
       <View style={styles.header}>
         <Text style={styles.headerTitle}>Documents</Text>
         <Text style={styles.headerSubtitle}>
-          Manage vehicle and driver documents
+          Manage vehicle, trailer, driver, and transport documents
         </Text>
       </View>
 
@@ -241,7 +296,7 @@ const DocumentsScreen = () => {
                   No Vehicle Selected
                 </Text>
                 <Text style={styles.selectedVehicleDetails}>
-                  Showing driver documents only
+                  Showing driver and ELD documents only
                 </Text>
               </>
             )}
@@ -252,32 +307,29 @@ const DocumentsScreen = () => {
 
       {/* Document Tabs */}
       <View style={styles.tabsContainer}>
-        <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-          {[
-            { key: 'vehicle', label: 'Vehicle', disabled: !selectedVehicle },
-            { key: 'cross_border', label: 'Cross Border', disabled: !selectedVehicle },
-            { key: 'driver', label: 'Driver' },
-            { key: 'permits', label: 'Permits', disabled: !selectedVehicle },
-          ].map((tab) => (
-            <TouchableOpacity
-              key={tab.key}
-              style={[
-                styles.tab,
-                activeTab === tab.key && styles.activeTab,
-                tab.disabled && styles.disabledTab,
-              ]}
-              onPress={() => !tab.disabled && setActiveTab(tab.key as any)}
-              disabled={tab.disabled}
-            >
-              <Text style={[
-                styles.tabText,
-                activeTab === tab.key && styles.activeTabText,
-                tab.disabled && styles.disabledTabText,
-              ]}>
-                {tab.label}
-              </Text>
-            </TouchableOpacity>
-          ))}
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.tabsScrollView}>
+          <View style={styles.tabsRow}>
+            {tabs.map((tab) => (
+              <TouchableOpacity
+                key={tab.key}
+                style={[
+                  styles.tab,
+                  activeTab === tab.key && styles.activeTab,
+                  tab.disabled && styles.disabledTab,
+                ]}
+                onPress={() => !tab.disabled && setActiveTab(tab.key)}
+                disabled={tab.disabled}
+              >
+                <Text style={[
+                  styles.tabText,
+                  activeTab === tab.key && styles.activeTabText,
+                  tab.disabled && styles.disabledTabText,
+                ]}>
+                  {tab.label}
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </View>
         </ScrollView>
       </View>
 
@@ -361,22 +413,32 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.1,
     shadowRadius: 4,
   },
+  tabsScrollView: {
+    flexGrow: 0,
+  },
+  tabsRow: {
+    flexDirection: 'row',
+    paddingVertical: 4,
+  },
   tab: {
-    paddingHorizontal: 20,
+    paddingHorizontal: 16,
     paddingVertical: 12,
-    marginHorizontal: 4,
+    marginHorizontal: 2,
+    minWidth: 80,
+    alignItems: 'center',
   },
   activeTab: {
-    borderBottomWidth: 2,
+    borderBottomWidth: 3,
     borderBottomColor: '#2196F3',
   },
   disabledTab: {
     opacity: 0.4,
   },
   tabText: {
-    fontSize: 14,
+    fontSize: 13,
     color: '#666',
     fontWeight: '500',
+    textAlign: 'center',
   },
   activeTabText: {
     color: '#2196F3',
@@ -440,6 +502,12 @@ const styles = StyleSheet.create({
   emptyStateText: {
     fontSize: 16,
     color: '#999',
+    textAlign: 'center',
+    marginBottom: 8,
+  },
+  emptyStateSubtext: {
+    fontSize: 14,
+    color: '#bbb',
     textAlign: 'center',
   },
   modalOverlay: {

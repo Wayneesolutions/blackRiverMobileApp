@@ -48,7 +48,7 @@ const TrailerFinder = () => {
       case 'service':
         return 'On In Service';
       default:
-        return '';
+        return 'Available';
     }
   };
 
@@ -58,7 +58,7 @@ const TrailerFinder = () => {
         {/* Header */}
         <Text style={styles.header}>Find Trailer</Text>
 
-        {/* Search Input */}
+        {/* Search Input with Find Button */}
         <View style={styles.searchContainer}>
           <TextInput
             style={styles.searchInput}
@@ -67,12 +67,10 @@ const TrailerFinder = () => {
             onChangeText={setSearchText}
             placeholderTextColor="#999"
           />
+          <TouchableOpacity style={styles.findButton}>
+            <Text style={styles.findButtonText}>Find</Text>
+          </TouchableOpacity>
         </View>
-
-        {/* Find Button */}
-        <TouchableOpacity style={styles.findButton}>
-          <Text style={styles.findButtonText}>Find</Text>
-        </TouchableOpacity>
 
         {/* Trailer List Header */}
         <Text style={styles.listHeader}>Trailer List</Text>
@@ -84,11 +82,9 @@ const TrailerFinder = () => {
               <Text style={styles.trailerText}>
                 Cascadio : S.No : {trailer.serialNo}
               </Text>
-              {trailer.status !== 'default' && (
-                <Text style={getStatusStyle(trailer.status)}>
-                  {getStatusText(trailer.status)}
-                </Text>
-              )}
+              <Text style={getStatusStyle(trailer.status)}>
+                {getStatusText(trailer.status)}
+              </Text>
             </View>
           ))}
         </View>
@@ -114,9 +110,12 @@ const styles = StyleSheet.create({
     marginBottom: 20,
   },
   searchContainer: {
-    marginBottom: 15,
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 30,
   },
   searchInput: {
+    flex: 1,
     backgroundColor: '#fff',
     borderRadius: 25,
     paddingHorizontal: 20,
@@ -132,14 +131,13 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.1,
     shadowRadius: 3,
     elevation: 3,
+    marginRight: 10,
   },
   findButton: {
     backgroundColor: '#8B5CF6',
     borderRadius: 25,
     paddingVertical: 12,
-    paddingHorizontal: 40,
-    alignSelf: 'center',
-    marginBottom: 30,
+    paddingHorizontal: 30,
     shadowColor: '#000',
     shadowOffset: {
       width: 0,

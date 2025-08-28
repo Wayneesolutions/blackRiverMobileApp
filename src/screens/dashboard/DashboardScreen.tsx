@@ -8,22 +8,11 @@ import {
     Image,
     Dimensions,
 } from "react-native";
-import { SafeAreaView } from "react-native-safe-area-context";
-import { Ionicons } from "@expo/vector-icons";
+import { SafeAreaView } from "react-native";
+import { Ionicons, FontAwesome5, MaterialIcons } from "@expo/vector-icons"
 import activeTrip from "../../../assets/icons/active trip.png";
 import completeTrip from "../../../assets/icons/complete trip.png";
 import pendingTrip from "../../../assets/icons/pending trip.png";
-import vehicle from "../../../assets/icons/vehicle.png";
-import trailer from "../../../assets/icons/trailer.png";
-import hos from "../../../assets/icons/sos.png";
-import assest from "../../../assets/icons/aasest.png";
-import settings from "../../../assets/icons/settings.png";
-import payroll from "../../../assets/icons/payroll.png";
-import document from "../../../assets/icons/document.png";
-import loadMap from "../../../assets/icons/map.png";
-import fuel from "../../../assets/icons/fuel.png"
-
-
 
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
@@ -38,15 +27,15 @@ export default function DashboardScreen() {
     const [showAllWishList, setShowAllWishList] = useState(false);
 
     const wishListItems = [
-        { id: 1, name: "Vehicle", icon: vehicle, color: "#906AD1", route: "Vehicle" },
-        { id: 2, name: "Trailer", icon: trailer, color: "#FF9797", route: "Trailer" },
-        { id: 3, name: "HOS", icon: hos, color: "#FFCC00", route: "HOS" },
-        { id: 4, name: "Asset Ins", icon: assest, color: "#D74848", route: "AssetIncidents" },
-        { id: 5, name: "Settings", icon: settings, color: "#2CDBFA", route: "Settings" },
-        { id: 6, name: "Document", icon: document, color: "#C79EFF", route: "Documents" },
-        { id: 7, name: "Load Map", icon: loadMap, color: "#831775", route: "LoadMap" },
-        { id: 8, name: "Tranfer", icon: vehicle, color: "#E61DCC", route: "Transfer" },
-        { id: 9, name: "Fuel", icon: fuel, color: "#04AA30", route: "Fuel" },
+        { id: 1, name: "Vehicle", icon: <Ionicons name="car-sport" size={24} color="#fff" />, color: "#906AD1", route: "Vehicle" },
+        { id: 2, name: "Trailer", icon: <FontAwesome5 name="truck-moving" size={24} color="#fff" />, color: "#FF9797", route: "Trailer" },
+        { id: 3, name: "HOS", icon: <MaterialIcons name="schedule" size={24} color="#fff" />, color: "#FFCC00", route: "HOS" },
+        { id: 4, name: "Asset Inspection", icon: <MaterialIcons name="report-problem" size={24} color="#fff" />, color: "#D74848", route: "AssetIncidents" },
+        { id: 5, name: "Settings", icon: <Ionicons name="settings" size={24} color="#fff" />, color: "#2CDBFA", route: "Settings" },
+        { id: 6, name: "Document", icon: <Ionicons name="document-text" size={24} color="#fff" />, color: "#C79EFF", route: "Documents" },
+        { id: 7, name: "Load Map", icon: <Ionicons name="map" size={24} color="#fff" />, color: "#831775", route: "LoadMap" },
+        { id: 8, name: "Transfer", icon: <Ionicons name="swap-horizontal" size={24} color="#fff" />, color: "#E61DCC", route: "Transfer" },
+        { id: 9, name: "Fuel", icon: <FontAwesome5 name="gas-pump" size={24} color="#fff" />, color: "#04AA30", route: "Fuel" },
     ];
 
     const handleWishItemPress = (item: any) => {
@@ -72,17 +61,13 @@ export default function DashboardScreen() {
             style={[styles.wishItem, { backgroundColor: item.color }]}
             onPress={() => handleWishItemPress(item)}
         >
-            <Image
-                source={item.icon}
-                style={[
-                    styles.wishIcon,
-                    item.name === "Vehicle" && { width: 39, height: 27 },
-                    item.name === "Tranfer" && { width: 39, height: 27 }
-                ]}
-            />
+            <View style={styles.iconWrapper}>
+                {item.icon}
+            </View>
             <Text style={styles.wishText}>{item.name}</Text>
         </TouchableOpacity>
     );
+
 
     const renderHorizontalWishList = () => (
         <ScrollView
@@ -115,82 +100,88 @@ export default function DashboardScreen() {
 
     return (
         <SafeAreaView style={styles.container}>
-            <ScrollView showsVerticalScrollIndicator={false}>
-                {/* Profile Card */}
-                <View style={styles.profileCard}>
-                    <View style={styles.profileContent}>
-                        <View style={styles.profileInfo}>
-                            <Text style={styles.driverLabel}>Driver</Text>
-                            <View style={styles.nameRow}>
-                                <Text style={styles.driverName}>Rajvinder</Text>
-                                <View style={styles.statusBadge}>
-                                    <Text style={styles.statusText}>Active</Text>
+            <ScrollView
+                style={styles.scrollContainer}
+                contentContainerStyle={styles.scrollContent}
+                showsVerticalScrollIndicator={false}
+            >
+                <View style={styles.content}>
+                    {/* Profile Card */}
+                    <View style={styles.profileCard}>
+                        <View style={styles.profileContent}>
+                            <View style={styles.profileInfo}>
+                                <Text style={styles.driverLabel}>Driver</Text>
+                                <View style={styles.nameRow}>
+                                    <Text style={styles.driverName}>Rajvinder</Text>
+                                    <View style={styles.statusBadge}>
+                                        <Text style={styles.statusText}>Active</Text>
+                                    </View>
                                 </View>
+                                <Text style={styles.tripLabel}>Total Trip</Text>
+                                <Text style={styles.miles}>600 Miles</Text>
                             </View>
-                            <Text style={styles.tripLabel}>Total Trip</Text>
-                            <Text style={styles.miles}>600 Miles</Text>
+                            <Image
+                                source={{ uri: "https://randomuser.me/api/portraits/men/75.jpg" }}
+                                style={styles.avatar}
+                            />
                         </View>
-                        <Image
-                            source={{ uri: "https://randomuser.me/api/portraits/men/75.jpg" }}
-                            style={styles.avatar}
-                        />
-                    </View>
-                </View>
-
-                {/* Daily Task Report */}
-                <View style={styles.section}>
-                    <View style={styles.sectionHeader}>
-                        <Text style={styles.sectionTitle}>Daily task report</Text>
-                        <TouchableOpacity onPress={() => navigation.navigate("NewTrip")}>
-                            <Text style={styles.linkText}>+ New Trip</Text>
-                        </TouchableOpacity>
                     </View>
 
-                    <View style={styles.taskContainer}>
-                        <TouchableOpacity
-                            style={styles.taskCard}
-                            onPress={() => navigation.navigate("ActiveTrips")}
-                        >
-                            <View style={styles.taskIconContainer}>
-                                <Image source={activeTrip} style={styles.taskIcon} />
-                            </View>
-                            <Text style={styles.taskText}>Active Trips</Text>
-                        </TouchableOpacity>
+                    {/* Daily Task Report */}
+                    <View style={styles.section}>
+                        <View style={styles.sectionHeader}>
+                            <Text style={styles.sectionTitle}>Daily task report</Text>
+                            <TouchableOpacity onPress={() => navigation.navigate("NewTrip")}>
+                                <Text style={styles.linkText}>+ New Trip</Text>
+                            </TouchableOpacity>
+                        </View>
 
-                        <TouchableOpacity
-                            style={styles.taskCard}
-                            onPress={() => navigation.navigate("CompleteTrips")}
-                        >
-                            <View style={[styles.taskIconContainer, { backgroundColor: "#FF6B6B" }]}>
-                                <Image source={completeTrip} style={styles.taskIcon} />
-                            </View>
-                            <Text style={styles.taskText}>Complete Trips</Text>
-                        </TouchableOpacity>
+                        <View style={styles.taskContainer}>
+                            <TouchableOpacity
+                                style={styles.taskCard}
+                                onPress={() => navigation.navigate("ActiveTrips")}
+                            >
+                                <View style={styles.taskIconContainer}>
+                                    <Image source={activeTrip} style={styles.taskIcon} />
+                                </View>
+                                <Text style={styles.taskText}>Active Trips</Text>
+                            </TouchableOpacity>
 
-                        <TouchableOpacity
-                            style={styles.taskCard}
-                            onPress={() => navigation.navigate("PendingTrips")}
-                        >
-                            <View style={[styles.taskIconContainer, { backgroundColor: "#8B4513" }]}>
-                                <Image source={pendingTrip} style={styles.taskIcon} />
-                            </View>
-                            <Text style={styles.taskText}>Pending Trips</Text>
-                        </TouchableOpacity>
-                    </View>
-                </View>
+                            <TouchableOpacity
+                                style={styles.taskCard}
+                                onPress={() => navigation.navigate("CompleteTrips")}
+                            >
+                                <View style={[styles.taskIconContainer, { backgroundColor: "#FF6B6B" }]}>
+                                    <Image source={completeTrip} style={styles.taskIcon} />
+                                </View>
+                                <Text style={styles.taskText}>Complete Trips</Text>
+                            </TouchableOpacity>
 
-                {/* Wish List */}
-                <View style={styles.section}>
-                    <View style={styles.sectionHeader}>
-                        <Text style={styles.sectionTitle}>Wish List</Text>
-                        <TouchableOpacity onPress={() => setShowAllWishList(!showAllWishList)}>
-                            <Text style={styles.linkText}>
-                                {showAllWishList ? "Hide" : "See All"}
-                            </Text>
-                        </TouchableOpacity>
+                            <TouchableOpacity
+                                style={styles.taskCard}
+                                onPress={() => navigation.navigate("PendingTrips")}
+                            >
+                                <View style={[styles.taskIconContainer, { backgroundColor: "#8B4513" }]}>
+                                    <Image source={pendingTrip} style={styles.taskIcon} />
+                                </View>
+                                <Text style={styles.taskText}>Pending Trips</Text>
+                            </TouchableOpacity>
+                        </View>
                     </View>
 
-                    {showAllWishList ? renderGridWishList() : renderHorizontalWishList()}
+                    {/* Wish List */}
+                    <View style={styles.section}>
+                        <View style={styles.sectionHeader}>
+                            <Text style={styles.sectionTitle}>Wish List</Text>
+                            <TouchableOpacity onPress={() => setShowAllWishList(!showAllWishList)}>
+                                <Text style={styles.linkText}>
+                                    {showAllWishList ? "Hide" : "See All"}
+                                </Text>
+                            </TouchableOpacity>
+                        </View>
+
+                        {showAllWishList ? renderGridWishList() : renderHorizontalWishList()}
+                    </View>
                 </View>
             </ScrollView>
         </SafeAreaView>
@@ -200,13 +191,25 @@ export default function DashboardScreen() {
 const styles = StyleSheet.create({
     container: {
         flex: 1,
-        backgroundColor: "white"
+        backgroundColor: '#f5f5f5',
+    },
+    scrollContainer: {
+        flex: 1,
+    },
+    scrollContent: {
+        flexGrow: 1,
+        paddingBottom: 80, // Add padding to account for footer
+    },
+    content: {
+        flex: 1,
+        paddingHorizontal: 20,
+        paddingTop: 20,
     },
     profileCard: {
         backgroundColor: "#8B5CF6",
         borderRadius: 20,
-        margin: 20,
         padding: 20,
+        marginBottom: 20,
         elevation: 4,
         shadowColor: "#000",
         shadowOffset: { width: 0, height: 2 },
@@ -266,7 +269,6 @@ const styles = StyleSheet.create({
         borderColor: "#fff",
     },
     section: {
-        marginHorizontal: 20,
         marginBottom: 20
     },
     sectionHeader: {
@@ -350,9 +352,9 @@ const styles = StyleSheet.create({
         height: 24,
         tintColor: "#fff",
     },
-    wishIcon: {
-        width: 28,
-        height: 28,
-        tintColor: "#fff",
+    iconWrapper: {
+        justifyContent: "center",
+        alignItems: "center",
+        color: "white"
     },
 });
