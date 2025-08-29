@@ -6,7 +6,7 @@
       "supportsTablet": true,
       "bundleIdentifier": "com.blackriver.mobileapp", 
       "config": {
-        "googleMapsApiKey": "AIzaSyBE6Ii-ZxHsICvzD2Fp3m3iMPYX-Vie1N4"
+        "googleMapsApiKey": "AIzaSyCGvKdOZfbOUVLR5xs-IlHQA1HFc0Xlokk"
       }
     },
     "android": {
@@ -17,7 +17,7 @@
       },
       "config": {
         "googleMaps": {
-          "apiKey": "AIzaSyBE6Ii-ZxHsICvzD2Fp3m3iMPYX-Vie1N4"
+          "apiKey": "AIzaSyCGvKdOZfbOUVLR5xs-IlHQA1HFc0Xlokk"
         }
       }
     }

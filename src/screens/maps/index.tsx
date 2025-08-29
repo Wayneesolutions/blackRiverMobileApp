@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef, useCallback } from "react";
 import {
     View,
     Text,
@@ -243,22 +243,23 @@ export default function DriverTrackingScreen() {
         }, 1000);
     };
 
-    const handleTripSelect = (trip: Trip) => {
+    const handleTripSelect = useCallback((trip: Trip) => {
+        console.log("Trip selected:", trip.id);
         setSelectedTrip(trip);
         setCurrentView('navigation');
-        setMapLoading(true); // FIXED: Start with loading true, let onMapReady set it false
+        setMapLoading(true); // Start with loading
 
-        // Reset tracking states
+        // Reset states
         setTripStarted(false);
         setCurrentStep(0);
         setDistanceCovered(0);
         setLocationHistory([]);
 
-        // Get current location
+        // Get location
         if (locationPermission) {
             getCurrentLocation();
         }
-    };
+    }, [locationPermission]);
 
     const handleStartTrip = async () => {
         if (!locationPermission) {
@@ -505,13 +506,13 @@ export default function DriverTrackingScreen() {
         </ScrollView>
     );
 
-    const renderMapView = (isFullScreen = false) => {
+    const renderMapView = useCallback((isFullScreen = false) => {
         if (!selectedTrip) return null;
-
+        const mapRef = useRef<MapView>(null);
         const pickup = { latitude: selectedTrip.pickup.lat, longitude: selectedTrip.pickup.lng };
         const delivery = { latitude: selectedTrip.delivery.lat, longitude: selectedTrip.delivery.lng };
 
-        // Calculate region to show both pickup and delivery
+        // Calculate region
         const allPoints = [pickup, delivery];
         if (driverLocation) {
             allPoints.push(driverLocation);
@@ -528,7 +529,6 @@ export default function DriverTrackingScreen() {
         const centerLat = (minLat + maxLat) / 2;
         const centerLng = (minLng + maxLng) / 2;
 
-        // Add padding around the region
         const latPadding = Math.max((maxLat - minLat) * 0.3, 0.005);
         const lngPadding = Math.max((maxLng - minLng) * 0.3, 0.005);
 
@@ -539,7 +539,21 @@ export default function DriverTrackingScreen() {
             longitudeDelta: (maxLng - minLng) + lngPadding,
         };
 
-        // Validate and prepare route coordinates
+        useEffect(() => {
+            if (mapRef.current && selectedTrip) {
+                const pickup = { latitude: selectedTrip.pickup.lat, longitude: selectedTrip.pickup.lng };
+                const delivery = { latitude: selectedTrip.delivery.lat, longitude: selectedTrip.delivery.lng };
+
+                const points = [pickup, delivery];
+                if (driverLocation) points.push(driverLocation);
+
+                mapRef.current.fitToCoordinates(points, {
+                    edgePadding: { top: 100, right: 100, bottom: 100, left: 100 },
+                    animated: true,
+                });
+            }
+        }, [selectedTrip, driverLocation]);
+        // Validate route coordinates
         const routeCoordinates = selectedTrip.routeSteps
             .filter(step =>
                 typeof step.lat === 'number' &&
@@ -561,7 +575,7 @@ export default function DriverTrackingScreen() {
                 <MapView
                     {...(Platform.OS === 'android' ? { provider: PROVIDER_GOOGLE } : {})}
                     style={styles.map}
-                    initialRegion={region}
+                    region={region}
                     showsUserLocation={true}
                     showsMyLocationButton={true}
                     showsCompass={true}
@@ -570,10 +584,10 @@ export default function DriverTrackingScreen() {
                     loadingIndicatorColor="#1a73e8"
                     onMapReady={() => {
                         console.log("Map ready - setting loading to false");
-                        setMapLoading(false);
-                    }}
-                    onRegionChangeComplete={(region) => {
-                        console.log("Region changed:", region);
+                        // FIXED: Use setTimeout to ensure state update happens
+                        setTimeout(() => {
+                            setMapLoading(false);
+                        }, 100);
                     }}
                 >
                     {/* Pickup Marker */}
@@ -600,7 +614,7 @@ export default function DriverTrackingScreen() {
                         </View>
                     </Marker>
 
-                    {/* Driver Location Marker */}
+                    {/* Driver Location */}
                     {driverLocation && (
                         <Marker
                             coordinate={driverLocation}
@@ -622,7 +636,7 @@ export default function DriverTrackingScreen() {
                         </Marker>
                     )}
 
-                    {/* Route Polyline */}
+                    {/* Route Line */}
                     {routeCoordinates.length >= 2 && (
                         <Polyline
                             coordinates={routeCoordinates}
@@ -632,7 +646,7 @@ export default function DriverTrackingScreen() {
                         />
                     )}
 
-                    {/* Driver's traveled path */}
+                    {/* Driver's Path */}
                     {locationHistory.length > 1 && tripStarted && (
                         <Polyline
                             coordinates={locationHistory}
@@ -662,7 +676,7 @@ export default function DriverTrackingScreen() {
                     </TouchableOpacity>
                 )}
 
-                {/* Route summary overlay */}
+                {/* Route Overlay */}
                 {!isFullScreen && !mapLoading && (
                     <View style={styles.mapOverlay}>
                         <Text style={styles.overlayText}>
@@ -680,7 +694,8 @@ export default function DriverTrackingScreen() {
                 )}
             </View>
         );
-    };
+    }, [selectedTrip, driverLocation, mapLoading, tripStarted, pulseAnim, locationHistory]);
+
 
     const renderStatsSection = () => {
         if (!selectedTrip) return null;
