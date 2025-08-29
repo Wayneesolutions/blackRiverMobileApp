@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import {
   View,
   Text,
@@ -33,6 +33,12 @@ const DocumentsScreen = () => {
   const [selectedVehicle, setSelectedVehicle] = useState<Vehicle | null>(null);
   const [showVehicleModal, setShowVehicleModal] = useState(false);
   const [activeTab, setActiveTab] = useState<TabKey>('vehicle');
+  const tabScrollViewRef = useRef<ScrollView>(null);
+  const handleViewDocument = (document: Document) => {
+    // Handle document viewing logic here
+    console.log('Viewing document:', document.name);
+    // In a real app, you might open a PDF viewer or navigate to a detail screen
+  };
 
   // Static vehicle data
   const vehicles: Vehicle[] = [
@@ -165,14 +171,14 @@ const DocumentsScreen = () => {
         <View style={styles.vehicleModal}>
           <View style={styles.modalHeader}>
             <Text style={styles.modalTitle}>Select Vehicle</Text>
-            <TouchableOpacity 
+            <TouchableOpacity
               style={styles.closeBtn}
               onPress={() => setShowVehicleModal(false)}
             >
               <Text style={styles.closeBtnText}>✕</Text>
             </TouchableOpacity>
           </View>
-          
+
           <FlatList
             data={vehicles}
             keyExtractor={(item) => item.id}
@@ -220,7 +226,7 @@ const DocumentsScreen = () => {
           </Text>
         </View>
       </View>
-      
+
       <View style={styles.documentDetails}>
         {document.documentNumber && (
           <Text style={styles.documentNumber}>
@@ -234,12 +240,19 @@ const DocumentsScreen = () => {
           Expires: {document.expiryDate}
         </Text>
       </View>
+
+      <TouchableOpacity
+        style={styles.viewDocumentButton}
+        onPress={() => handleViewDocument(document)}
+      >
+        <Text style={styles.viewDocumentButtonText}>View Document</Text>
+      </TouchableOpacity>
     </View>
   );
 
   const renderTabContent = () => {
     const documents = getDocuments(selectedVehicle?.id || null, activeTab);
-    
+
     if (documents.length === 0) {
       const tabLabel = tabs.find(tab => tab.key === activeTab)?.label || activeTab;
       return (
@@ -276,7 +289,7 @@ const DocumentsScreen = () => {
       {/* Vehicle Selection */}
       <View style={styles.vehicleSection}>
         <Text style={styles.sectionTitle}>Selected Vehicle</Text>
-        <TouchableOpacity 
+        <TouchableOpacity
           style={styles.vehicleSelector}
           onPress={() => setShowVehicleModal(true)}
         >
@@ -307,7 +320,12 @@ const DocumentsScreen = () => {
 
       {/* Document Tabs */}
       <View style={styles.tabsContainer}>
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.tabsScrollView}>
+        <ScrollView
+          ref={tabScrollViewRef}
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          style={styles.tabsScrollView}
+        >
           <View style={styles.tabsRow}>
             {tabs.map((tab) => (
               <TouchableOpacity
@@ -317,7 +335,20 @@ const DocumentsScreen = () => {
                   activeTab === tab.key && styles.activeTab,
                   tab.disabled && styles.disabledTab,
                 ]}
-                onPress={() => !tab.disabled && setActiveTab(tab.key)}
+                onPress={() => {
+                  if (!tab.disabled) {
+                    setActiveTab(tab.key);
+                    // Auto-scroll to center the selected tab
+                    const tabIndex = tabs.findIndex(t => t.key === tab.key);
+                    const tabWidth = 100; // Approximate tab width including margins
+                    const scrollToX = Math.max(0, (tabIndex * tabWidth) - 50);
+
+                    tabScrollViewRef.current?.scrollTo({
+                      x: scrollToX,
+                      animated: true
+                    });
+                  }
+                }}
                 disabled={tab.disabled}
               >
                 <Text style={[
@@ -424,7 +455,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingVertical: 12,
     marginHorizontal: 2,
-    minWidth: 80,
+    minWidth: 100, // Increased for better spacing
     alignItems: 'center',
   },
   activeTab: {
@@ -439,6 +470,19 @@ const styles = StyleSheet.create({
     color: '#666',
     fontWeight: '500',
     textAlign: 'center',
+  },
+  viewDocumentButton: {
+    backgroundColor: '#2196F3',
+    paddingVertical: 10,
+    paddingHorizontal: 16,
+    borderRadius: 6,
+    alignItems: 'center',
+    marginTop: 12,
+  },
+  viewDocumentButtonText: {
+    color: 'white',
+    fontSize: 14,
+    fontWeight: '600',
   },
   activeTabText: {
     color: '#2196F3',

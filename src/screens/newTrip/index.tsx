@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -16,6 +16,33 @@ import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 
 const { width: screenWidth } = Dimensions.get('window');
 
+interface SearchableItem {
+  id: string;
+  name: string;
+  serialNo: string;
+  status: string;
+  statusColor: string;
+  location: string;
+  distance: string;
+  hasTrailer?: boolean;
+  trailerInfo?: string | null;
+}
+
+interface CombinedSearchResultsProps<T extends SearchableItem> {
+  title: string;
+  placeholder: string;
+  searchQuery: string;
+  setSearchQuery: React.Dispatch<React.SetStateAction<string>>;
+  onItemSelect: (item: T) => void;
+  onNext: () => void;
+  onBack: () => void;
+  onSkip?: () => void;
+  selectedItem: T | null;
+  data: T[];
+  showSkip?: boolean;
+}
+
+
 // Types
 type RootStackParamList = {
   Dashboard: undefined;
@@ -30,6 +57,30 @@ interface VehicleItem {
   serialNo: string;
   status: string;
   statusColor: string;
+  location: string;
+  distance: string;
+  hasTrailer: boolean;
+  trailerInfo?: string;
+}
+
+interface TrailerItem {
+  id: string;
+  name: string;
+  serialNo: string;
+  status: string;
+  statusColor: string;
+  location: string;
+  distance: string;
+}
+
+interface ShipmentItem {
+  id: string;
+  name: string;
+  serialNo: string;
+  status: string;
+  statusColor: string;
+  location: string;
+  distance: string;
 }
 
 interface InspectionItem {
@@ -45,70 +96,95 @@ const dummyVehicles: VehicleItem[] = [
     name: "Cascadia",
     serialNo: "1253566",
     status: "On Track with Active Load",
-    statusColor: "#F59E0B"
+    statusColor: "#F59E0B",
+    location: "Downtown Depot",
+    distance: "0.5 km",
+    hasTrailer: true,
+    trailerInfo: "GreatDane - 1265456"
   },
   {
     id: "2",
     name: "Cascadia",
     serialNo: "12jkk555",
     status: "Ready to Load",
-    statusColor: "#10B981"
+    statusColor: "#10B981",
+    location: "North Terminal",
+    distance: "2.1 km",
+    hasTrailer: false,
+    trailerInfo: undefined
   },
   {
     id: "3",
     name: "Cascadia",
     serialNo: "141584",
     status: "On In Service",
-    statusColor: "#EF4444"
+    statusColor: "#EF4444",
+    location: "Service Bay",
+    distance: "5.3 km",
+    hasTrailer: true,
+    trailerInfo: "Utility - 1389454"
   },
 ];
 
-const dummyTrailers: VehicleItem[] = [
+const dummyTrailers: TrailerItem[] = [
   {
     id: "1",
     name: "GreatDane",
     serialNo: "1265456",
     status: "Available",
-    statusColor: "#10B981"
+    statusColor: "#10B981",
+    location: "Downtown Depot",
+    distance: "0.5 km"
   },
   {
     id: "2",
     name: "GreatDane",
     serialNo: "1394956",
     status: "In Use",
-    statusColor: "#F59E0B"
+    statusColor: "#F59E0B",
+    location: "Loading Dock A",
+    distance: "1.8 km"
   },
   {
     id: "3",
     name: "Utility",
     serialNo: "1389454",
     status: "Maintenance",
-    statusColor: "#EF4444"
+    statusColor: "#EF4444",
+    location: "Service Center",
+    distance: "4.2 km"
   },
 ];
 
-const dummyShipments: VehicleItem[] = [
+const dummyShipments: ShipmentItem[] = [
   {
     id: "1",
     name: "Shipment",
     serialNo: "SH001234",
     status: "Ready to Ship",
-    statusColor: "#10B981"
+    statusColor: "#10B981",
+    location: "Warehouse A",
+    distance: "1.2 km"
   },
   {
     id: "2",
     name: "Shipment",
     serialNo: "SH005678",
     status: "Processing",
-    statusColor: "#F59E0B"
+    statusColor: "#F59E0B",
+    location: "Processing Center",
+    distance: "3.5 km"
   },
   {
     id: "3",
     name: "Shipment",
     serialNo: "SH009012",
     status: "On Hold",
-    statusColor: "#EF4444"
+    statusColor: "#EF4444",
+    location: "Holding Area",
+    distance: "6.1 km"
   },
+
 ];
 
 const inspectionItems: InspectionItem[] = [
@@ -184,121 +260,139 @@ const BackButton = ({ onPress }: { onPress: () => void }) => (
   </TouchableOpacity>
 );
 
-// Search Form Component
-const SearchForm = ({
+function CombinedSearchResults<T extends SearchableItem>({
   title,
   placeholder,
   searchQuery,
   setSearchQuery,
-  onFind,
-  onBack
-}: {
-  title: string;
-  placeholder: string;
-  searchQuery: string;
-  setSearchQuery: (query: string) => void;
-  onFind: () => void;
-  onBack: () => void;
-}) => (
-  <ScrollView style={styles.scrollViewContainer} showsVerticalScrollIndicator={false}>
-    <View style={styles.searchFormContainer}>
-      <BackButton onPress={onBack} />
-
-      <View style={styles.titleSection}>
-        <Text style={styles.mainTitle}>{title}</Text>
-      </View>
-
-      <View style={styles.searchCard}>
-        <View style={styles.searchContainer}>
-          <TextInput
-            style={styles.searchInput}
-            placeholder={placeholder}
-            value={searchQuery}
-            onChangeText={setSearchQuery}
-            placeholderTextColor="#9CA3AF"
-          />
-          <TouchableOpacity
-            style={styles.findButton}
-            onPress={onFind}
-          >
-            <Text style={styles.buttonText}>Find</Text>
-          </TouchableOpacity>
-        </View>
-      </View>
-    </View>
-  </ScrollView>
-);
-
-// Results List Component
-const ResultsList = ({
-  title,
-  items,
-  selectedItem,
   onItemSelect,
   onNext,
-  onBack
-}: {
-  title: string;
-  items: VehicleItem[];
-  selectedItem: VehicleItem | null;
-  onItemSelect: (item: VehicleItem) => void;
-  onNext: () => void;
-  onBack: () => void;
-}) => (
-  <View style={styles.resultsContainer}>
-    <BackButton onPress={onBack} />
+  onBack,
+  onSkip,
+  selectedItem,
+  data,
+  showSkip = false,
+}: CombinedSearchResultsProps<T>) {
+  const [filteredResults, setFilteredResults] = useState(data);
 
-    <View style={styles.titleSection}>
-      <Text style={styles.mainTitle}>{title}</Text>
-    </View>
+  useEffect(() => {
+    if (searchQuery.trim() === "") {
+      const sorted = [...data].sort(
+        (a, b) => parseFloat(a.distance) - parseFloat(b.distance)
+      );
+      setFilteredResults(sorted);
+    } else {
+      const filtered = data.filter(
+        (item) =>
+          item.serialNo.toLowerCase().includes(searchQuery.toLowerCase()) ||
+          item.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+          item.location.toLowerCase().includes(searchQuery.toLowerCase())
+      );
+      setFilteredResults(filtered);
+    }
+  }, [searchQuery, data]);
 
-    <View style={styles.resultsCard}>
-      <View style={styles.resultsHeader}>
-        <Text style={styles.resultsTitle}>{title}</Text>
+  return (
+    <View style={styles.combinedContainer}>
+      {/* Compact Header */}
+      <View style={styles.compactHeader}>
+        <TouchableOpacity style={styles.compactBackButton} onPress={onBack}>
+          <Text style={styles.backButtonText}>← Back</Text>
+        </TouchableOpacity>
+        <Text style={styles.compactTitle}>{title}</Text>
+        <View style={styles.headerSpacer} />
       </View>
 
-      <ScrollView style={styles.scrollContainer} showsVerticalScrollIndicator={false}>
-        {items.map((item: VehicleItem) => (
-          <TouchableOpacity
-            key={item.id}
-            onPress={() => onItemSelect(item)}
-            style={[
-              styles.resultItem,
-              selectedItem?.id === item.id && styles.selectedItem,
-            ]}
-          >
-            <View style={styles.itemContent}>
-              <View style={styles.itemInfo}>
-                <Text style={styles.itemTitle}>
-                  {item.name} : S.No : {item.serialNo}
-                </Text>
-                <Text style={[styles.itemStatus, { color: item.statusColor }]}>
-                  {item.status}
-                </Text>
-              </View>
-              {selectedItem?.id === item.id && (
-                <View style={styles.checkIconContainer}>
-                  <Text style={styles.checkIcon}>✓</Text>
-                </View>
-              )}
-            </View>
-          </TouchableOpacity>
-        ))}
-      </ScrollView>
+      {/* Compact Search */}
+      <View style={styles.compactSearchCard}>
+        <TextInput
+          style={styles.compactSearchInput}
+          placeholder={placeholder}
+          value={searchQuery}
+          onChangeText={setSearchQuery}
+          placeholderTextColor="#9CA3AF"
+        />
+        <Text style={styles.searchIcon}>🔍</Text>
+      </View>
 
-      {selectedItem && (
-        <View style={styles.nextButtonContainer}>
-          <TouchableOpacity
-            style={styles.nextButton}
-            onPress={onNext}
-          >
-            <Text style={styles.buttonText}>Next</Text>
-          </TouchableOpacity>
+      {/* Compact Results List */}
+      <View style={styles.compactResultsCard}>
+        <Text style={styles.compactResultsTitle}>
+          {searchQuery ? `Results (${filteredResults.length})` : `Nearby Items`}
+        </Text>
+
+        <ScrollView
+          style={styles.compactScrollContainer}
+          showsVerticalScrollIndicator={false}
+        >
+          {filteredResults.map((item) => (
+            <TouchableOpacity
+              key={item.id}
+              onPress={() => onItemSelect(item)}
+              style={[
+                styles.compactResultItem,
+                selectedItem?.id === item.id && styles.compactSelectedItem,
+              ]}
+            >
+              <View style={styles.compactItemContent}>
+                <View style={styles.compactItemInfo}>
+                  <Text style={styles.compactItemTitle}>
+                    {item.name} : {item.serialNo}
+                  </Text>
+                  <View style={styles.compactItemRow}>
+                    <Text style={[styles.compactItemStatus, { color: item.statusColor }]}>
+                      {item.status}
+                    </Text>
+                    <Text style={styles.compactDistanceText}>
+                      {item.distance}
+                    </Text>
+                  </View>
+                  <Text style={styles.compactLocationText}>
+                    📍 {item.location}
+                  </Text>
+                  {item.hasTrailer && (
+                    <Text style={styles.compactTrailerInfo}>
+                      🚛 {item.trailerInfo}
+                    </Text>
+                  )}
+                </View>
+                {selectedItem?.id === item.id && (
+                  <View style={styles.compactCheckIcon}>
+                    <Text style={styles.checkIcon}>✓</Text>
+                  </View>
+                )}
+              </View>
+            </TouchableOpacity>
+          ))}
+        </ScrollView>
+      </View>
+
+      {/* Compact Action Buttons */}
+      {(selectedItem || showSkip) && (
+        <View style={styles.compactActionButtons}>
+          {showSkip && (
+            <TouchableOpacity style={styles.compactSkipButton} onPress={onSkip}>
+              <Text style={styles.skipButtonText}>Skip</Text>
+            </TouchableOpacity>
+          )}
+          {selectedItem && (
+            <TouchableOpacity
+              style={[
+                styles.compactNextButton,
+                showSkip && styles.compactNextButtonWithSkip,
+              ]}
+              onPress={onNext}
+            >
+              <Text style={styles.buttonText}>Next</Text>
+            </TouchableOpacity>
+          )}
         </View>
       )}
     </View>
-  </View>
-);
+  );
+}
+
+
 
 // Inspection Screen Component
 const InspectionScreen = ({
@@ -464,7 +558,7 @@ const InspectionScreen = ({
                   <Text style={styles.buttonText}>No Defects</Text>
                 </TouchableOpacity>
               )}
-              
+
               {/* Submit button - always show but adjust width */}
               <TouchableOpacity
                 onPress={onSubmit}
@@ -581,18 +675,7 @@ const NewTripScreen = () => {
     }
   };
 
-  const handleSearch = () => {
-    const config = getStepConfig();
-    if (!config) return;
 
-    const filteredResults = config.data.filter((item: VehicleItem) =>
-      item.serialNo.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      item.name.toLowerCase().includes(searchQuery.toLowerCase())
-    );
-
-    setSearchResults(filteredResults.length > 0 ? filteredResults : config.data);
-    setCurrentView('results');
-  };
 
   const handleItemSelect = (item: VehicleItem) => {
     const key = currentStep === 1 ? 'vehicle' : currentStep === 2 ? 'trailer' : 'shipment';
@@ -637,6 +720,11 @@ const NewTripScreen = () => {
         navigation.navigate('Dashboard');
       }
     }
+  };
+  const handleSkipTrailer = () => {
+    // Skip trailer selection and move to shipment
+    setCurrentStep(3);
+    setSearchQuery("");
   };
 
   const handleInspectionItemToggle = (id: string) => {
@@ -706,32 +794,23 @@ const NewTripScreen = () => {
       );
     }
 
-    // Results List
-    if (currentView === 'results' && config) {
-      return (
-        <ResultsList
-          title={config.listTitle}
-          items={searchResults}
-          selectedItem={getCurrentSelectedItem()}
-          onItemSelect={handleItemSelect}
-          onNext={handleNext}
-          onBack={handleBack}
-        />
-      );
-    }
-
-    // Search Form (default)
+    // Combined Search & Results (default for steps 1-3)
     if (config) {
       return (
         <View style={styles.mainContainer}>
           <ProgressIndicator currentStep={currentStep} />
-          <SearchForm
+          <CombinedSearchResults
             title={config.title}
             placeholder={config.placeholder}
             searchQuery={searchQuery}
             setSearchQuery={setSearchQuery}
-            onFind={handleSearch}
+            onItemSelect={handleItemSelect}
+            onNext={handleNext}
             onBack={handleBack}
+            onSkip={currentStep === 2 ? handleSkipTrailer : undefined}
+            selectedItem={getCurrentSelectedItem()}
+            data={config.data}
+            showSkip={currentStep === 2} // Only show skip for trailer step
           />
         </View>
       );
@@ -757,6 +836,7 @@ const styles = StyleSheet.create({
   mainContainer: {
     flex: 1,
     paddingHorizontal: 8,
+    paddingBottom: 20
   },
   scrollViewContainer: {
     flex: 1,
@@ -779,6 +859,221 @@ const styles = StyleSheet.create({
   successContainer: {
     flex: 1,
     paddingHorizontal: 16,
+  },
+  combinedContainer: {
+    flex: 1,
+    paddingHorizontal: 16,
+    paddingBottom: 20,
+  },
+  headerSection: {
+    marginBottom: 16,
+  },
+  searchInputContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  findButton: {
+    padding: 12,
+    justifyContent: 'center',
+    alignItems: 'center',
+    minWidth: 48,
+    minHeight: 48,
+  },
+  findButtonText: {
+    fontSize: 18,
+  },
+  locationInfo: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 4,
+    gap: 8,
+  },
+  locationText: {
+    fontSize: 12,
+    color: '#6B7280',
+    flex: 1,
+  },
+  distanceText: {
+    fontSize: 12,
+    color: '#059669',
+    fontWeight: '500',
+  },
+  trailerInfo: {
+    fontSize: 12,
+    color: '#8B5CF6',
+    marginTop: 2,
+  },
+  actionButtonsContainer: {
+    padding: 16,
+    borderTopWidth: 1,
+    borderTopColor: '#E5E7EB',
+    backgroundColor: '#F9FAFB',
+    flexDirection: 'row',
+    gap: 12,
+  },
+
+  compactHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 8,
+    marginBottom: 8,
+  },
+  compactBackButton: {
+    padding: 4,
+  },
+  compactTitle: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: '#111827',
+    flex: 1,
+    textAlign: 'center',
+  },
+  headerSpacer: {
+    width: 50, // Balance the back button width
+  },
+  compactSearchCard: {
+    backgroundColor: '#FFFFFF',
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 12,
+    borderRadius: 8,
+    marginBottom: 8,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 2,
+    elevation: 2,
+  },
+  compactSearchInput: {
+    flex: 1,
+    fontSize: 16,
+    color: '#111827',
+    paddingVertical: 4,
+  },
+  searchIcon: {
+    marginLeft: 8,
+    fontSize: 16,
+  },
+  compactResultsCard: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 8,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 2,
+    elevation: 2,
+    flex: 1,
+  },
+  compactResultsTitle: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#374151',
+    padding: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: '#E5E7EB',
+    backgroundColor: '#F9FAFB',
+    borderTopLeftRadius: 8,
+    borderTopRightRadius: 8,
+  },
+  compactScrollContainer: {
+    flex: 1,
+  },
+  compactResultItem: {
+    padding: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: '#F3F4F6',
+  },
+  compactSelectedItem: {
+    backgroundColor: '#EEF2FF',
+    borderLeftWidth: 3,
+    borderLeftColor: '#8B5CF6',
+  },
+  compactItemContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  compactItemInfo: {
+    flex: 1,
+  },
+  compactItemTitle: {
+    fontSize: 14,
+    fontWeight: '500',
+    color: '#111827',
+    marginBottom: 2,
+  },
+  compactItemRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 2,
+  },
+  compactItemStatus: {
+    fontSize: 12,
+    fontWeight: '500',
+    flex: 1,
+  },
+  compactDistanceText: {
+    fontSize: 12,
+    color: '#059669',
+    fontWeight: '500',
+  },
+  compactLocationText: {
+    fontSize: 11,
+    color: '#6B7280',
+    marginBottom: 1,
+  },
+  compactTrailerInfo: {
+    fontSize: 11,
+    color: '#8B5CF6',
+  },
+  compactCheckIcon: {
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+    backgroundColor: '#8B5CF6',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginLeft: 8,
+  },
+  compactActionButtons: {
+    flexDirection: 'row',
+    gap: 8,
+    marginTop: 8,
+  },
+  compactSkipButton: {
+    backgroundColor: '#6B7280',
+    padding: 12,
+    borderRadius: 6,
+    alignItems: 'center',
+    flex: 1,
+  },
+  compactNextButton: {
+    backgroundColor: '#8B5CF6',
+    padding: 12,
+    borderRadius: 6,
+    alignItems: 'center',
+    flex: 2,
+  },
+  compactNextButtonWithSkip: {
+    flex: 2,
+  },
+  skipButton: {
+    backgroundColor: '#6B7280',
+    padding: 14,
+    borderRadius: 8,
+    alignItems: 'center',
+    minHeight: 48,
+    justifyContent: 'center',
+    flex: 1,
+  },
+  skipButtonText: {
+    color: '#FFFFFF',
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  nextButtonWithSkip: {
+    flex: 1,
   },
   backButton: {
     alignSelf: 'flex-start',
@@ -889,14 +1184,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#FFFFFF',
     minHeight: 48,
   },
-  findButton: {
-    backgroundColor: '#8B5CF6',
-    padding: 14,
-    borderRadius: 8,
-    alignItems: 'center',
-    minHeight: 48,
-    justifyContent: 'center',
-  },
+
   buttonText: {
     color: '#FFFFFF',
     fontSize: 16,

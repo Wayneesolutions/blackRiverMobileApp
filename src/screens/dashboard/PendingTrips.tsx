@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useState } from "react";
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity } from "react-native";
 
 const PendingTrips = () => {
@@ -80,6 +80,20 @@ const PendingTrips = () => {
       specialInstructions: "Oversized load - special permits required"
     }
   ];
+  const [trips, setTrips] = useState(pendingTrips);
+
+  const handleStartTrip = (tripId: any) => {
+    // Remove trip from pending and add to active
+    const tripToStart = trips.find(trip => trip.id === tripId);
+    if (tripToStart) {
+      // Here you would typically call a parent component function or API
+      // For now, we'll just remove it from the local state
+      setTrips(prevTrips => prevTrips.filter(trip => trip.id !== tripId));
+
+      // In a real app, you'd call something like:
+      // onTripStarted(tripToStart);
+    }
+  };
 
   const getPriorityColor = (priority: any) => {
     switch (priority) {
@@ -157,10 +171,33 @@ const PendingTrips = () => {
         </View>
       </View>
 
-      {/* Status Badge */}
-      <View style={[styles.statusBadge, { backgroundColor: getStatusColor(trip.status) }]}>
-        <Text style={styles.statusText}>{trip.status}</Text>
+      {/* Inline Action Button + Status Badge */}
+      <View style={{ flexDirection: "row", alignItems: "center", marginTop: 2 }}>
+        <TouchableOpacity
+          style={[styles.startTripButton, { flex: 0.65, marginRight: 10 }]}
+          onPress={() => handleStartTrip(trip.id)}
+        >
+          <Text style={styles.startTripButtonText}>Start Trip</Text>
+        </TouchableOpacity>
+
+        <View
+          style={[
+            styles.statusBadge,
+            {
+              flex: 0.35,
+              backgroundColor: getStatusColor(trip.status),
+              alignItems: "center",
+              justifyContent: "center", // vertical + horizontal centering
+              alignSelf: "stretch",     // makes badge take full row height
+              paddingVertical: 0,       // remove extra vertical padding
+            },
+          ]}
+        >
+          <Text style={styles.statusText}>{trip.status}</Text>
+        </View>
       </View>
+
+
 
       {/* Trip Details Grid */}
       <View style={styles.detailsGrid}>
@@ -412,6 +449,31 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     borderRadius: 12,
     marginTop: 20
+  },
+  actionButtonContainer: {
+    marginTop: 2,
+    marginBottom: 8
+  },
+  startTripButton: {
+    backgroundColor: "#27ae60",
+    paddingVertical: 14,
+    paddingHorizontal: 20,
+    borderRadius: 12,
+    marginBottom: 16,
+    alignItems: "center",
+    shadowColor: "#27ae60",
+    shadowOffset: {
+      width: 0,
+      height: 4
+    },
+    shadowOpacity: 0.3,
+    shadowRadius: 6,
+    elevation: 4
+  },
+  startTripButtonText: {
+    color: "#ffffff",
+    fontSize: 16,
+    fontWeight: "700"
   },
   distanceValue: {
     fontSize: 20,

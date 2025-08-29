@@ -1,12 +1,12 @@
 import React, { useState } from "react";
-import { 
-  View, 
-  Text, 
-  StyleSheet, 
-  ScrollView, 
-  TouchableOpacity, 
+import {
+  View,
+  Text,
+  StyleSheet,
+  ScrollView,
+  TouchableOpacity,
   SafeAreaView,
-  Dimensions 
+  Dimensions
 } from "react-native";
 
 const { width } = Dimensions.get('window');
@@ -61,7 +61,7 @@ const ActiveTrips = () => {
       },
       endLocation: {
         city: "Los Angeles",
-        state: "CA", 
+        state: "CA",
         address: "5678 Warehouse Ave, Los Angeles, CA 90001",
         coords: { lat: 34.0522, lng: -118.2437 }
       },
@@ -90,7 +90,7 @@ const ActiveTrips = () => {
       endLocation: {
         city: "Miami",
         state: "FL",
-        address: "3456 Port Rd, Miami, FL 33101", 
+        address: "3456 Port Rd, Miami, FL 33101",
         coords: { lat: 25.7617, lng: -80.1918 }
       },
       cargo: {
@@ -134,13 +134,81 @@ const ActiveTrips = () => {
       estimatedArrival: "2024-08-31 16:45",
       status: "In Transit",
       currentLocation: "Salt Lake City, UT"
-    }
+    }, {
+      id: 4,
+      startLocation: {
+        city: "New York",
+        state: "NY",
+        address: "1234 Industrial Blvd, New York, NY 10001",
+        coords: { lat: 40.7128, lng: -74.0060 }
+      },
+      endLocation: {
+        city: "Los Angeles",
+        state: "CA",
+        address: "5678 Warehouse Ave, Los Angeles, CA 90001",
+        coords: { lat: 34.0522, lng: -118.2437 }
+      },
+      cargo: {
+        name: "Electronics",
+        code: "ELC-2024-001",
+        weight: "15,000 lbs",
+        type: "Fragile"
+      },
+      driverName: "John Smith",
+      driverPhone: "+1-555-0123",
+      totalMiles: 2789,
+      completedMiles: 1245,
+      estimatedArrival: "2024-08-30 14:30",
+      status: "In Transit",
+      currentLocation: "Denver, CO"
+    },
+    {
+      id: 5,
+      startLocation: {
+        city: "New York",
+        state: "NY",
+        address: "1234 Industrial Blvd, New York, NY 10001",
+        coords: { lat: 40.7128, lng: -74.0060 }
+      },
+      endLocation: {
+        city: "Los Angeles",
+        state: "CA",
+        address: "5678 Warehouse Ave, Los Angeles, CA 90001",
+        coords: { lat: 34.0522, lng: -118.2437 }
+      },
+      cargo: {
+        name: "Electronics",
+        code: "ELC-2024-001",
+        weight: "15,000 lbs",
+        type: "Fragile"
+      },
+      driverName: "John Smith",
+      driverPhone: "+1-555-0123",
+      totalMiles: 2789,
+      completedMiles: 1245,
+      estimatedArrival: "2024-08-30 14:30",
+      status: "In Transit",
+      currentLocation: "Denver, CO"
+    },
   ];
 
   const [selectedTrip, setSelectedTrip] = useState<number | null>(null);
 
   const getProgressPercentage = (completed: number, total: number) => {
     return Math.round((completed / total) * 100);
+  };
+
+  const [trips, setTrips] = useState(activeTrips);
+
+  const handleCompleteTrip = (tripId: any) => {
+    // Remove trip from active and add to completed
+    const tripToComplete = trips.find(trip => trip.id === tripId);
+    if (tripToComplete) {
+      setTrips(prevTrips => prevTrips.filter(trip => trip.id !== tripId));
+
+      // In a real app, you'd call something like:
+      // onTripCompleted(tripToComplete);
+    }
   };
 
   const getStatusColor = (status: string) => {
@@ -158,7 +226,7 @@ const ActiveTrips = () => {
         <Text style={styles.mapIcon}>🗺️</Text>
         <Text style={styles.mapTitle}>Route Overview</Text>
       </View>
-      
+
       <View style={styles.routeContainer}>
         <View style={styles.routePoint}>
           <View style={[styles.routeDot, { backgroundColor: '#27ae60' }]} />
@@ -169,9 +237,9 @@ const ActiveTrips = () => {
             <Text style={styles.routeAddressText}>{trip.startLocation.address}</Text>
           </View>
         </View>
-        
+
         <View style={styles.routeLine} />
-        
+
         <View style={styles.routePoint}>
           <View style={[styles.routeDot, { backgroundColor: '#3498db' }]} />
           <View style={styles.routeInfo}>
@@ -179,9 +247,9 @@ const ActiveTrips = () => {
             <Text style={styles.routeAddressText}>{trip.completedMiles} miles completed</Text>
           </View>
         </View>
-        
+
         <View style={styles.routeLine} />
-        
+
         <View style={styles.routePoint}>
           <View style={[styles.routeDot, { backgroundColor: '#e74c3c' }]} />
           <View style={styles.routeInfo}>
@@ -258,23 +326,23 @@ const ActiveTrips = () => {
             {trip.completedMiles} / {trip.totalMiles} miles
           </Text>
         </View>
-        
+
         <View style={styles.progressBar}>
-          <View 
+          <View
             style={[
-              styles.progressFill, 
+              styles.progressFill,
               { width: `${getProgressPercentage(trip.completedMiles, trip.totalMiles)}%` }
-            ]} 
+            ]}
           />
         </View>
-        
+
         <Text style={styles.progressPercentage}>
           {getProgressPercentage(trip.completedMiles, trip.totalMiles)}% Complete
         </Text>
       </View>
 
       <View style={styles.buttonContainer}>
-        <TouchableOpacity 
+        <TouchableOpacity
           style={styles.primaryButton}
           onPress={() => setSelectedTrip(selectedTrip === trip.id ? null : trip.id)}
         >
@@ -282,7 +350,13 @@ const ActiveTrips = () => {
             {selectedTrip === trip.id ? 'Hide Route' : 'View Route'}
           </Text>
         </TouchableOpacity>
-      
+
+        <TouchableOpacity
+          style={styles.completeButton}
+          onPress={() => handleCompleteTrip(trip.id)}
+        >
+          <Text style={styles.completeButtonText}>Complete Trip</Text>
+        </TouchableOpacity>
       </View>
 
       {selectedTrip === trip.id && <SimpleMap trip={trip} />}
@@ -294,7 +368,7 @@ const ActiveTrips = () => {
       <View style={styles.header}>
         <View style={styles.headerContent}>
           <View style={styles.titleContainer}>
-          
+
             <Text style={styles.headerTitle}>Active Trips</Text>
           </View>
           <Text style={styles.headerSubtitle}>Monitor your ongoing shipments in real-time</Text>
@@ -311,15 +385,15 @@ const ActiveTrips = () => {
         </View>
       </View>
 
-      <ScrollView 
-        style={styles.scrollView} 
+      <ScrollView
+        style={styles.scrollView}
         showsVerticalScrollIndicator={false}
         contentContainerStyle={styles.scrollContent}
       >
         {activeTrips.map(trip => (
-          <TripCard 
-            key={trip.id} 
-            trip={trip} 
+          <TripCard
+            key={trip.id}
+            trip={trip}
           />
         ))}
       </ScrollView>
@@ -512,7 +586,8 @@ const styles = StyleSheet.create({
   },
   buttonContainer: {
     flexDirection: "row",
-    gap: 12
+    gap: 12,
+    alignItems: "center"
   },
   primaryButton: {
     flex: 1,
@@ -523,6 +598,19 @@ const styles = StyleSheet.create({
     alignItems: "center"
   },
   primaryButtonText: {
+    color: "#ffffff",
+    fontSize: 14,
+    fontWeight: "700"
+  },
+  completeButton: {
+    backgroundColor: "#27ae60",
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    borderRadius: 10,
+    alignItems: "center",
+    minWidth: 100
+  },
+  completeButtonText: {
     color: "#ffffff",
     fontSize: 14,
     fontWeight: "700"

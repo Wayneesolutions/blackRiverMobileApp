@@ -25,7 +25,7 @@ export default function FuelUpdateScreen() {
               strokeWidth="8"
               fill="none"
             />
-            
+
             {/* Gauge Arc Segments */}
             <Path
               d="M 40 110 A 70 70 0 0 1 110 40"
@@ -33,14 +33,14 @@ export default function FuelUpdateScreen() {
               strokeWidth="8"
               fill="none"
             />
-            
+
             {/* Small tick marks */}
             <Line x1="40" y1="110" x2="45" y2="105" stroke="#333" strokeWidth="2" />
             <Line x1="60" y1="65" x2="65" y2="60" stroke="#333" strokeWidth="2" />
             <Line x1="110" y1="40" x2="110" y2="35" stroke="#333" strokeWidth="2" />
             <Line x1="160" y1="65" x2="155" y2="60" stroke="#333" strokeWidth="2" />
             <Line x1="180" y1="110" x2="175" y2="105" stroke="#333" strokeWidth="2" />
-            
+
             {/* Needle */}
             <Line
               x1="110"
@@ -50,10 +50,10 @@ export default function FuelUpdateScreen() {
               stroke="#ff0000"
               strokeWidth="3"
             />
-            
+
             {/* Center dot */}
             <Circle cx="110" cy="110" r="4" fill="#333" />
-            
+
             {/* Fuel icon (simplified gas pump) */}
             <Svg x="100" y="50" width="20" height="20">
               <Path
@@ -62,7 +62,7 @@ export default function FuelUpdateScreen() {
               />
             </Svg>
           </Svg>
-          
+
           <View style={styles.gaugeLabels}>
             <Text style={styles.eLabel}>E</Text>
             <Text style={styles.fLabel}>F</Text>
@@ -80,7 +80,7 @@ export default function FuelUpdateScreen() {
       </View>
 
       {/* Expandable Fuel Update Form */}
-      <TouchableOpacity 
+      <TouchableOpacity
         style={styles.updateLinkContainer}
         onPress={() => setShowForm(!showForm)}
       >
@@ -99,15 +99,15 @@ export default function FuelUpdateScreen() {
               keyboardType="numeric"
             />
           </View>
-          
+
           <View style={styles.inputContainer}>
             <Text style={styles.inputLabel}>City/Town</Text>
-            <TextInput 
-              placeholder="City/Town" 
-              style={styles.input} 
+            <TextInput
+              placeholder="City/Town"
+              style={styles.input}
             />
           </View>
-          
+
           <TouchableOpacity style={styles.submitButton}>
             <Text style={styles.submitText}>Submit</Text>
           </TouchableOpacity>

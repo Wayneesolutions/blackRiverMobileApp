@@ -10,75 +10,175 @@ import {
     Animated,
     Modal,
     StatusBar,
+    FlatList,
+    RefreshControl,
 } from "react-native";
 import { WebView } from "react-native-webview";
 
 const { width, height } = Dimensions.get("window");
 
+// Sample trips data - replace with API call
+const SAMPLE_TRIPS = [
+    {
+        id: "TRP001",
+        status: "active",
+        priority: "high",
+        pickup: {
+            location: "Manhattan Financial District",
+            address: "120 Wall Street, New York, NY 10005",
+            lat: 40.7074,
+            lng: -74.0113,
+            time: "09:30 AM"
+        },
+        delivery: {
+            location: "Boston Downtown",
+            address: "1 State Street, Boston, MA 02109",
+            lat: 42.3601,
+            lng: -71.0589,
+            time: "02:30 PM"
+        },
+        distance: "240 km",
+        duration: "4h 30m",
+        cargo: "Electronics Equipment",
+        cargoWeight: "1,200 kg",
+        driverProgress: 35,
+        currentLocation: "New Haven, CT",
+        estimatedArrival: "2:45 PM",
+        startedAt: "09:45 AM",
+        routeSteps: [
+            { lat: 40.7074, lng: -74.0113, instruction: "Start from Manhattan Financial District", distance: "0 km", type: "start" },
+            { lat: 40.8176, lng: -73.7781, instruction: "Take I-95 N toward Bronx", distance: "25 km", type: "highway" },
+            { lat: 41.0534, lng: -73.5387, instruction: "Continue on I-95 N through Connecticut", distance: "45 km", type: "highway" },
+            { lat: 41.2033, lng: -73.2094, instruction: "Merge onto I-91 N toward Springfield", distance: "35 km", type: "merge" },
+            { lat: 41.7658, lng: -72.6851, instruction: "Take I-90 E (Mass Pike) toward Boston", distance: "65 km", type: "highway" },
+            { lat: 42.0629, lng: -71.7611, instruction: "Continue on I-90 E through Worcester", distance: "40 km", type: "highway" },
+            { lat: 42.3601, lng: -71.0589, instruction: "Exit to downtown Boston - Destination reached", distance: "30 km", type: "destination" }
+        ]
+    },
+    {
+        id: "TRP002",
+        status: "scheduled",
+        priority: "medium",
+        pickup: {
+            location: "Brooklyn Warehouse",
+            address: "500 Hamilton Avenue, Brooklyn, NY 11232",
+            lat: 40.6782,
+            lng: -74.0151,
+            time: "11:00 AM"
+        },
+        delivery: {
+            location: "Philadelphia Center",
+            address: "1600 Market Street, Philadelphia, PA 19103",
+            lat: 39.9526,
+            lng: -75.1652,
+            time: "03:00 PM"
+        },
+        distance: "160 km",
+        duration: "3h 15m",
+        cargo: "Medical Supplies",
+        cargoWeight: "800 kg",
+        driverProgress: 0,
+        currentLocation: "Brooklyn Warehouse",
+        estimatedArrival: "3:15 PM",
+        startedAt: null,
+        routeSteps: [
+            { lat: 40.6782, lng: -74.0151, instruction: "Start from Brooklyn Warehouse", distance: "0 km", type: "start" },
+            { lat: 40.6892, lng: -74.0445, instruction: "Take I-278 W toward Staten Island", distance: "15 km", type: "highway" },
+            { lat: 40.5795, lng: -74.1502, instruction: "Continue on I-95 S toward New Jersey", distance: "35 km", type: "highway" },
+            { lat: 40.0583, lng: -74.4057, instruction: "Take I-195 W toward Trenton", distance: "45 km", type: "highway" },
+            { lat: 39.9526, lng: -75.1652, instruction: "Exit to downtown Philadelphia", distance: "65 km", type: "destination" }
+        ]
+    },
+    {
+        id: "TRP003",
+        status: "active",
+        priority: "urgent",
+        pickup: {
+            location: "Newark Industrial",
+            address: "200 Industrial Way, Newark, NJ 07114",
+            lat: 40.7357,
+            lng: -74.1724,
+            time: "08:15 AM"
+        },
+        delivery: {
+            location: "Washington DC Metro",
+            address: "1000 Constitution Ave, Washington, DC 20001",
+            lat: 38.8951,
+            lng: -77.0364,
+            time: "01:00 PM"
+        },
+        distance: "320 km",
+        duration: "5h 45m",
+        cargo: "Government Documents",
+        cargoWeight: "200 kg",
+        driverProgress: 60,
+        currentLocation: "Baltimore, MD",
+        estimatedArrival: "1:15 PM",
+        startedAt: "08:30 AM",
+        routeSteps: [
+            { lat: 40.7357, lng: -74.1724, instruction: "Start from Newark Industrial", distance: "0 km", type: "start" },
+            { lat: 40.7282, lng: -74.0776, instruction: "Take I-78 W toward Manhattan", distance: "25 km", type: "highway" },
+            { lat: 40.7589, lng: -73.9851, instruction: "Continue on I-95 S toward New Jersey", distance: "45 km", type: "highway" },
+            { lat: 39.2904, lng: -76.6122, instruction: "Take I-95 S through Baltimore", distance: "180 km", type: "highway" },
+            { lat: 38.8951, lng: -77.0364, instruction: "Exit to Washington DC downtown", distance: "70 km", type: "destination" }
+        ]
+    },
+    {
+        id: "TRP004",
+        status: "completed",
+        priority: "low",
+        pickup: {
+            location: "Queens Distribution",
+            address: "45-10 Court Square, Long Island City, NY 11101",
+            lat: 40.7505,
+            lng: -73.9426,
+            time: "07:00 AM"
+        },
+        delivery: {
+            location: "Hartford Office",
+            address: "280 Trumbull Street, Hartford, CT 06103",
+            lat: 41.7658,
+            lng: -72.6851,
+            time: "11:30 AM"
+        },
+        distance: "180 km",
+        duration: "3h 00m",
+        cargo: "Office Furniture",
+        cargoWeight: "1,500 kg",
+        driverProgress: 100,
+        currentLocation: "Hartford Office - Delivered",
+        estimatedArrival: "11:30 AM",
+        startedAt: "07:15 AM",
+        completedAt: "11:25 AM"
+    }
+];
+
 export default function DriverTrackingScreen() {
+    const [currentView, setCurrentView] = useState('tripsList'); // 'tripsList' or 'navigation'
+    const [selectedTrip, setSelectedTrip] = useState(null);
+    const [trips, setTrips] = useState(SAMPLE_TRIPS);
+    const [refreshing, setRefreshing] = useState(false);
     const [showMap, setShowMap] = useState(false);
     const [fullScreenMap, setFullScreenMap] = useState(false);
     const [tripStarted, setTripStarted] = useState(false);
     const [currentStep, setCurrentStep] = useState(0);
     const [distanceCovered, setDistanceCovered] = useState(0);
     const [currentLocation, setCurrentLocation] = useState(null);
-    const [eta, setEta] = useState("2:30 PM");
     const pulseAnim = useRef(new Animated.Value(1)).current;
 
-    // Route waypoints for detailed navigation
-    const routeSteps = [
-        {
-            lat: 40.7128, lng: -74.0060,
-            instruction: "Start from Manhattan, New York",
-            distance: "0 km",
-            type: "start"
-        },
-        {
-            lat: 40.8176, lng: -73.7781,
-            instruction: "Take I-95 N toward Bronx",
-            distance: "25 km",
-            type: "highway"
-        },
-        {
-            lat: 41.0534, lng: -73.5387,
-            instruction: "Continue on I-95 N through Connecticut",
-            distance: "45 km",
-            type: "highway"
-        },
-        {
-            lat: 41.2033, lng: -73.2094,
-            instruction: "Merge onto I-91 N toward Springfield",
-            distance: "35 km",
-            type: "merge"
-        },
-        {
-            lat: 41.7658, lng: -72.6851,
-            instruction: "Take I-90 E (Mass Pike) toward Boston",
-            distance: "65 km",
-            type: "highway"
-        },
-        {
-            lat: 42.0629, lng: -71.7611,
-            instruction: "Continue on I-90 E through Worcester",
-            distance: "40 km",
-            type: "highway"
-        },
-        {
-            lat: 42.3601, lng: -71.0589,
-            instruction: "Exit to downtown Boston - Destination reached",
-            distance: "30 km",
-            type: "destination"
-        }
-    ];
+    // Filter trips by status
+    const activeTrips = trips.filter(trip => trip.status === 'active');
+    const scheduledTrips = trips.filter(trip => trip.status === 'scheduled');
+    const completedTrips = trips.filter(trip => trip.status === 'completed');
 
     useEffect(() => {
-        if (tripStarted) {
+        if (tripStarted && selectedTrip) {
             const interval = setInterval(() => {
                 setCurrentStep(prev => {
                     const next = prev + 1;
-                    if (next < routeSteps.length) {
+                    if (next < selectedTrip.routeSteps.length) {
                         setDistanceCovered(prev => prev + 5);
-                        setCurrentLocation(routeSteps[next]);
+                        setCurrentLocation(selectedTrip.routeSteps[next]);
                         return next;
                     }
                     return prev;
@@ -87,7 +187,7 @@ export default function DriverTrackingScreen() {
 
             return () => clearInterval(interval);
         }
-    }, [tripStarted]);
+    }, [tripStarted, selectedTrip]);
 
     useEffect(() => {
         if (tripStarted) {
@@ -100,9 +200,32 @@ export default function DriverTrackingScreen() {
         }
     }, [tripStarted]);
 
+    const onRefresh = () => {
+        setRefreshing(true);
+        // Simulate API call
+        setTimeout(() => {
+            setRefreshing(false);
+        }, 1000);
+    };
+
+    const handleTripSelect = (trip: any) => {
+        setSelectedTrip(trip);
+        setCurrentView('navigation');
+
+        // If trip is already active, set initial progress
+        if (trip.status === 'active') {
+            const initialStep = Math.floor((trip.driverProgress / 100) * trip.routeSteps.length);
+            setCurrentStep(initialStep);
+            setCurrentLocation(trip.routeSteps[initialStep]);
+            setDistanceCovered(trip.driverProgress * 2.4); // 240km * progress
+        }
+    };
+
     const handleStartTrip = () => {
         setTripStarted(true);
-        setCurrentLocation(routeSteps[0]);
+        if (selectedTrip && selectedTrip.routeSteps.length > 0) {
+            setCurrentLocation(selectedTrip.routeSteps[0]);
+        }
         Alert.alert(
             "Trip Started",
             "GPS tracking activated. Follow the route instructions for safe navigation.",
@@ -130,16 +253,190 @@ export default function DriverTrackingScreen() {
         );
     };
 
-    const handleMapExpand = () => {
-        setFullScreenMap(true);
+    const handleBackToList = () => {
+        setCurrentView('tripsList');
+        setSelectedTrip(null);
+        setTripStarted(false);
+        setShowMap(false);
+        setCurrentStep(0);
+        setDistanceCovered(0);
+        setCurrentLocation(null);
     };
 
-    const handleMapClose = () => {
-        setFullScreenMap(false);
+    const getPriorityColor = (priority: any) => {
+        switch (priority) {
+            case 'urgent': return '#DC2626';
+            case 'high': return '#EA580C';
+            case 'medium': return '#CA8A04';
+            case 'low': return '#16A34A';
+            default: return '#6B7280';
+        }
     };
 
-    // Professional Google Maps HTML with routing and zoom controls
-    const mapHtml = `
+    const getStatusColor = (status: any) => {
+        switch (status) {
+            case 'active': return '#1a73e8';
+            case 'scheduled': return '#CA8A04';
+            case 'completed': return '#16A34A';
+            default: return '#6B7280';
+        }
+    };
+
+    const renderTripCard = ({ item: trip }) => (
+        <TouchableOpacity
+            style={styles.tripCard}
+            onPress={() => handleTripSelect(trip)}
+            activeOpacity={0.8}
+        >
+            <View style={styles.tripHeader}>
+                <View>
+                    <Text style={styles.tripId}>{trip.id}</Text>
+                    <View style={styles.statusRow}>
+                        <View style={[styles.statusBadge, { backgroundColor: getStatusColor(trip.status) }]}>
+                            <Text style={styles.statusText}>{trip.status.toUpperCase()}</Text>
+                        </View>
+                        <View style={[styles.priorityBadge, { backgroundColor: getPriorityColor(trip.priority) }]}>
+                            <Text style={styles.priorityText}>{trip.priority.toUpperCase()}</Text>
+                        </View>
+                    </View>
+                </View>
+                <View style={styles.tripMeta}>
+                    <Text style={styles.distanceText}>{trip.distance}</Text>
+                    <Text style={styles.durationText}>{trip.duration}</Text>
+                </View>
+            </View>
+
+            <View style={styles.routeInfo}>
+                <View style={styles.locationRow}>
+                    <View style={[styles.locationDot, { backgroundColor: '#10B981' }]}>
+                        <Text style={styles.locationIcon}>📦</Text>
+                    </View>
+                    <View style={styles.locationDetails}>
+                        <Text style={styles.locationName}>{trip.pickup.location}</Text>
+                        <Text style={styles.locationAddress}>{trip.pickup.address}</Text>
+                        <Text style={styles.locationTime}>Pickup: {trip.pickup.time}</Text>
+                    </View>
+                </View>
+
+                <View style={styles.routeLine} />
+
+                <View style={styles.locationRow}>
+                    <View style={[styles.locationDot, { backgroundColor: '#EF4444' }]}>
+                        <Text style={styles.locationIcon}>🏁</Text>
+                    </View>
+                    <View style={styles.locationDetails}>
+                        <Text style={styles.locationName}>{trip.delivery.location}</Text>
+                        <Text style={styles.locationAddress}>{trip.delivery.address}</Text>
+                        <Text style={styles.locationTime}>Delivery: {trip.delivery.time}</Text>
+                    </View>
+                </View>
+            </View>
+
+            {trip.status === 'active' && (
+                <View style={styles.progressSection}>
+                    <View style={styles.progressHeader}>
+                        <Text style={styles.progressLabel}>Current Location: {trip.currentLocation}</Text>
+                        <Text style={styles.progressPercent}>{trip.driverProgress}%</Text>
+                    </View>
+                    <View style={styles.progressBar}>
+                        <View style={[styles.progressFill, { width: `${trip.driverProgress}%` }]} />
+                    </View>
+                    <Text style={styles.etaText}>ETA: {trip.estimatedArrival}</Text>
+                </View>
+            )}
+
+            <View style={styles.cargoInfo}>
+                <Text style={styles.cargoLabel}>Cargo: {trip.cargo}</Text>
+                <Text style={styles.cargoWeight}>Weight: {trip.cargoWeight}</Text>
+            </View>
+
+            <TouchableOpacity style={styles.viewDetailsButton}
+                onPress={() => handleTripSelect(trip)}>
+                <Text style={styles.viewDetailsText}>View Route & Navigate →</Text>
+            </TouchableOpacity>
+        </TouchableOpacity>
+    );
+
+    const renderTripsListView = () => (
+        <ScrollView
+            style={styles.container}
+            refreshControl={
+                <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
+            }
+            showsVerticalScrollIndicator={false}
+        >
+            {/* Header */}
+            <View style={styles.headerContainer}>
+                <Text style={styles.header}>Driver Operations</Text>
+                <View style={styles.statsRow}>
+                    <Text style={styles.statItem}>{activeTrips.length} Active</Text>
+                    <Text style={styles.statItem}>{scheduledTrips.length} Scheduled</Text>
+                    <Text style={styles.statItem}>{completedTrips.length} Completed</Text>
+                </View>
+            </View>
+
+            {/* Active Trips Section */}
+            {activeTrips.length > 0 && (
+                <View style={styles.section}>
+                    <View style={styles.sectionHeader}>
+                        <Text style={styles.sectionTitle}>🔴 Active Trips</Text>
+                        <Text style={styles.sectionCount}>{activeTrips.length}</Text>
+                    </View>
+                    <FlatList
+                        data={activeTrips}
+                        keyExtractor={(item) => item.id}
+                        renderItem={renderTripCard}
+                        scrollEnabled={false}
+                        showsVerticalScrollIndicator={false}
+                    />
+                </View>
+            )}
+
+            {/* Scheduled Trips Section */}
+            {scheduledTrips.length > 0 && (
+                <View style={styles.section}>
+                    <View style={styles.sectionHeader}>
+                        <Text style={styles.sectionTitle}>📅 Scheduled Trips</Text>
+                        <Text style={styles.sectionCount}>{scheduledTrips.length}</Text>
+                    </View>
+                    <FlatList
+                        data={scheduledTrips}
+                        keyExtractor={(item) => item.id}
+                        renderItem={renderTripCard}
+                        scrollEnabled={false}
+                        showsVerticalScrollIndicator={false}
+                    />
+                </View>
+            )}
+
+            {/* Completed Trips Section */}
+            {completedTrips.length > 0 && (
+                <View style={styles.section}>
+                    <View style={styles.sectionHeader}>
+                        <Text style={styles.sectionTitle}>✅ Recently Completed</Text>
+                        <Text style={styles.sectionCount}>{completedTrips.length}</Text>
+                    </View>
+                    <FlatList
+                        data={completedTrips}
+                        keyExtractor={(item) => item.id}
+                        renderItem={renderTripCard}
+                        scrollEnabled={false}
+                        showsVerticalScrollIndicator={false}
+                    />
+                </View>
+            )}
+
+            {trips.length === 0 && (
+                <View style={styles.emptyState}>
+                    <Text style={styles.emptyIcon}>📋</Text>
+                    <Text style={styles.emptyTitle}>No Trips Found</Text>
+                    <Text style={styles.emptyText}>Pull down to refresh and check for new assignments</Text>
+                </View>
+            )}
+        </ScrollView>
+    );
+
+    const generateMapHtml = (trip: any) => `
     <!DOCTYPE html>
     <html>
     <head>
@@ -158,7 +455,6 @@ export default function DriverTrackingScreen() {
                 border-radius: 0;
             }
             
-            /* Custom Control Panel */
             .control-panel {
                 position: absolute;
                 top: 15px;
@@ -168,7 +464,7 @@ export default function DriverTrackingScreen() {
                 border-radius: 12px;
                 padding: 15px;
                 box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
-                max-width: 280px;
+                max-width: 320px;
                 z-index: 1000;
                 border: 1px solid rgba(255, 255, 255, 0.2);
             }
@@ -179,13 +475,14 @@ export default function DriverTrackingScreen() {
                 margin-bottom: 10px;
                 font-weight: 600;
                 color: #1a73e8;
-                font-size: 14px;
+                font-size: 16px;
             }
             
-            .route-info {
+            .trip-info {
                 font-size: 12px;
                 color: #5f6368;
                 line-height: 1.4;
+                margin-bottom: 10px;
             }
             
             .route-stats {
@@ -213,7 +510,6 @@ export default function DriverTrackingScreen() {
                 letter-spacing: 0.5px;
             }
             
-            /* Speed and Status Indicator */
             .speed-indicator {
                 position: absolute;
                 top: 15px;
@@ -231,7 +527,6 @@ export default function DriverTrackingScreen() {
                 gap: 8px;
             }
             
-            /* Custom Zoom Controls */
             .custom-zoom-controls {
                 position: absolute;
                 bottom: 120px;
@@ -265,7 +560,6 @@ export default function DriverTrackingScreen() {
                 box-shadow: 0 4px 15px rgba(0, 0, 0, 0.15);
             }
             
-            /* Map Style Controls */
             .map-controls {
                 position: absolute;
                 bottom: 15px;
@@ -295,7 +589,6 @@ export default function DriverTrackingScreen() {
                 box-shadow: 0 4px 12px rgba(26, 115, 232, 0.3);
             }
             
-            /* Exit Full Screen Button */
             .exit-fullscreen {
                 position: absolute;
                 top: 15px;
@@ -323,7 +616,6 @@ export default function DriverTrackingScreen() {
                 display: block;
             }
             
-            /* Progress Bar */
             .progress-container {
                 position: absolute;
                 bottom: 70px;
@@ -359,21 +651,6 @@ export default function DriverTrackingScreen() {
                 color: #5f6368;
                 text-align: center;
                 font-weight: 500;
-            }
-            
-            /* Error Message Styling */
-            .error-message {
-                position: absolute;
-                top: 50%;
-                left: 50%;
-                transform: translate(-50%, -50%);
-                background: rgba(220, 38, 38, 0.9);
-                color: white;
-                padding: 20px;
-                border-radius: 8px;
-                text-align: center;
-                max-width: 300px;
-                z-index: 2000;
             }
             
             .fallback-map {
@@ -445,7 +722,7 @@ export default function DriverTrackingScreen() {
                 <div class="fallback-icon">🗺️</div>
                 <div class="fallback-title">Route Navigation</div>
                 <div class="fallback-text">
-                    Interactive route display from Manhattan, NY to Boston, MA
+                    Trip ${trip.id}: ${trip.pickup.location} to ${trip.delivery.location}
                 </div>
                 <div class="route-display" id="route-display">
                     <!-- Route steps will be populated here -->
@@ -453,52 +730,49 @@ export default function DriverTrackingScreen() {
             </div>
         </div>
         
-        <!-- Exit Full Screen Button -->
         <div class="exit-fullscreen" id="exitFullscreen" onclick="exitFullScreen()">
             ✕
         </div>
         
-        <!-- Custom Control Panel -->
         <div class="control-panel">
             <div class="route-header">
-                🧭 Navigation Route
+                🚛 Trip ${trip.id}
             </div>
-            <div class="route-info">
-                <div><strong>From:</strong> Manhattan, NY</div>
-                <div><strong>To:</strong> Boston, MA</div>
+            <div class="trip-info">
+                <div><strong>From:</strong> ${trip.pickup.location}</div>
+                <div><strong>To:</strong> ${trip.delivery.location}</div>
+                <div><strong>Cargo:</strong> ${trip.cargo}</div>
+                <div><strong>Weight:</strong> ${trip.cargoWeight}</div>
                 <div id="next-instruction" style="margin-top: 8px; font-weight: 500; color: #1a73e8;">
                     Ready for navigation
                 </div>
             </div>
             <div class="route-stats">
                 <div class="stat-item">
-                    <div class="stat-value" id="total-distance">240 km</div>
+                    <div class="stat-value" id="total-distance">${trip.distance}</div>
                     <div class="stat-label">Distance</div>
                 </div>
                 <div class="stat-item">
-                    <div class="stat-value" id="total-time">4h 30m</div>
+                    <div class="stat-value" id="total-time">${trip.duration}</div>
                     <div class="stat-label">Duration</div>
                 </div>
                 <div class="stat-item">
-                    <div class="stat-value" id="remaining-distance">240 km</div>
+                    <div class="stat-value" id="remaining-distance">${trip.distance}</div>
                     <div class="stat-label">Remaining</div>
                 </div>
             </div>
         </div>
         
-        <!-- Speed Indicator -->
         <div class="speed-indicator">
             <span>🚛</span>
             <span id="current-speed">0 km/h</span>
         </div>
         
-        <!-- Custom Zoom Controls -->
         <div class="custom-zoom-controls">
             <div class="zoom-btn" onclick="zoomIn()">+</div>
             <div class="zoom-btn" onclick="zoomOut()">−</div>
         </div>
         
-        <!-- Map Style Controls -->
         <div class="map-controls">
             <div class="control-btn active" onclick="setMapType('roadmap')">Map</div>
             <div class="control-btn" onclick="setMapType('satellite')">Satellite</div>
@@ -507,7 +781,6 @@ export default function DriverTrackingScreen() {
             <div class="control-btn" onclick="fitRoute()">Fit Route</div>
         </div>
         
-        <!-- Progress Bar -->
         <div class="progress-container">
             <div class="progress-bar">
                 <div class="progress-fill" id="route-progress"></div>
@@ -522,17 +795,8 @@ export default function DriverTrackingScreen() {
             let routeWaypoints = [];
             let isNavigating = false;
             let isFullScreen = false;
-            let routeSteps = [
-                { lat: 40.7128, lng: -74.0060, instruction: "Start from Manhattan, New York", distance: "0 km", type: "start" },
-                { lat: 40.8176, lng: -73.7781, instruction: "Take I-95 N toward Bronx", distance: "25 km", type: "highway" },
-                { lat: 41.0534, lng: -73.5387, instruction: "Continue on I-95 N through Connecticut", distance: "45 km", type: "highway" },
-                { lat: 41.2033, lng: -73.2094, instruction: "Merge onto I-91 N toward Springfield", distance: "35 km", type: "merge" },
-                { lat: 41.7658, lng: -72.6851, instruction: "Take I-90 E (Mass Pike) toward Boston", distance: "65 km", type: "highway" },
-                { lat: 42.0629, lng: -71.7611, instruction: "Continue on I-90 E through Worcester", distance: "40 km", type: "highway" },
-                { lat: 42.3601, lng: -71.0589, instruction: "Exit to downtown Boston - Destination reached", distance: "30 km", type: "destination" }
-            ];
+            let routeSteps = ${JSON.stringify(trip.routeSteps)};
             
-            // Fallback route display
             function showFallbackRoute() {
                 document.getElementById('map').style.display = 'none';
                 document.getElementById('fallback-map').style.display = 'flex';
@@ -548,12 +812,10 @@ export default function DriverTrackingScreen() {
                     routeDisplay.appendChild(stepDiv);
                 });
                 
-                // Simulate movement through fallback route
                 simulateFallbackNavigation();
             }
             
             function simulateFallbackNavigation() {
-                // This will be triggered by React Native WebView messages
                 window.fallbackNavigation = function(stepIndex) {
                     const steps = document.querySelectorAll('.route-step');
                     steps.forEach((step, index) => {
@@ -562,13 +824,11 @@ export default function DriverTrackingScreen() {
                 };
             }
             
-            // Initialize Google Maps with error handling
             function initMap() {
                 try {
-                    // Create map with professional styling
                     map = new google.maps.Map(document.getElementById('map'), {
                         zoom: 8,
-                        center: { lat: 41.5, lng: -72.5 }, // Center between NY and Boston
+                        center: { lat: ${(trip.pickup.lat + trip.delivery.lat) / 2}, lng: ${(trip.pickup.lng + trip.delivery.lng) / 2} },
                         mapTypeId: 'roadmap',
                         styles: [
                             {
@@ -592,7 +852,6 @@ export default function DriverTrackingScreen() {
                         gestureHandling: 'greedy'
                     });
                     
-                    // Initialize directions service and renderer
                     directionsService = new google.maps.DirectionsService();
                     directionsRenderer = new google.maps.DirectionsRenderer({
                         suppressMarkers: true,
@@ -604,10 +863,8 @@ export default function DriverTrackingScreen() {
                     });
                     directionsRenderer.setMap(map);
                     
-                    // Initialize traffic layer
                     trafficLayer = new google.maps.TrafficLayer();
                     
-                    // Create route
                     createRoute();
                 } catch (error) {
                     console.error('Google Maps initialization failed:', error);
@@ -616,17 +873,13 @@ export default function DriverTrackingScreen() {
             }
             
             function createRoute() {
-                const start = { lat: 40.7128, lng: -74.0060 }; // Manhattan
-                const end = { lat: 42.3601, lng: -71.0589 };   // Boston
+                const start = { lat: ${trip.pickup.lat}, lng: ${trip.pickup.lng} };
+                const end = { lat: ${trip.delivery.lat}, lng: ${trip.delivery.lng} };
                 
-                // Waypoints for more realistic routing
-                const waypoints = [
-                    { location: { lat: 40.8176, lng: -73.7781 }, stopover: false },
-                    { location: { lat: 41.0534, lng: -73.5387 }, stopover: false },
-                    { location: { lat: 41.2033, lng: -73.2094 }, stopover: false },
-                    { location: { lat: 41.7658, lng: -72.6851 }, stopover: false },
-                    { location: { lat: 42.0629, lng: -71.7611 }, stopover: false }
-                ];
+                const waypoints = routeSteps.slice(1, -1).map(step => ({
+                    location: { lat: step.lat, lng: step.lng },
+                    stopover: false
+                }));
                 
                 const request = {
                     origin: start,
@@ -646,22 +899,17 @@ export default function DriverTrackingScreen() {
                     if (status === 'OK') {
                         directionsRenderer.setDirections(result);
                         
-                        // Extract route information
                         const route = result.routes[0];
                         const leg = route.legs[0];
                         
-                        // Update route stats
                         document.getElementById('total-distance').textContent = leg.distance.text;
                         document.getElementById('total-time').textContent = leg.duration.text;
                         document.getElementById('remaining-distance').textContent = leg.distance.text;
                         
-                        // Store waypoints for animation
                         routeWaypoints = route.overview_path;
                         
-                        // Create custom markers
                         createCustomMarkers(start, end);
                         
-                        // Update instructions
                         if (route.legs[0].steps.length > 0) {
                             document.getElementById('next-instruction').textContent = 
                                 route.legs[0].steps[0].instructions.replace(/<[^>]*>/g, '');
@@ -676,7 +924,6 @@ export default function DriverTrackingScreen() {
             }
             
             function createCustomMarkers(start, end) {
-                // Driver marker (animated)
                 driverMarker = new google.maps.Marker({
                     position: start,
                     map: map,
@@ -692,7 +939,6 @@ export default function DriverTrackingScreen() {
                     zIndex: 1000
                 });
                 
-                // Destination marker
                 const destinationMarker = new google.maps.Marker({
                     position: end,
                     map: map,
@@ -704,16 +950,15 @@ export default function DriverTrackingScreen() {
                         strokeColor: '#ffffff',
                         strokeWeight: 2
                     },
-                    title: 'Destination: Boston, MA'
+                    title: 'Destination: ${trip.delivery.location}'
                 });
                 
-                // Info windows
                 const driverInfoWindow = new google.maps.InfoWindow({
                     content: \`
                         <div style="padding: 10px; font-family: 'Roboto', sans-serif;">
-                            <h4 style="margin: 0 0 8px 0; color: #1a73e8;">🚛 Driver Location</h4>
+                            <h4 style="margin: 0 0 8px 0; color: #1a73e8;">Driver Location</h4>
                             <p style="margin: 0; color: #5f6368; font-size: 12px;">
-                                Current Position<br>
+                                Trip ${trip.id}<br>
                                 <strong>Speed:</strong> <span id="popup-speed">0 km/h</span><br>
                                 <strong>Status:</strong> <span id="popup-status">Ready</span>
                             </p>
@@ -724,16 +969,16 @@ export default function DriverTrackingScreen() {
                 const destInfoWindow = new google.maps.InfoWindow({
                     content: \`
                         <div style="padding: 10px; font-family: 'Roboto', sans-serif;">
-                            <h4 style="margin: 0 0 8px 0; color: #ea4335;">🏁 Destination</h4>
+                            <h4 style="margin: 0 0 8px 0; color: #ea4335;">Destination</h4>
                             <p style="margin: 0; color: #5f6368; font-size: 12px;">
-                                Boston, Massachusetts<br>
-                                Downtown Area
+                                ${trip.delivery.location}<br>
+                                ${trip.delivery.address}<br>
+                                <strong>ETA:</strong> ${trip.delivery.time}
                             </p>
                         </div>
                     \`
                 });
                 
-                // Add click listeners for info windows
                 driverMarker.addListener('click', () => {
                     destInfoWindow.close();
                     driverInfoWindow.open(map, driverMarker);
@@ -745,7 +990,6 @@ export default function DriverTrackingScreen() {
                 });
             }
             
-            // Zoom controls
             function zoomIn() {
                 if (map) map.setZoom(map.getZoom() + 1);
             }
@@ -754,12 +998,10 @@ export default function DriverTrackingScreen() {
                 if (map) map.setZoom(map.getZoom() - 1);
             }
             
-            // Map type controls
             function setMapType(type) {
                 if (map) {
                     map.setMapTypeId(type);
                     
-                    // Update active button
                     document.querySelectorAll('.control-btn').forEach(btn => {
                         btn.classList.remove('active');
                     });
@@ -783,13 +1025,12 @@ export default function DriverTrackingScreen() {
             function fitRoute() {
                 if (map) {
                     const bounds = new google.maps.LatLngBounds();
-                    bounds.extend({ lat: 40.7128, lng: -74.0060 }); // NYC
-                    bounds.extend({ lat: 42.3601, lng: -71.0589 }); // Boston
+                    bounds.extend({ lat: ${trip.pickup.lat}, lng: ${trip.pickup.lng} });
+                    bounds.extend({ lat: ${trip.delivery.lat}, lng: ${trip.delivery.lng} });
                     map.fitBounds(bounds, { padding: 50 });
                 }
             }
             
-            // Full screen functions
             function enterFullScreen() {
                 isFullScreen = true;
                 document.getElementById('exitFullscreen').classList.add('show');
@@ -805,7 +1046,6 @@ export default function DriverTrackingScreen() {
                 window.ReactNativeWebView?.postMessage('EXIT_FULLSCREEN');
             }
             
-            // Driver movement simulation
             function startNavigation() {
                 if (isNavigating) return;
                 
@@ -819,12 +1059,10 @@ export default function DriverTrackingScreen() {
                     if (currentPosition < routeSteps.length - 1) {
                         currentPosition++;
                         
-                        // Update fallback display if using fallback
                         if (window.fallbackNavigation) {
                             window.fallbackNavigation(currentPosition);
                         }
                         
-                        // Update Google Maps if available
                         if (driverMarker && routeWaypoints.length > 0) {
                             const stepProgress = Math.floor((currentPosition / (routeSteps.length - 1)) * routeWaypoints.length);
                             const clampedProgress = Math.min(stepProgress, routeWaypoints.length - 1);
@@ -834,30 +1072,25 @@ export default function DriverTrackingScreen() {
                             }
                         }
                         
-                        // Update progress
                         const progress = (currentPosition / (routeSteps.length - 1)) * 100;
                         document.getElementById('route-progress').style.width = progress + '%';
                         
-                        // Update remaining distance
-                        const remainingKm = Math.round(240 * (1 - progress / 100));
+                        const totalDistance = parseInt('${trip.distance}'.replace(' km', ''));
+                        const remainingKm = Math.round(totalDistance * (1 - progress / 100));
                         document.getElementById('remaining-distance').textContent = remainingKm + ' km';
                         
-                        // Update instruction
                         if (routeSteps[currentPosition]) {
                             document.getElementById('next-instruction').textContent = 
                                 routeSteps[currentPosition].instruction;
                         }
                         
-                        // Update speed randomly for realism
                         const speeds = [45, 55, 65, 75, 60, 50, 70];
                         const speed = speeds[Math.floor(Math.random() * speeds.length)];
                         document.getElementById('current-speed').textContent = speed + ' km/h';
                         
-                        // Continue movement
                         if (currentPosition < routeSteps.length - 1) {
-                            setTimeout(moveDriver, 3000); // 3 second intervals
+                            setTimeout(moveDriver, 3000);
                         } else {
-                            // Destination reached
                             document.getElementById('current-speed').textContent = '0 km/h';
                             document.getElementById('progress-text').textContent = 'Destination reached!';
                             document.getElementById('remaining-distance').textContent = '0 km';
@@ -870,7 +1103,6 @@ export default function DriverTrackingScreen() {
                 setTimeout(moveDriver, 1000);
             }
             
-            // Communication with React Native
             window.addEventListener('message', function(event) {
                 if (event.data === 'START_TRACKING') {
                     startNavigation();
@@ -879,11 +1111,8 @@ export default function DriverTrackingScreen() {
                 }
             });
             
-            // Load Google Maps API with error handling
             function loadGoogleMaps() {
                 const script = document.createElement('script');
-                // IMPORTANT: Replace 'YOUR_ACTUAL_API_KEY' with your real Google Maps API key
-                // Change this line in the HTML:
                 script.src = 'https://maps.googleapis.com/maps/api/js?key=AIzaSyAMIfypjgj4ARy3ldyvSTNZ4y_-fbwDJ7E&callback=initMap&libraries=geometry';
                 script.async = true;
                 script.defer = true;
@@ -894,7 +1123,6 @@ export default function DriverTrackingScreen() {
                 document.head.appendChild(script);
             }
             
-            // Handle case where Google Maps API is not available
             window.initMap = function() {
                 try {
                     initMap();
@@ -904,10 +1132,8 @@ export default function DriverTrackingScreen() {
                 }
             };
             
-            // Initialize on page load
             if (document.readyState === 'loading') {
                 document.addEventListener('DOMContentLoaded', function() {
-                    // Check if we can access Google Maps
                     if (typeof google === 'undefined') {
                         loadGoogleMaps();
                     } else {
@@ -922,13 +1148,12 @@ export default function DriverTrackingScreen() {
                 }
             }
             
-            // Fallback initialization if Google Maps fails to load
             setTimeout(function() {
                 if (!map && document.getElementById('map').style.display !== 'none') {
                     console.log('Google Maps failed to initialize, showing fallback');
                     showFallbackRoute();
                 }
-            }, 5000); // Wait 5 seconds for Google Maps to load
+            }, 5000);
         </script>
     </body>
     </html>
@@ -936,7 +1161,7 @@ export default function DriverTrackingScreen() {
 
     const webViewRef = useRef(null);
 
-    const handleWebViewMessage = (event) => {
+    const handleWebViewMessage = (event: any) => {
         const message = event.nativeEvent.data;
         console.log('WebView message:', message);
 
@@ -945,233 +1170,488 @@ export default function DriverTrackingScreen() {
         }
     };
 
-    const renderMap = (isFullScreen = false) => (
-        <View style={isFullScreen ? styles.fullScreenMapContainer : styles.mapContainer}>
-            <WebView
-                ref={webViewRef}
-                source={{ html: mapHtml }}
-                style={isFullScreen ? styles.fullScreenMap : styles.map}
-                javaScriptEnabled={true}
-                domStorageEnabled={true}
-                startInLoadingState={true}
-                onMessage={handleWebViewMessage}
-                injectedJavaScript={
-                    tripStarted
-                        ? (isFullScreen
-                            ? "window.postMessage('START_TRACKING', '*'); window.postMessage('ENTER_FULLSCREEN', '*');"
-                            : "window.postMessage('START_TRACKING', '*');")
-                        : (isFullScreen
-                            ? "window.postMessage('ENTER_FULLSCREEN', '*');"
-                            : "")
-                }
-            />
+    const renderNavigationView = () => {
+        if (!selectedTrip) return null;
 
-            {/* Expand button for embedded map */}
-            {!isFullScreen && (
-                <TouchableOpacity
-                    style={styles.expandButton}
-                    onPress={handleMapExpand}
-                    activeOpacity={0.8}
-                >
-                    <Text style={styles.expandButtonText}>⛶</Text>
-                </TouchableOpacity>
-            )}
-        </View>
-    );
+        const renderMap = (isFullScreen = false) => (
+            <View style={isFullScreen ? styles.fullScreenMapContainer : styles.mapContainer}>
+                <WebView
+                    ref={webViewRef}
+                    source={{ html: generateMapHtml(selectedTrip) }}
+                    style={isFullScreen ? styles.fullScreenMap : styles.map}
+                    javaScriptEnabled={true}
+                    domStorageEnabled={true}
+                    startInLoadingState={true}
+                    onMessage={handleWebViewMessage}
+                    injectedJavaScript={
+                        tripStarted
+                            ? (isFullScreen
+                                ? "window.postMessage('START_TRACKING', '*'); window.postMessage('ENTER_FULLSCREEN', '*');"
+                                : "window.postMessage('START_TRACKING', '*');")
+                            : (isFullScreen
+                                ? "window.postMessage('ENTER_FULLSCREEN', '*');"
+                                : "")
+                    }
+                />
 
-    return (
-        <>
-            <StatusBar barStyle={fullScreenMap ? "light-content" : "dark-content"} />
-
-            {/* Full Screen Map Modal */}
-            <Modal
-                visible={fullScreenMap}
-                animationType="slide"
-                statusBarTranslucent={true}
-                onRequestClose={handleMapClose}
-            >
-                <View style={styles.fullScreenContainer}>
-                    {renderMap(true)}
-                </View>
-            </Modal>
-
-            {/* Regular Screen Content */}
-            <ScrollView style={styles.container} showsVerticalScrollIndicator={false}>
-                {/* Driver Header */}
-                <View style={styles.headerContainer}>
-                    <Text style={styles.header}>Professional Navigation</Text>
-                    <Animated.View style={[styles.liveIndicator, { transform: [{ scale: pulseAnim }] }]}>
-                        <Text style={styles.liveText}>
-                            {tripStarted ? "🔴 LIVE" : "⚪ OFFLINE"}
-                        </Text>
-                    </Animated.View>
-                </View>
-
-                {/* Current Trip Info */}
-                <View style={styles.card}>
-                    <View style={styles.row}>
-                        <Text style={styles.label}>Status</Text>
-                        <Text style={[styles.value, tripStarted ? styles.statusActive : styles.statusInactive]}>
-                            {tripStarted ? "🚛 In Transit" : "📋 Ready to Start"}
-                        </Text>
-                    </View>
-
-                    <View style={styles.routeSection}>
-                        <Text style={styles.sectionTitle}>Route Information</Text>
-
-                        <View style={styles.locationRow}>
-                            <View style={styles.locationDot}>
-                                <Text style={styles.locationEmoji}>📦</Text>
-                            </View>
-                            <View style={styles.locationInfo}>
-                                <Text style={styles.locationLabel}>Pickup</Text>
-                                <Text style={styles.locationValue}>Manhattan, New York</Text>
-                                <Text style={styles.locationAddress}>Financial District</Text>
-                            </View>
-                        </View>
-
-                        <View style={styles.routeLine} />
-
-                        <View style={styles.locationRow}>
-                            <View style={styles.locationDot}>
-                                <Text style={styles.locationEmoji}>🏁</Text>
-                            </View>
-                            <View style={styles.locationInfo}>
-                                <Text style={styles.locationLabel}>Delivery</Text>
-                                <Text style={styles.locationValue}>Boston, Massachusetts</Text>
-                                <Text style={styles.locationAddress}>Downtown Area</Text>
-                            </View>
-                        </View>
-                    </View>
-                </View>
-
-                {/* Current Navigation Step */}
-                {tripStarted && currentLocation && (
-                    <View style={styles.navigationCard}>
-                        <Text style={styles.navigationTitle}>🧭 Current Navigation</Text>
-                        <View style={styles.stepContainer}>
-                            <View style={styles.stepNumber}>
-                                <Text style={styles.stepText}>{currentStep + 1}</Text>
-                            </View>
-                            <View style={styles.stepInfo}>
-                                <Text style={styles.stepInstruction}>{currentLocation.instruction}</Text>
-                                <Text style={styles.stepDistance}>Distance: {currentLocation.distance}</Text>
-                            </View>
-                        </View>
-                    </View>
-                )}
-
-                {/* Map Controls */}
-                {!showMap ? (
+                {!isFullScreen && (
                     <TouchableOpacity
-                        style={styles.loadButton}
-                        onPress={() => setShowMap(true)}
+                        style={styles.expandButton}
+                        onPress={() => setFullScreenMap(true)}
                         activeOpacity={0.8}
                     >
-                        <Text style={styles.loadButtonText}>🗺️ Load Google Maps Navigation</Text>
+                        <Text style={styles.expandButtonText}>⛶</Text>
                     </TouchableOpacity>
-                ) : (
-                    <>
-                        {/* Embedded Google Maps */}
-                        {renderMap(false)}
-
-                        {/* Trip Controls */}
-                        <View style={styles.controlsContainer}>
-                            {!tripStarted ? (
-                                <TouchableOpacity
-                                    style={styles.startButton}
-                                    onPress={handleStartTrip}
-                                    activeOpacity={0.8}
-                                >
-                                    <Text style={styles.startButtonText}>🚀 Start Google Maps Navigation</Text>
-                                </TouchableOpacity>
-                            ) : (
-                                <View style={styles.tripControls}>
-                                    <TouchableOpacity
-                                        style={styles.pauseButton}
-                                        activeOpacity={0.8}
-                                    >
-                                        <Text style={styles.pauseButtonText}>⏸️ Pause</Text>
-                                    </TouchableOpacity>
-
-                                    <TouchableOpacity
-                                        style={styles.stopButton}
-                                        onPress={handleStopTrip}
-                                        activeOpacity={0.8}
-                                    >
-                                        <Text style={styles.stopButtonText}>⏹️ Stop Trip</Text>
-                                    </TouchableOpacity>
-                                </View>
-                            )}
-                        </View>
-
-                        {/* Real-time Trip Stats */}
-                        <View style={styles.statsContainer}>
-                            <View style={styles.statBox}>
-                                <Text style={styles.statLabel}>Distance Covered</Text>
-                                <Text style={styles.statValue}>{distanceCovered} KM</Text>
-                                <Text style={styles.statSubtext}>
-                                    {Math.round((distanceCovered / 240) * 100)}% Complete
-                                </Text>
-                            </View>
-
-                            <View style={styles.statBox}>
-                                <Text style={styles.statLabel}>Remaining</Text>
-                                <Text style={styles.statValue}>{240 - distanceCovered} KM</Text>
-                                <Text style={styles.statSubtext}>
-                                    Est. {Math.round((240 - distanceCovered) / 60 * 60)} mins
-                                </Text>
-                            </View>
-
-                            <View style={styles.statBox}>
-                                <Text style={styles.statLabel}>Current Speed</Text>
-                                <Text style={styles.statValue}>
-                                    {tripStarted ? "65 KM/H" : "0 KM/H"}
-                                </Text>
-                                <Text style={styles.statSubtext}>
-                                    {tripStarted ? "Highway" : "Stopped"}
-                                </Text>
-                            </View>
-
-                            <View style={styles.statBox}>
-                                <Text style={styles.statLabel}>ETA</Text>
-                                <Text style={styles.statValue}>{eta}</Text>
-                                <Text style={styles.statSubtext}>Today</Text>
-                            </View>
-                        </View>
-
-                        {/* Map Instructions */}
-                        <View style={styles.instructionsCard}>
-                            <Text style={styles.instructionsTitle}>📱 Map Features</Text>
-                            <View style={styles.featureList}>
-                                <Text style={styles.featureItem}>• Tap expand button (⛶) to view map in full screen</Text>
-                                <Text style={styles.featureItem}>• Pinch to zoom in/out or use + - buttons</Text>
-                                <Text style={styles.featureItem}>• Switch between Map, Satellite, and Hybrid views</Text>
-                                <Text style={styles.featureItem}>• Toggle traffic layer for real-time conditions</Text>
-                                <Text style={styles.featureItem}>• Tap markers for detailed information</Text>
-                                <Text style={styles.featureItem}>• Use "Fit Route" to view entire journey</Text>
-                                <Text style={styles.featureItem}>• Real-time driver position tracking</Text>
-                                <Text style={styles.featureItem}>• Press ✕ button to exit full screen mode</Text>
-                            </View>
-
-
-                        </View>
-                    </>
                 )}
-            </ScrollView>
-        </>
-    );
+            </View>
+        );
+
+        return (
+            <>
+                <StatusBar barStyle={fullScreenMap ? "light-content" : "dark-content"} />
+
+                <Modal
+                    visible={fullScreenMap}
+                    animationType="slide"
+                    statusBarTranslucent={true}
+                    onRequestClose={() => setFullScreenMap(false)}
+                >
+                    <View style={styles.fullScreenContainer}>
+                        {renderMap(true)}
+                    </View>
+                </Modal>
+
+                <ScrollView style={styles.container} showsVerticalScrollIndicator={false}>
+                    <View style={styles.navigationHeader}>
+                        <TouchableOpacity
+                            style={styles.backButton}
+                            onPress={handleBackToList}
+                            activeOpacity={0.8}
+                        >
+                            <Text style={styles.backButtonText}>← Back to Trips</Text>
+                        </TouchableOpacity>
+                        <Animated.View style={[styles.liveIndicator, { transform: [{ scale: pulseAnim }] }]}>
+                            <Text style={styles.liveText}>
+                                {tripStarted ? "LIVE" : "OFFLINE"}
+                            </Text>
+                        </Animated.View>
+                    </View>
+
+                    <View style={styles.tripDetailsCard}>
+                        <View style={styles.tripDetailHeader}>
+                            <Text style={styles.tripDetailTitle}>Trip {selectedTrip.id}</Text>
+                            <View style={styles.tripDetailBadges}>
+                                <View style={[styles.statusBadge, { backgroundColor: getStatusColor(selectedTrip.status) }]}>
+                                    <Text style={styles.statusText}>{selectedTrip.status.toUpperCase()}</Text>
+                                </View>
+                                <View style={[styles.priorityBadge, { backgroundColor: getPriorityColor(selectedTrip.priority) }]}>
+                                    <Text style={styles.priorityText}>{selectedTrip.priority.toUpperCase()}</Text>
+                                </View>
+                            </View>
+                        </View>
+
+                        <View style={styles.routeSection}>
+                            <View style={styles.locationRow}>
+                                <View style={[styles.locationDot, { backgroundColor: '#10B981' }]}>
+                                    <Text style={styles.locationIcon}>📦</Text>
+                                </View>
+                                <View style={styles.locationDetails}>
+                                    <Text style={styles.locationName}>{selectedTrip.pickup.location}</Text>
+                                    <Text style={styles.locationAddress}>{selectedTrip.pickup.address}</Text>
+                                    <Text style={styles.locationTime}>Pickup: {selectedTrip.pickup.time}</Text>
+                                </View>
+                            </View>
+
+                            <View style={styles.routeLine} />
+
+                            <View style={styles.locationRow}>
+                                <View style={[styles.locationDot, { backgroundColor: '#EF4444' }]}>
+                                    <Text style={styles.locationIcon}>🏁</Text>
+                                </View>
+                                <View style={styles.locationDetails}>
+                                    <Text style={styles.locationName}>{selectedTrip.delivery.location}</Text>
+                                    <Text style={styles.locationAddress}>{selectedTrip.delivery.address}</Text>
+                                    <Text style={styles.locationTime}>Delivery: {selectedTrip.delivery.time}</Text>
+                                </View>
+                            </View>
+                        </View>
+
+                        <View style={styles.cargoSection}>
+                            <Text style={styles.cargoLabel}>Cargo: {selectedTrip.cargo}</Text>
+                            <Text style={styles.cargoWeight}>Weight: {selectedTrip.cargoWeight}</Text>
+                            <Text style={styles.tripDistance}>Distance: {selectedTrip.distance} • Duration: {selectedTrip.duration}</Text>
+                        </View>
+                    </View>
+
+                    {tripStarted && currentLocation && (
+                        <View style={styles.navigationCard}>
+                            <Text style={styles.navigationTitle}>Current Navigation</Text>
+                            <View style={styles.stepContainer}>
+                                <View style={styles.stepNumber}>
+                                    <Text style={styles.stepText}>{currentStep + 1}</Text>
+                                </View>
+                                <View style={styles.stepInfo}>
+                                    <Text style={styles.stepInstruction}>{currentLocation.instruction}</Text>
+                                    <Text style={styles.stepDistance}>Distance: {currentLocation.distance}</Text>
+                                </View>
+                            </View>
+                        </View>
+                    )}
+
+                    {!showMap ? (
+                        <TouchableOpacity
+                            style={styles.loadButton}
+                            onPress={() => setShowMap(true)}
+                            activeOpacity={0.8}
+                        >
+                            <Text style={styles.loadButtonText}>Load Google Maps Navigation</Text>
+                        </TouchableOpacity>
+                    ) : (
+                        <>
+                            {renderMap(false)}
+
+                            <View style={styles.controlsContainer}>
+                                {!tripStarted ? (
+                                    <TouchableOpacity
+                                        style={styles.startButton}
+                                        onPress={handleStartTrip}
+                                        activeOpacity={0.8}
+                                    >
+                                        <Text style={styles.startButtonText}>Start Navigation</Text>
+                                    </TouchableOpacity>
+                                ) : (
+                                    <View style={styles.tripControls}>
+                                        <TouchableOpacity
+                                            style={styles.pauseButton}
+                                            activeOpacity={0.8}
+                                        >
+                                            <Text style={styles.pauseButtonText}>Pause</Text>
+                                        </TouchableOpacity>
+
+                                        <TouchableOpacity
+                                            style={styles.stopButton}
+                                            onPress={handleStopTrip}
+                                            activeOpacity={0.8}
+                                        >
+                                            <Text style={styles.stopButtonText}>Stop Trip</Text>
+                                        </TouchableOpacity>
+                                    </View>
+                                )}
+                            </View>
+
+                            <View style={styles.statsContainer}>
+                                <View style={styles.statBox}>
+                                    <Text style={styles.statLabel}>Distance Covered</Text>
+                                    <Text style={styles.statValue}>{distanceCovered} KM</Text>
+                                    <Text style={styles.statSubtext}>
+                                        {Math.round((distanceCovered / parseInt(selectedTrip.distance.replace(' km', ''))) * 100)}% Complete
+                                    </Text>
+                                </View>
+
+                                <View style={styles.statBox}>
+                                    <Text style={styles.statLabel}>Remaining</Text>
+                                    <Text style={styles.statValue}>{parseInt(selectedTrip.distance.replace(' km', '')) - distanceCovered} KM</Text>
+                                    <Text style={styles.statSubtext}>
+                                        Est. {Math.round((parseInt(selectedTrip.distance.replace(' km', '')) - distanceCovered) / 60 * 60)} mins
+                                    </Text>
+                                </View>
+
+                                <View style={styles.statBox}>
+                                    <Text style={styles.statLabel}>Current Speed</Text>
+                                    <Text style={styles.statValue}>
+                                        {tripStarted ? "65 KM/H" : "0 KM/H"}
+                                    </Text>
+                                    <Text style={styles.statSubtext}>
+                                        {tripStarted ? "Highway" : "Stopped"}
+                                    </Text>
+                                </View>
+
+                                <View style={styles.statBox}>
+                                    <Text style={styles.statLabel}>ETA</Text>
+                                    <Text style={styles.statValue}>{selectedTrip.estimatedArrival}</Text>
+                                    <Text style={styles.statSubtext}>Today</Text>
+                                </View>
+                            </View>
+                        </>
+                    )}
+                </ScrollView>
+            </>
+        );
+    };
+
+    return currentView === 'tripsList' ? renderTripsListView() : renderNavigationView();
 }
 
 const styles = StyleSheet.create({
-    // Main Container Styles
     container: {
         flex: 1,
         backgroundColor: "#f5f7fa",
     },
 
-    // Header Styles
+    // Trips List Styles
     headerContainer: {
+        marginHorizontal: 16,
+        marginTop: 20,
+        marginBottom: 16,
+    },
+    header: {
+        fontSize: 28,
+        fontWeight: "bold",
+        color: "#1a1a1a",
+        marginBottom: 8,
+    },
+    statsRow: {
+        flexDirection: "row",
+        gap: 16,
+    },
+    statItem: {
+        fontSize: 14,
+        color: "#6B7280",
+        fontWeight: "500",
+    },
+
+    section: {
+        marginBottom: 24,
+    },
+    sectionHeader: {
+        flexDirection: "row",
+        justifyContent: "space-between",
+        alignItems: "center",
+        marginHorizontal: 16,
+        marginBottom: 12,
+    },
+    sectionTitle: {
+        fontSize: 18,
+        fontWeight: "bold",
+        color: "#1a1a1a",
+    },
+    sectionCount: {
+        backgroundColor: "#1a73e8",
+        color: "white",
+        paddingHorizontal: 8,
+        paddingVertical: 4,
+        borderRadius: 12,
+        fontSize: 12,
+        fontWeight: "bold",
+        minWidth: 24,
+        textAlign: "center",
+    },
+
+    // Trip Card Styles
+    tripCard: {
+        backgroundColor: "#fff",
+        marginHorizontal: 16,
+        marginBottom: 12,
+        borderRadius: 16,
+        padding: 16,
+        elevation: 4,
+        shadowColor: "#000",
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.1,
+        shadowRadius: 8,
+        borderLeftWidth: 4,
+        borderLeftColor: "#1a73e8",
+    },
+
+    tripHeader: {
+        flexDirection: "row",
+        justifyContent: "space-between",
+        alignItems: "flex-start",
+        marginBottom: 16,
+    },
+    tripId: {
+        fontSize: 20,
+        fontWeight: "bold",
+        color: "#1a1a1a",
+        marginBottom: 8,
+    },
+    statusRow: {
+        flexDirection: "row",
+        gap: 8,
+    },
+    statusBadge: {
+        paddingHorizontal: 8,
+        paddingVertical: 4,
+        borderRadius: 12,
+    },
+    statusText: {
+        color: "white",
+        fontSize: 10,
+        fontWeight: "bold",
+    },
+    priorityBadge: {
+        paddingHorizontal: 8,
+        paddingVertical: 4,
+        borderRadius: 12,
+    },
+    priorityText: {
+        color: "white",
+        fontSize: 10,
+        fontWeight: "bold",
+    },
+
+    tripMeta: {
+        alignItems: "flex-end",
+    },
+    distanceText: {
+        fontSize: 18,
+        fontWeight: "bold",
+        color: "#1a73e8",
+        marginBottom: 4,
+    },
+    durationText: {
+        fontSize: 14,
+        color: "#6B7280",
+    },
+
+    // Location Styles
+    routeInfo: {
+        marginBottom: 16,
+    },
+    locationRow: {
+        flexDirection: "row",
+        alignItems: "center",
+        marginBottom: 12,
+    },
+    locationDot: {
+        width: 44,
+        height: 44,
+        borderRadius: 22,
+        alignItems: "center",
+        justifyContent: "center",
+        marginRight: 12,
+    },
+    locationIcon: {
+        fontSize: 20,
+    },
+    locationDetails: {
+        flex: 1,
+    },
+    locationName: {
+        fontSize: 16,
+        fontWeight: "bold",
+        color: "#1a1a1a",
+        marginBottom: 2,
+    },
+    locationAddress: {
+        fontSize: 12,
+        color: "#6B7280",
+        marginBottom: 2,
+    },
+    locationTime: {
+        fontSize: 12,
+        color: "#1a73e8",
+        fontWeight: "500",
+    },
+    routeLine: {
+        width: 3,
+        height: 24,
+        backgroundColor: "#E5E7EB",
+        marginLeft: 20,
+        marginVertical: -8,
+    },
+
+    // Progress Styles
+    progressSection: {
+        backgroundColor: "#F8FAFC",
+        padding: 12,
+        borderRadius: 8,
+        marginBottom: 12,
+    },
+    progressHeader: {
+        flexDirection: "row",
+        justifyContent: "space-between",
+        alignItems: "center",
+        marginBottom: 8,
+    },
+    progressLabel: {
+        fontSize: 12,
+        color: "#374151",
+        fontWeight: "500",
+        flex: 1,
+    },
+    progressPercent: {
+        fontSize: 14,
+        fontWeight: "bold",
+        color: "#1a73e8",
+    },
+    progressBar: {
+        height: 6,
+        backgroundColor: "#E5E7EB",
+        borderRadius: 3,
+        overflow: "hidden",
+        marginBottom: 8,
+    },
+    progressFill: {
+        height: "100%",
+        backgroundColor: "#1a73e8",
+        borderRadius: 3,
+    },
+    etaText: {
+        fontSize: 12,
+        color: "#6B7280",
+        textAlign: "center",
+    },
+
+    // Cargo Info
+    cargoInfo: {
+        flexDirection: "row",
+        justifyContent: "space-between",
+        marginBottom: 12,
+        paddingTop: 12,
+        borderTopWidth: 1,
+        borderTopColor: "#F3F4F6",
+    },
+    cargoLabel: {
+        fontSize: 14,
+        color: "#374151",
+        fontWeight: "500",
+    },
+    cargoWeight: {
+        fontSize: 14,
+        color: "#6B7280",
+    },
+
+    viewDetailsButton: {
+        backgroundColor: "#1a73e8",
+        padding: 12,
+        borderRadius: 8,
+        alignItems: "center",
+    },
+    viewDetailsText: {
+        color: "white",
+        fontWeight: "600",
+        fontSize: 14,
+    },
+
+    // Empty State
+    emptyState: {
+        flex: 1,
+        alignItems: "center",
+        justifyContent: "center",
+        paddingVertical: 60,
+        paddingHorizontal: 32,
+    },
+    emptyIcon: {
+        fontSize: 64,
+        marginBottom: 16,
+    },
+    emptyTitle: {
+        fontSize: 20,
+        fontWeight: "bold",
+        color: "#1a1a1a",
+        marginBottom: 8,
+        textAlign: "center",
+    },
+    emptyText: {
+        fontSize: 14,
+        color: "#6B7280",
+        textAlign: "center",
+        lineHeight: 20,
+    },
+
+    // Navigation View Styles
+    navigationHeader: {
         flexDirection: "row",
         justifyContent: "space-between",
         alignItems: "center",
@@ -1179,10 +1659,21 @@ const styles = StyleSheet.create({
         marginTop: 20,
         marginBottom: 16,
     },
-    header: {
-        fontSize: 24,
-        fontWeight: "bold",
-        color: "#1a1a1a",
+    backButton: {
+        backgroundColor: "#fff",
+        paddingHorizontal: 16,
+        paddingVertical: 8,
+        borderRadius: 20,
+        elevation: 2,
+        shadowColor: "#000",
+        shadowOffset: { width: 0, height: 1 },
+        shadowOpacity: 0.1,
+        shadowRadius: 2,
+    },
+    backButtonText: {
+        color: "#1a73e8",
+        fontWeight: "600",
+        fontSize: 14,
     },
     liveIndicator: {
         backgroundColor: "#1a1a1a",
@@ -1196,102 +1687,52 @@ const styles = StyleSheet.create({
         fontWeight: "bold",
     },
 
-    // Card Styles
-    card: {
+    // Trip Details Card
+    tripDetailsCard: {
         backgroundColor: "#fff",
         marginHorizontal: 16,
         marginBottom: 16,
-        borderRadius: 12,
-        padding: 16,
-        elevation: 3,
+        borderRadius: 16,
+        padding: 20,
+        elevation: 4,
         shadowColor: "#000",
         shadowOffset: { width: 0, height: 2 },
         shadowOpacity: 0.1,
-        shadowRadius: 4,
+        shadowRadius: 8,
+        borderLeftWidth: 4,
+        borderLeftColor: "#1a73e8",
     },
-
-    // Row and Text Styles
-    row: {
+    tripDetailHeader: {
         flexDirection: "row",
         justifyContent: "space-between",
-        alignItems: "center",
-        marginBottom: 12,
+        alignItems: "flex-start",
+        marginBottom: 20,
     },
-    label: {
-        fontSize: 14,
-        color: "#666",
-        fontWeight: "500",
-    },
-    value: {
-        fontSize: 14,
-        fontWeight: "600",
+    tripDetailTitle: {
+        fontSize: 24,
+        fontWeight: "bold",
         color: "#1a1a1a",
     },
-    statusActive: {
-        color: "#1a73e8",
-    },
-    statusInactive: {
-        color: "#6B7280",
+    tripDetailBadges: {
+        flexDirection: "row",
+        gap: 8,
     },
 
-    // Route Section Styles
     routeSection: {
-        marginTop: 16,
+        marginBottom: 20,
+    },
+    cargoSection: {
         paddingTop: 16,
         borderTopWidth: 1,
-        borderTopColor: "#E5E7EB",
+        borderTopColor: "#F3F4F6",
     },
-    sectionTitle: {
-        fontSize: 16,
-        fontWeight: "bold",
-        color: "#1a1a1a",
-        marginBottom: 16,
-    },
-    locationRow: {
-        flexDirection: "row",
-        alignItems: "center",
-        marginBottom: 8,
-    },
-    locationDot: {
-        width: 40,
-        height: 40,
-        borderRadius: 20,
-        backgroundColor: "#1a73e8",
-        alignItems: "center",
-        justifyContent: "center",
-        marginRight: 12,
-    },
-    locationEmoji: {
-        fontSize: 18,
-    },
-    locationInfo: {
-        flex: 1,
-    },
-    locationLabel: {
+    tripDistance: {
         fontSize: 12,
-        color: "#666",
-        fontWeight: "500",
-    },
-    locationValue: {
-        fontSize: 16,
-        fontWeight: "bold",
-        color: "#1a1a1a",
-        marginTop: 2,
-    },
-    locationAddress: {
-        fontSize: 12,
-        color: "#9CA3AF",
-        marginTop: 1,
-    },
-    routeLine: {
-        width: 2,
-        height: 20,
-        backgroundColor: "#1a73e8",
-        marginLeft: 19,
-        marginVertical: 4,
+        color: "#6B7280",
+        marginTop: 4,
     },
 
-    // Navigation Card Styles
+    // Navigation Card
     navigationCard: {
         backgroundColor: "#1F2937",
         marginHorizontal: 16,
@@ -1338,7 +1779,7 @@ const styles = StyleSheet.create({
         color: "#9CA3AF",
     },
 
-    // Load Button Styles
+    // Map and Controls
     loadButton: {
         backgroundColor: "#1a73e8",
         marginHorizontal: 16,
@@ -1354,7 +1795,6 @@ const styles = StyleSheet.create({
         fontWeight: "600",
     },
 
-    // Full Screen Map Styles
     fullScreenContainer: {
         flex: 1,
         backgroundColor: "#000",
@@ -1369,7 +1809,6 @@ const styles = StyleSheet.create({
         height: height,
     },
 
-    // Regular Map Styles
     mapContainer: {
         marginHorizontal: 16,
         marginBottom: 16,
@@ -1387,7 +1826,6 @@ const styles = StyleSheet.create({
         height: 400,
     },
 
-    // Expand Button Styles
     expandButton: {
         position: "absolute",
         top: 12,
@@ -1408,7 +1846,6 @@ const styles = StyleSheet.create({
         fontWeight: "bold",
     },
 
-    // Control Styles
     controlsContainer: {
         marginHorizontal: 16,
         marginBottom: 16,
@@ -1456,12 +1893,12 @@ const styles = StyleSheet.create({
         fontWeight: "600",
     },
 
-    // Stats Container Styles
+    // Stats Container
     statsContainer: {
         flexDirection: "row",
         flexWrap: "wrap",
         marginHorizontal: 16,
-        marginBottom: 16,
+        marginBottom: 20,
         gap: 12,
     },
     statBox: {
@@ -1493,122 +1930,24 @@ const styles = StyleSheet.create({
         color: "#9CA3AF",
     },
 
-    // Instructions Card Styles
-    instructionsCard: {
-        backgroundColor: "#fff",
-        marginHorizontal: 16,
-        marginBottom: 20,
-        borderRadius: 12,
-        padding: 16,
-        elevation: 2,
-        borderLeftWidth: 4,
-        borderLeftColor: "#4285f4",
-    },
-    instructionsTitle: {
-        fontSize: 16,
-        fontWeight: "bold",
-        color: "#1a1a1a",
-        marginBottom: 12,
-    },
-    featureList: {
-        marginBottom: 16,
-    },
-    featureItem: {
-        fontSize: 14,
-        color: "#5f6368",
-        marginBottom: 6,
-        lineHeight: 20,
-    },
-    setupNote: {
-        backgroundColor: "#f8f9fa",
-        padding: 12,
-        borderRadius: 8,
-        borderLeftWidth: 3,
-        borderLeftColor: "#1a73e8",
-    },
-    setupTitle: {
-        fontSize: 14,
-        fontWeight: "bold",
-        color: "#1a73e8",
-        marginBottom: 8,
-    },
-    setupText: {
-        fontSize: 12,
-        color: "#5f6368",
-        marginBottom: 4,
-        lineHeight: 16,
-    },
-
-    // Responsive Styles for Tablets
+    // Responsive design for tablets
     '@media (min-width: 768px)': {
         container: {
             paddingHorizontal: 24,
         },
-        headerContainer: {
-            marginHorizontal: 24,
-        },
-        card: {
-            marginHorizontal: 24,
-        },
-        navigationCard: {
-            marginHorizontal: 24,
-        },
-        loadButton: {
+        tripCard: {
             marginHorizontal: 24,
         },
         mapContainer: {
             marginHorizontal: 24,
-            height: 500, // Larger height for tablets
+            height: 500,
         },
         map: {
             width: width - 48,
             height: 500,
         },
-        controlsContainer: {
-            marginHorizontal: 24,
-        },
-        statsContainer: {
-            marginHorizontal: 24,
-        },
-        instructionsCard: {
-            marginHorizontal: 24,
-        },
         statBox: {
-            minWidth: (width - 80) / 4, // 4 columns on tablets
-        },
-    },
-
-    // Dark Mode Support (Optional)
-    '@media (prefers-color-scheme: dark)': {
-        container: {
-            backgroundColor: "#1a1a1a",
-        },
-        card: {
-            backgroundColor: "#2d2d2d",
-        },
-        header: {
-            color: "#ffffff",
-        },
-        sectionTitle: {
-            color: "#ffffff",
-        },
-        locationValue: {
-            color: "#ffffff",
-        },
-        value: {
-            color: "#ffffff",
-        },
-        instructionsCard: {
-            backgroundColor: "#2d2d2d",
-        },
-        instructionsTitle: {
-            color: "#ffffff",
-        },
-        statBox: {
-            backgroundColor: "#2d2d2d",
-        },
-        statValue: {
-            color: "#ffffff",
+            minWidth: (width - 80) / 4,
         },
     },
 });

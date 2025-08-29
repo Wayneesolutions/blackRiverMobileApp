@@ -120,6 +120,7 @@ const CompleteTrips = () => {
     }
   ];
 
+
   const getStatusColor = (status: any) => {
     switch (status) {
       case "Delivered Early":
