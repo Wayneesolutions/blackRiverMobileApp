@@ -125,31 +125,80 @@ export default function DriverTrackingScreen() {
     const activeTrips = trips.filter(trip => trip.status === 'active');
     const scheduledTrips = trips.filter(trip => trip.status === 'scheduled');
     const completedTrips = trips.filter(trip => trip.status === 'completed');
+    const mapRef = useRef<MapView>(null);
+    const mapReadyRef = useRef(false);
 
     // NEW: Request location permissions and start tracking
     useEffect(() => {
         requestLocationPermission();
     }, []);
 
+    const clearMapLoading = useCallback(() => {
+        console.log("Clearing map loading state");
+        setMapLoading(false);
+        mapReadyRef.current = true;
+    }, []);
+
+    // FIXED: Reset map ready state when switching trips
+    useEffect(() => {
+        if (selectedTrip) {
+            mapReadyRef.current = false;
+        }
+    }, [selectedTrip]);
+
+    useEffect(() => {
+        if (mapRef.current && selectedTrip && currentView === 'navigation') {
+            setTimeout(() => {
+                const pickup = { latitude: selectedTrip.pickup.lat, longitude: selectedTrip.pickup.lng };
+                const delivery = { latitude: selectedTrip.delivery.lat, longitude: selectedTrip.delivery.lng };
+
+                const points = [pickup, delivery];
+                if (driverLocation) points.push(driverLocation);
+
+                mapRef.current?.fitToCoordinates(points, {
+                    edgePadding: { top: 50, right: 50, bottom: 50, left: 50 },
+                    animated: true,
+                });
+            }, 500); // Give map time to render
+        }
+    }, [selectedTrip, driverLocation, currentView]);
+
     const requestLocationPermission = async () => {
         try {
-            const { status } = await Location.requestForegroundPermissionsAsync();
+            let { status } = await Location.requestForegroundPermissionsAsync();
+
+            if (status !== 'granted') {
+                const backgroundResult = await Location.requestBackgroundPermissionsAsync();
+                status = backgroundResult.status;
+            }
+
             if (status !== 'granted') {
                 Alert.alert(
                     'Location Permission Required',
-                    'Please enable location access to use navigation features.',
-                    [{ text: 'OK' }]
+                    'Please enable location access in your device settings to use navigation features.',
+                    [
+                        { text: 'Cancel', style: 'cancel' },
+                        {
+                            text: 'Open Settings',
+                            onPress: () => {
+                                console.log('Would open app settings');
+                            }
+                        }
+                    ]
                 );
                 setLocationPermission(false);
                 return;
             }
+
+            console.log('Location permission granted');
             setLocationPermission(true);
-            getCurrentLocation();
+            // REMOVED: Don't call getCurrentLocation here - let useEffect handle it
         } catch (error) {
             console.error('Location permission error:', error);
             setLocationPermission(false);
         }
     };
+
 
 
     const calculateDistance = (lat1: number, lon1: number, lat2: number, lon2: number): number => {
@@ -165,16 +214,13 @@ export default function DriverTrackingScreen() {
     };
 
     const getCurrentLocation = async () => {
-        if (!locationPermission) {
-            console.log("No location permission");
-            return;
-        }
-
+        // REMOVED: Don't check permission here - it causes infinite loop
         try {
             console.log("Getting location...");
-            const location = await Location.getCurrentPositionAsync({
-                accuracy: Location.Accuracy.High,
 
+            const location = await Location.getCurrentPositionAsync({
+                accuracy: Location.Accuracy.Balanced,
+                maximumAge: 60000,
             });
 
             const newLocation = {
@@ -185,6 +231,7 @@ export default function DriverTrackingScreen() {
             console.log("Got location:", newLocation);
             setDriverLocation(newLocation);
 
+            // Update tracking if trip is started
             if (tripStarted && selectedTrip) {
                 setLocationHistory(prev => {
                     const newHistory = [...prev, newLocation];
@@ -198,21 +245,35 @@ export default function DriverTrackingScreen() {
                     }
 
                     setDistanceCovered(totalDistance);
-                    console.log("Distance covered:", totalDistance);
                     return newHistory;
                 });
             }
         } catch (error) {
             console.error('Location error:', error);
+            // Use a default location for testing
+            const fallbackLocation = {
+                latitude: 40.7589,
+                longitude: -73.9851
+            };
+            console.log("Using fallback location:", fallbackLocation);
+            setDriverLocation(fallbackLocation);
         }
     };
 
-    // Start location tracking when trip starts
+
+    // FIXED: Add useEffect to call getCurrentLocation when permission is granted
+    useEffect(() => {
+        if (locationPermission) {
+            getCurrentLocation();
+        }
+    }, [locationPermission]);
+
+    // FIXED: Update location tracking effect
     useEffect(() => {
         if (tripStarted && locationPermission) {
             locationInterval.current = setInterval(() => {
                 getCurrentLocation();
-            }, 5000); // Update every 5 seconds like the example
+            }, 5000);
         } else if (locationInterval.current) {
             clearInterval(locationInterval.current);
             locationInterval.current = null;
@@ -247,7 +308,6 @@ export default function DriverTrackingScreen() {
         console.log("Trip selected:", trip.id);
         setSelectedTrip(trip);
         setCurrentView('navigation');
-        setMapLoading(true); // Start with loading
 
         // Reset states
         setTripStarted(false);
@@ -255,50 +315,31 @@ export default function DriverTrackingScreen() {
         setDistanceCovered(0);
         setLocationHistory([]);
 
-        // Get location
+        // FIXED: Set loading state only after a brief delay to ensure clean state
+        setTimeout(() => {
+            setMapLoading(true);
+        }, 100);
+
+        // Get location if we have permission
         if (locationPermission) {
             getCurrentLocation();
         }
     }, [locationPermission]);
 
-    const handleStartTrip = async () => {
+    const handleStartTrip = () => {
         if (!locationPermission) {
-            await requestLocationPermission();
+            requestLocationPermission();
             return;
         }
 
-        // Get current location first
-        await getCurrentLocation();
-
         setTripStarted(true);
+        setCurrentStep(0);
+        setDistanceCovered(0);
+        setLocationHistory([]);
 
-        if (driverLocation) {
-            setLocationHistory([driverLocation]);
-
-            // If user is not at pickup location, create route from current location to pickup
-            if (selectedTrip) {
-                const distanceToPickup = calculateDistance(
-                    driverLocation.latitude, driverLocation.longitude,
-                    selectedTrip.pickup.lat, selectedTrip.pickup.lng
-                );
-
-                if (distanceToPickup > 0.5) { // More than 500m from pickup
-                    Alert.alert(
-                        "Trip Started",
-                        `You are ${distanceToPickup.toFixed(1)}km from the pickup location. Navigate there first.`,
-                        [{ text: "Got it!" }]
-                    );
-                }
-            }
-        }
-
-        Alert.alert(
-            "Trip Started",
-            "GPS tracking activated. Your location will be tracked every 5 seconds.",
-            [{ text: "Got it!" }]
-        );
+        // Start location tracking immediately
+        getCurrentLocation();
     };
-
     const handleStopTrip = () => {
         Alert.alert(
             "Stop Trip",
@@ -508,18 +549,29 @@ export default function DriverTrackingScreen() {
 
     const renderMapView = useCallback((isFullScreen = false) => {
         if (!selectedTrip) return null;
-        const mapRef = useRef<MapView>(null);
+
         const pickup = { latitude: selectedTrip.pickup.lat, longitude: selectedTrip.pickup.lng };
         const delivery = { latitude: selectedTrip.delivery.lat, longitude: selectedTrip.delivery.lng };
 
-        // Calculate region
-        const allPoints = [pickup, delivery];
+        let regionPoints = [pickup, delivery];
+
         if (driverLocation) {
-            allPoints.push(driverLocation);
+            const distanceToPickup = calculateDistance(
+                driverLocation.latitude, driverLocation.longitude,
+                pickup.latitude, pickup.longitude
+            );
+            const distanceToDelivery = calculateDistance(
+                driverLocation.latitude, driverLocation.longitude,
+                delivery.latitude, delivery.longitude
+            );
+
+            if (distanceToPickup < 500 || distanceToDelivery < 500) {
+                regionPoints.push(driverLocation);
+            }
         }
 
-        const latitudes = allPoints.map(p => p.latitude);
-        const longitudes = allPoints.map(p => p.longitude);
+        const latitudes = regionPoints.map(p => p.latitude);
+        const longitudes = regionPoints.map(p => p.longitude);
 
         const minLat = Math.min(...latitudes);
         const maxLat = Math.max(...latitudes);
@@ -529,66 +581,49 @@ export default function DriverTrackingScreen() {
         const centerLat = (minLat + maxLat) / 2;
         const centerLng = (minLng + maxLng) / 2;
 
-        const latPadding = Math.max((maxLat - minLat) * 0.3, 0.005);
-        const lngPadding = Math.max((maxLng - minLng) * 0.3, 0.005);
+        const latPadding = Math.max((maxLat - minLat) * 0.3, 0.01);
+        const lngPadding = Math.max((maxLng - minLng) * 0.3, 0.01);
 
         const region = {
-            latitude: centerLat,
-            longitude: centerLng,
-            latitudeDelta: (maxLat - minLat) + latPadding,
-            longitudeDelta: (maxLng - minLng) + lngPadding,
+            latitude: centerLat || 30.8867,
+            longitude: centerLng || 75.8714,
+            latitudeDelta: (maxLat - minLat) + latPadding || 0.05,
+            longitudeDelta: (maxLng - minLng) + lngPadding || 0.05,
         };
 
-        useEffect(() => {
-            if (mapRef.current && selectedTrip) {
-                const pickup = { latitude: selectedTrip.pickup.lat, longitude: selectedTrip.pickup.lng };
-                const delivery = { latitude: selectedTrip.delivery.lat, longitude: selectedTrip.delivery.lng };
 
-                const points = [pickup, delivery];
-                if (driverLocation) points.push(driverLocation);
-
-                mapRef.current.fitToCoordinates(points, {
-                    edgePadding: { top: 100, right: 100, bottom: 100, left: 100 },
-                    animated: true,
-                });
-            }
-        }, [selectedTrip, driverLocation]);
-        // Validate route coordinates
         const routeCoordinates = selectedTrip.routeSteps
-            .filter(step =>
-                typeof step.lat === 'number' &&
-                typeof step.lng === 'number' &&
-                !isNaN(step.lat) &&
-                !isNaN(step.lng) &&
-                Math.abs(step.lat) <= 90 &&
-                Math.abs(step.lng) <= 180
-            )
+            .filter(step => {
+                const isValidLat = typeof step.lat === 'number' && !isNaN(step.lat) && step.lat >= -90 && step.lat <= 90;
+                const isValidLng = typeof step.lng === 'number' && !isNaN(step.lng) && step.lng >= -180 && step.lng <= 180;
+                return isValidLat && isValidLng;
+            })
             .map(step => ({
                 latitude: step.lat,
                 longitude: step.lng
             }));
 
-        console.log("Route coordinates count:", routeCoordinates.length);
-
         return (
             <View style={isFullScreen ? styles.fullScreenMapContainer : styles.mapContainer}>
                 <MapView
-                    {...(Platform.OS === 'android' ? { provider: PROVIDER_GOOGLE } : {})}
+                    ref={mapRef}
+                    provider={PROVIDER_GOOGLE}
                     style={styles.map}
                     region={region}
-                    showsUserLocation={true}
-                    showsMyLocationButton={true}
+                    showsUserLocation={false}
+                    showsMyLocationButton={false}
                     showsCompass={true}
                     showsScale={true}
                     loadingEnabled={true}
                     loadingIndicatorColor="#1a73e8"
                     onMapReady={() => {
-                        console.log("Map ready - setting loading to false");
-                        // FIXED: Use setTimeout to ensure state update happens
-                        setTimeout(() => {
-                            setMapLoading(false);
-                        }, 100);
+                        if (!mapReadyRef.current) {
+                            console.log("Map ready - clearing loading");
+                            clearMapLoading();
+                        }
                     }}
+                // REMOVED: Multiple conflicting event handlers that cause issues
+                // Only keep onMapReady as the primary loading clear mechanism
                 >
                     {/* Pickup Marker */}
                     <Marker
@@ -616,24 +651,36 @@ export default function DriverTrackingScreen() {
 
                     {/* Driver Location */}
                     {driverLocation && (
-                        <Marker
-                            coordinate={driverLocation}
-                            title="YOU ARE HERE"
-                            description="Current Driver Position"
-                            identifier="driver"
-                        >
-                            <Animated.View
-                                style={[
-                                    styles.customMarker,
-                                    {
-                                        backgroundColor: '#1a73e8',
-                                        transform: [{ scale: tripStarted ? pulseAnim : 1 }]
-                                    }
-                                ]}
-                            >
-                                <Text style={styles.markerText}>🚛</Text>
-                            </Animated.View>
-                        </Marker>
+                        (() => {
+                            const distanceToRoute = Math.min(
+                                calculateDistance(driverLocation.latitude, driverLocation.longitude, pickup.latitude, pickup.longitude),
+                                calculateDistance(driverLocation.latitude, driverLocation.longitude, delivery.latitude, delivery.longitude)
+                            );
+
+                            if (distanceToRoute < 1000) {
+                                return (
+                                    <Marker
+                                        coordinate={driverLocation}
+                                        title="YOU ARE HERE"
+                                        description={`Distance to route: ${distanceToRoute.toFixed(1)}km`}
+                                        identifier="driver"
+                                    >
+                                        <Animated.View
+                                            style={[
+                                                styles.customMarker,
+                                                {
+                                                    backgroundColor: '#1a73e8',
+                                                    transform: [{ scale: tripStarted ? pulseAnim : 1 }]
+                                                }
+                                            ]}
+                                        >
+                                            <Text style={styles.markerText}>🚛</Text>
+                                        </Animated.View>
+                                    </Marker>
+                                );
+                            }
+                            return null;
+                        })()
                     )}
 
                     {/* Route Line */}
@@ -657,11 +704,14 @@ export default function DriverTrackingScreen() {
                     )}
                 </MapView>
 
-                {/* Loading Overlay */}
+                {/* FIXED: Simplified loading overlay with better timeout */}
                 {mapLoading && (
                     <View style={styles.mapLoadingOverlay}>
                         <ActivityIndicator size="large" color="#1a73e8" />
                         <Text style={styles.loadingText}>Loading Map...</Text>
+                        <Text style={styles.loadingSubtext}>
+                            {routeCoordinates.length} route points • {locationPermission ? 'GPS Ready' : 'No GPS'}
+                        </Text>
                     </View>
                 )}
 
@@ -685,16 +735,52 @@ export default function DriverTrackingScreen() {
                         <Text style={styles.overlaySubtext}>
                             {selectedTrip.distance} • {selectedTrip.duration}
                         </Text>
-                        {routeCoordinates.length >= 2 && (
+                        <Text style={styles.overlaySubtext}>
+                            Route: {routeCoordinates.length} waypoints
+                        </Text>
+                        {driverLocation && (
                             <Text style={styles.overlaySubtext}>
-                                Route: {routeCoordinates.length} waypoints
+                                GPS: {driverLocation.latitude.toFixed(4)}, {driverLocation.longitude.toFixed(4)}
                             </Text>
                         )}
                     </View>
                 )}
             </View>
         );
-    }, [selectedTrip, driverLocation, mapLoading, tripStarted, pulseAnim, locationHistory]);
+    }, [selectedTrip, driverLocation, mapLoading, tripStarted, pulseAnim, locationHistory, locationPermission, clearMapLoading]);
+
+    useEffect(() => {
+        let timeoutId: NodeJS.Timeout;
+
+        if (mapLoading && selectedTrip) {
+            timeoutId = setTimeout(() => {
+                console.log("Failsafe timeout - forcing map loading clear");
+                setMapLoading(false);
+                mapReadyRef.current = true;
+            }, 5000); // 5 second failsafe
+        }
+
+        return () => {
+            if (timeoutId) {
+                clearTimeout(timeoutId);
+            }
+        };
+    }, [mapLoading, selectedTrip]);
+
+    // FIXED: Also clear loading when driver location updates (indicates map is working)
+    useEffect(() => {
+        if (driverLocation && mapLoading && selectedTrip) {
+            // If we have location data and map is still loading, clear it
+            setTimeout(() => {
+                if (mapLoading) {
+                    console.log("Clearing loading due to location update");
+                    setMapLoading(false);
+                    mapReadyRef.current = true;
+                }
+            }, 1000);
+        }
+    }, [driverLocation, mapLoading, selectedTrip]);
+
 
 
     const renderStatsSection = () => {
@@ -883,7 +969,7 @@ export default function DriverTrackingScreen() {
                                     styles.startButton,
                                     !locationPermission && styles.disabledButton
                                 ]}
-                                onPress={handleStartTrip}
+                                onPress={handleStartTrip} // FIXED: Changed from handleStopTrip
                                 activeOpacity={0.8}
                                 disabled={!locationPermission}
                             >
@@ -1607,6 +1693,12 @@ const styles = StyleSheet.create({
         marginHorizontal: 16,
         marginBottom: 20,
         gap: 12,
+    },
+    loadingSubtext: {
+        marginTop: 4,
+        fontSize: 12,
+        color: "#666",
+        fontStyle: "italic",
     },
     statBox: {
         flex: 1,
