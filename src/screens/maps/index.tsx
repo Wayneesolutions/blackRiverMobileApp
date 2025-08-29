@@ -12,13 +12,57 @@ import {
     StatusBar,
     FlatList,
     RefreshControl,
+    Platform,
+    SafeAreaView,
+    ActivityIndicator
 } from "react-native";
-import { WebView } from "react-native-webview";
+// CRITICAL CHANGE: Replace WebView with react-native-maps
+import MapView, { Marker, Polyline, PROVIDER_GOOGLE, Region } from "react-native-maps";
+import * as Location from "expo-location";
 
 const { width, height } = Dimensions.get("window");
 
-// Sample trips data - replace with API call
-const SAMPLE_TRIPS = [
+interface Location {
+    lat: number;
+    lng: number;
+}
+
+interface LocationDetails {
+    location: string;
+    address: string;
+    lat: number;
+    lng: number;
+    time: string;
+}
+
+interface RouteStep {
+    lat: number;
+    lng: number;
+    instruction: string;
+    distance: string;
+    type: 'start' | 'highway' | 'merge' | 'destination';
+}
+
+interface Trip {
+    id: string;
+    status: 'active' | 'scheduled' | 'completed';
+    priority: 'urgent' | 'high' | 'medium' | 'low';
+    pickup: LocationDetails;
+    delivery: LocationDetails;
+    distance: string;
+    duration: string;
+    cargo: string;
+    cargoWeight: string;
+    driverProgress: number;
+    currentLocation: string;
+    estimatedArrival: string;
+    startedAt: string | null;
+    completedAt?: string;
+    routeSteps: RouteStep[];
+}
+
+// Sample trips data - same as your original
+const SAMPLE_TRIPS: Trip[] = [
     {
         id: "TRP001",
         status: "active",
@@ -55,139 +99,131 @@ const SAMPLE_TRIPS = [
             { lat: 42.3601, lng: -71.0589, instruction: "Exit to downtown Boston - Destination reached", distance: "30 km", type: "destination" }
         ]
     },
-    {
-        id: "TRP002",
-        status: "scheduled",
-        priority: "medium",
-        pickup: {
-            location: "Brooklyn Warehouse",
-            address: "500 Hamilton Avenue, Brooklyn, NY 11232",
-            lat: 40.6782,
-            lng: -74.0151,
-            time: "11:00 AM"
-        },
-        delivery: {
-            location: "Philadelphia Center",
-            address: "1600 Market Street, Philadelphia, PA 19103",
-            lat: 39.9526,
-            lng: -75.1652,
-            time: "03:00 PM"
-        },
-        distance: "160 km",
-        duration: "3h 15m",
-        cargo: "Medical Supplies",
-        cargoWeight: "800 kg",
-        driverProgress: 0,
-        currentLocation: "Brooklyn Warehouse",
-        estimatedArrival: "3:15 PM",
-        startedAt: null,
-        routeSteps: [
-            { lat: 40.6782, lng: -74.0151, instruction: "Start from Brooklyn Warehouse", distance: "0 km", type: "start" },
-            { lat: 40.6892, lng: -74.0445, instruction: "Take I-278 W toward Staten Island", distance: "15 km", type: "highway" },
-            { lat: 40.5795, lng: -74.1502, instruction: "Continue on I-95 S toward New Jersey", distance: "35 km", type: "highway" },
-            { lat: 40.0583, lng: -74.4057, instruction: "Take I-195 W toward Trenton", distance: "45 km", type: "highway" },
-            { lat: 39.9526, lng: -75.1652, instruction: "Exit to downtown Philadelphia", distance: "65 km", type: "destination" }
-        ]
-    },
-    {
-        id: "TRP003",
-        status: "active",
-        priority: "urgent",
-        pickup: {
-            location: "Newark Industrial",
-            address: "200 Industrial Way, Newark, NJ 07114",
-            lat: 40.7357,
-            lng: -74.1724,
-            time: "08:15 AM"
-        },
-        delivery: {
-            location: "Washington DC Metro",
-            address: "1000 Constitution Ave, Washington, DC 20001",
-            lat: 38.8951,
-            lng: -77.0364,
-            time: "01:00 PM"
-        },
-        distance: "320 km",
-        duration: "5h 45m",
-        cargo: "Government Documents",
-        cargoWeight: "200 kg",
-        driverProgress: 60,
-        currentLocation: "Baltimore, MD",
-        estimatedArrival: "1:15 PM",
-        startedAt: "08:30 AM",
-        routeSteps: [
-            { lat: 40.7357, lng: -74.1724, instruction: "Start from Newark Industrial", distance: "0 km", type: "start" },
-            { lat: 40.7282, lng: -74.0776, instruction: "Take I-78 W toward Manhattan", distance: "25 km", type: "highway" },
-            { lat: 40.7589, lng: -73.9851, instruction: "Continue on I-95 S toward New Jersey", distance: "45 km", type: "highway" },
-            { lat: 39.2904, lng: -76.6122, instruction: "Take I-95 S through Baltimore", distance: "180 km", type: "highway" },
-            { lat: 38.8951, lng: -77.0364, instruction: "Exit to Washington DC downtown", distance: "70 km", type: "destination" }
-        ]
-    },
-    {
-        id: "TRP004",
-        status: "completed",
-        priority: "low",
-        pickup: {
-            location: "Queens Distribution",
-            address: "45-10 Court Square, Long Island City, NY 11101",
-            lat: 40.7505,
-            lng: -73.9426,
-            time: "07:00 AM"
-        },
-        delivery: {
-            location: "Hartford Office",
-            address: "280 Trumbull Street, Hartford, CT 06103",
-            lat: 41.7658,
-            lng: -72.6851,
-            time: "11:30 AM"
-        },
-        distance: "180 km",
-        duration: "3h 00m",
-        cargo: "Office Furniture",
-        cargoWeight: "1,500 kg",
-        driverProgress: 100,
-        currentLocation: "Hartford Office - Delivered",
-        estimatedArrival: "11:30 AM",
-        startedAt: "07:15 AM",
-        completedAt: "11:25 AM"
-    }
+    // ... your other sample trips
 ];
 
 export default function DriverTrackingScreen() {
-    const [currentView, setCurrentView] = useState('tripsList'); // 'tripsList' or 'navigation'
-    const [selectedTrip, setSelectedTrip] = useState(null);
-    const [trips, setTrips] = useState(SAMPLE_TRIPS);
-    const [refreshing, setRefreshing] = useState(false);
-    const [showMap, setShowMap] = useState(false);
-    const [fullScreenMap, setFullScreenMap] = useState(false);
-    const [tripStarted, setTripStarted] = useState(false);
-    const [currentStep, setCurrentStep] = useState(0);
-    const [distanceCovered, setDistanceCovered] = useState(0);
-    const [currentLocation, setCurrentLocation] = useState(null);
+    const [currentView, setCurrentView] = useState<'tripsList' | 'navigation'>('tripsList');
+    const [selectedTrip, setSelectedTrip] = useState<Trip | null>(null);
+    const [trips, setTrips] = useState<Trip[]>(SAMPLE_TRIPS);
+    const [refreshing, setRefreshing] = useState<boolean>(false);
+    const [fullScreenMap, setFullScreenMap] = useState<boolean>(false);
+    const [tripStarted, setTripStarted] = useState<boolean>(false);
+    const [currentStep, setCurrentStep] = useState<number>(0);
+    const [distanceCovered, setDistanceCovered] = useState<number>(0);
+
+    // NEW: Add real location tracking states
+    const [driverLocation, setDriverLocation] = useState<{ latitude: number, longitude: number } | null>(null);
+    const [locationHistory, setLocationHistory] = useState<{ latitude: number, longitude: number }[]>([]);
+    const [locationPermission, setLocationPermission] = useState<boolean>(false);
+    const [mapLoading, setMapLoading] = useState<boolean>(true);
+
     const pulseAnim = useRef(new Animated.Value(1)).current;
+    const locationInterval = useRef<NodeJS.Timeout | null>(null);
 
     // Filter trips by status
     const activeTrips = trips.filter(trip => trip.status === 'active');
     const scheduledTrips = trips.filter(trip => trip.status === 'scheduled');
     const completedTrips = trips.filter(trip => trip.status === 'completed');
 
+    // NEW: Request location permissions and start tracking
     useEffect(() => {
-        if (tripStarted && selectedTrip) {
-            const interval = setInterval(() => {
-                setCurrentStep(prev => {
-                    const next = prev + 1;
-                    if (next < selectedTrip.routeSteps.length) {
-                        setDistanceCovered(prev => prev + 5);
-                        setCurrentLocation(selectedTrip.routeSteps[next]);
-                        return next;
-                    }
-                    return prev;
-                });
-            }, 8000);
+        requestLocationPermission();
+    }, []);
 
-            return () => clearInterval(interval);
+    const requestLocationPermission = async () => {
+        try {
+            const { status } = await Location.requestForegroundPermissionsAsync();
+            if (status !== 'granted') {
+                Alert.alert(
+                    'Location Permission Required',
+                    'Please enable location access to use navigation features.',
+                    [{ text: 'OK' }]
+                );
+                setLocationPermission(false);
+                return;
+            }
+            setLocationPermission(true);
+            getCurrentLocation();
+        } catch (error) {
+            console.error('Location permission error:', error);
+            setLocationPermission(false);
         }
-    }, [tripStarted, selectedTrip]);
+    };
+
+
+    const calculateDistance = (lat1: number, lon1: number, lat2: number, lon2: number): number => {
+        const R = 6371; // Radius of the Earth in kilometers
+        const dLat = (lat2 - lat1) * (Math.PI / 180);
+        const dLon = (lon2 - lon1) * (Math.PI / 180);
+        const a =
+            Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+            Math.cos(lat1 * (Math.PI / 180)) * Math.cos(lat2 * (Math.PI / 180)) *
+            Math.sin(dLon / 2) * Math.sin(dLon / 2);
+        const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+        return R * c;
+    };
+
+    const getCurrentLocation = async () => {
+        if (!locationPermission) {
+            console.log("No location permission");
+            return;
+        }
+
+        try {
+            console.log("Getting location...");
+            const location = await Location.getCurrentPositionAsync({
+                accuracy: Location.Accuracy.High,
+
+            });
+
+            const newLocation = {
+                latitude: location.coords.latitude,
+                longitude: location.coords.longitude,
+            };
+
+            console.log("Got location:", newLocation);
+            setDriverLocation(newLocation);
+
+            if (tripStarted && selectedTrip) {
+                setLocationHistory(prev => {
+                    const newHistory = [...prev, newLocation];
+
+                    let totalDistance = 0;
+                    for (let i = 1; i < newHistory.length; i++) {
+                        totalDistance += calculateDistance(
+                            newHistory[i - 1].latitude, newHistory[i - 1].longitude,
+                            newHistory[i].latitude, newHistory[i].longitude
+                        );
+                    }
+
+                    setDistanceCovered(totalDistance);
+                    console.log("Distance covered:", totalDistance);
+                    return newHistory;
+                });
+            }
+        } catch (error) {
+            console.error('Location error:', error);
+        }
+    };
+
+    // Start location tracking when trip starts
+    useEffect(() => {
+        if (tripStarted && locationPermission) {
+            locationInterval.current = setInterval(() => {
+                getCurrentLocation();
+            }, 5000); // Update every 5 seconds like the example
+        } else if (locationInterval.current) {
+            clearInterval(locationInterval.current);
+            locationInterval.current = null;
+        }
+
+        return () => {
+            if (locationInterval.current) {
+                clearInterval(locationInterval.current);
+            }
+        };
+    }, [tripStarted, locationPermission]);
 
     useEffect(() => {
         if (tripStarted) {
@@ -202,33 +238,62 @@ export default function DriverTrackingScreen() {
 
     const onRefresh = () => {
         setRefreshing(true);
-        // Simulate API call
         setTimeout(() => {
             setRefreshing(false);
         }, 1000);
     };
 
-    const handleTripSelect = (trip: any) => {
+    const handleTripSelect = (trip: Trip) => {
         setSelectedTrip(trip);
         setCurrentView('navigation');
+        setMapLoading(true); // FIXED: Start with loading true, let onMapReady set it false
 
-        // If trip is already active, set initial progress
-        if (trip.status === 'active') {
-            const initialStep = Math.floor((trip.driverProgress / 100) * trip.routeSteps.length);
-            setCurrentStep(initialStep);
-            setCurrentLocation(trip.routeSteps[initialStep]);
-            setDistanceCovered(trip.driverProgress * 2.4); // 240km * progress
+        // Reset tracking states
+        setTripStarted(false);
+        setCurrentStep(0);
+        setDistanceCovered(0);
+        setLocationHistory([]);
+
+        // Get current location
+        if (locationPermission) {
+            getCurrentLocation();
         }
     };
 
-    const handleStartTrip = () => {
-        setTripStarted(true);
-        if (selectedTrip && selectedTrip.routeSteps.length > 0) {
-            setCurrentLocation(selectedTrip.routeSteps[0]);
+    const handleStartTrip = async () => {
+        if (!locationPermission) {
+            await requestLocationPermission();
+            return;
         }
+
+        // Get current location first
+        await getCurrentLocation();
+
+        setTripStarted(true);
+
+        if (driverLocation) {
+            setLocationHistory([driverLocation]);
+
+            // If user is not at pickup location, create route from current location to pickup
+            if (selectedTrip) {
+                const distanceToPickup = calculateDistance(
+                    driverLocation.latitude, driverLocation.longitude,
+                    selectedTrip.pickup.lat, selectedTrip.pickup.lng
+                );
+
+                if (distanceToPickup > 0.5) { // More than 500m from pickup
+                    Alert.alert(
+                        "Trip Started",
+                        `You are ${distanceToPickup.toFixed(1)}km from the pickup location. Navigate there first.`,
+                        [{ text: "Got it!" }]
+                    );
+                }
+            }
+        }
+
         Alert.alert(
             "Trip Started",
-            "GPS tracking activated. Follow the route instructions for safe navigation.",
+            "GPS tracking activated. Your location will be tracked every 5 seconds.",
             [{ text: "Got it!" }]
         );
     };
@@ -246,7 +311,12 @@ export default function DriverTrackingScreen() {
                         setTripStarted(false);
                         setCurrentStep(0);
                         setDistanceCovered(0);
-                        setCurrentLocation(null);
+                        setLocationHistory([]);
+
+                        if (locationInterval.current) {
+                            clearInterval(locationInterval.current);
+                            locationInterval.current = null;
+                        }
                     }
                 }
             ]
@@ -257,13 +327,17 @@ export default function DriverTrackingScreen() {
         setCurrentView('tripsList');
         setSelectedTrip(null);
         setTripStarted(false);
-        setShowMap(false);
         setCurrentStep(0);
         setDistanceCovered(0);
-        setCurrentLocation(null);
+        setLocationHistory([]);
+
+        if (locationInterval.current) {
+            clearInterval(locationInterval.current);
+            locationInterval.current = null;
+        }
     };
 
-    const getPriorityColor = (priority: any) => {
+    const getPriorityColor = (priority: Trip['priority']) => {
         switch (priority) {
             case 'urgent': return '#DC2626';
             case 'high': return '#EA580C';
@@ -273,7 +347,7 @@ export default function DriverTrackingScreen() {
         }
     };
 
-    const getStatusColor = (status: any) => {
+    const getStatusColor = (status: Trip['status']) => {
         switch (status) {
             case 'active': return '#1a73e8';
             case 'scheduled': return '#CA8A04';
@@ -282,27 +356,27 @@ export default function DriverTrackingScreen() {
         }
     };
 
-    const renderTripCard = ({ item: trip }) => (
+    const renderTripCard = ({ item }: { item: Trip }) => (
         <TouchableOpacity
             style={styles.tripCard}
-            onPress={() => handleTripSelect(trip)}
+            onPress={() => handleTripSelect(item)}
             activeOpacity={0.8}
         >
             <View style={styles.tripHeader}>
                 <View>
-                    <Text style={styles.tripId}>{trip.id}</Text>
+                    <Text style={styles.tripId}>{item.id}</Text>
                     <View style={styles.statusRow}>
-                        <View style={[styles.statusBadge, { backgroundColor: getStatusColor(trip.status) }]}>
-                            <Text style={styles.statusText}>{trip.status.toUpperCase()}</Text>
+                        <View style={[styles.statusBadge, { backgroundColor: getStatusColor(item.status) }]}>
+                            <Text style={styles.statusText}>{item.status.toUpperCase()}</Text>
                         </View>
-                        <View style={[styles.priorityBadge, { backgroundColor: getPriorityColor(trip.priority) }]}>
-                            <Text style={styles.priorityText}>{trip.priority.toUpperCase()}</Text>
+                        <View style={[styles.priorityBadge, { backgroundColor: getPriorityColor(item.priority) }]}>
+                            <Text style={styles.priorityText}>{item.priority.toUpperCase()}</Text>
                         </View>
                     </View>
                 </View>
                 <View style={styles.tripMeta}>
-                    <Text style={styles.distanceText}>{trip.distance}</Text>
-                    <Text style={styles.durationText}>{trip.duration}</Text>
+                    <Text style={styles.distanceText}>{item.distance}</Text>
+                    <Text style={styles.durationText}>{item.duration}</Text>
                 </View>
             </View>
 
@@ -312,9 +386,9 @@ export default function DriverTrackingScreen() {
                         <Text style={styles.locationIcon}>📦</Text>
                     </View>
                     <View style={styles.locationDetails}>
-                        <Text style={styles.locationName}>{trip.pickup.location}</Text>
-                        <Text style={styles.locationAddress}>{trip.pickup.address}</Text>
-                        <Text style={styles.locationTime}>Pickup: {trip.pickup.time}</Text>
+                        <Text style={styles.locationName}>{item.pickup.location}</Text>
+                        <Text style={styles.locationAddress}>{item.pickup.address}</Text>
+                        <Text style={styles.locationTime}>Pickup: {item.pickup.time}</Text>
                     </View>
                 </View>
 
@@ -325,33 +399,32 @@ export default function DriverTrackingScreen() {
                         <Text style={styles.locationIcon}>🏁</Text>
                     </View>
                     <View style={styles.locationDetails}>
-                        <Text style={styles.locationName}>{trip.delivery.location}</Text>
-                        <Text style={styles.locationAddress}>{trip.delivery.address}</Text>
-                        <Text style={styles.locationTime}>Delivery: {trip.delivery.time}</Text>
+                        <Text style={styles.locationName}>{item.delivery.location}</Text>
+                        <Text style={styles.locationAddress}>{item.delivery.address}</Text>
+                        <Text style={styles.locationTime}>Delivery: {item.delivery.time}</Text>
                     </View>
                 </View>
             </View>
 
-            {trip.status === 'active' && (
+            {item.status === 'active' && (
                 <View style={styles.progressSection}>
                     <View style={styles.progressHeader}>
-                        <Text style={styles.progressLabel}>Current Location: {trip.currentLocation}</Text>
-                        <Text style={styles.progressPercent}>{trip.driverProgress}%</Text>
+                        <Text style={styles.progressLabel}>Current Location: {item.currentLocation}</Text>
+                        <Text style={styles.progressPercent}>{item.driverProgress}%</Text>
                     </View>
                     <View style={styles.progressBar}>
-                        <View style={[styles.progressFill, { width: `${trip.driverProgress}%` }]} />
+                        <View style={[styles.progressFill, { width: `${item.driverProgress}%` }]} />
                     </View>
-                    <Text style={styles.etaText}>ETA: {trip.estimatedArrival}</Text>
+                    <Text style={styles.etaText}>ETA: {item.estimatedArrival}</Text>
                 </View>
             )}
 
             <View style={styles.cargoInfo}>
-                <Text style={styles.cargoLabel}>Cargo: {trip.cargo}</Text>
-                <Text style={styles.cargoWeight}>Weight: {trip.cargoWeight}</Text>
+                <Text style={styles.cargoLabel}>Cargo: {item.cargo}</Text>
+                <Text style={styles.cargoWeight}>Weight: {item.cargoWeight}</Text>
             </View>
 
-            <TouchableOpacity style={styles.viewDetailsButton}
-                onPress={() => handleTripSelect(trip)}>
+            <TouchableOpacity style={styles.viewDetailsButton}>
                 <Text style={styles.viewDetailsText}>View Route & Navigate →</Text>
             </TouchableOpacity>
         </TouchableOpacity>
@@ -365,7 +438,6 @@ export default function DriverTrackingScreen() {
             }
             showsVerticalScrollIndicator={false}
         >
-            {/* Header */}
             <View style={styles.headerContainer}>
                 <Text style={styles.header}>Driver Operations</Text>
                 <View style={styles.statsRow}>
@@ -375,7 +447,6 @@ export default function DriverTrackingScreen() {
                 </View>
             </View>
 
-            {/* Active Trips Section */}
             {activeTrips.length > 0 && (
                 <View style={styles.section}>
                     <View style={styles.sectionHeader}>
@@ -392,7 +463,6 @@ export default function DriverTrackingScreen() {
                 </View>
             )}
 
-            {/* Scheduled Trips Section */}
             {scheduledTrips.length > 0 && (
                 <View style={styles.section}>
                     <View style={styles.sectionHeader}>
@@ -409,7 +479,6 @@ export default function DriverTrackingScreen() {
                 </View>
             )}
 
-            {/* Completed Trips Section */}
             {completedTrips.length > 0 && (
                 <View style={styles.section}>
                     <View style={styles.sectionHeader}>
@@ -436,764 +505,153 @@ export default function DriverTrackingScreen() {
         </ScrollView>
     );
 
-    const generateMapHtml = (trip: any) => `
-    <!DOCTYPE html>
-    <html>
-    <head>
-        <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        <style>
-            body { 
-                margin: 0; 
-                padding: 0; 
-                font-family: 'Roboto', Arial, sans-serif;
-                background: #f8f9fa;
-            }
-            
-            #map { 
-                height: 100vh; 
-                width: 100%; 
-                border-radius: 0;
-            }
-            
-            .control-panel {
-                position: absolute;
-                top: 15px;
-                left: 15px;
-                background: rgba(255, 255, 255, 0.95);
-                backdrop-filter: blur(10px);
-                border-radius: 12px;
-                padding: 15px;
-                box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
-                max-width: 320px;
-                z-index: 1000;
-                border: 1px solid rgba(255, 255, 255, 0.2);
-            }
-            
-            .route-header {
-                display: flex;
-                align-items: center;
-                margin-bottom: 10px;
-                font-weight: 600;
-                color: #1a73e8;
-                font-size: 16px;
-            }
-            
-            .trip-info {
-                font-size: 12px;
-                color: #5f6368;
-                line-height: 1.4;
-                margin-bottom: 10px;
-            }
-            
-            .route-stats {
-                display: flex;
-                justify-content: space-between;
-                margin-top: 10px;
-                padding-top: 10px;
-                border-top: 1px solid #e8eaed;
-            }
-            
-            .stat-item {
-                text-align: center;
-            }
-            
-            .stat-value {
-                font-weight: 600;
-                color: #1a73e8;
-                font-size: 14px;
-            }
-            
-            .stat-label {
-                font-size: 10px;
-                color: #5f6368;
-                text-transform: uppercase;
-                letter-spacing: 0.5px;
-            }
-            
-            .speed-indicator {
-                position: absolute;
-                top: 15px;
-                right: 15px;
-                background: linear-gradient(135deg, #1a73e8, #4285f4);
-                color: white;
-                padding: 12px 16px;
-                border-radius: 25px;
-                font-weight: 600;
-                font-size: 14px;
-                box-shadow: 0 4px 20px rgba(26, 115, 232, 0.3);
-                z-index: 1000;
-                display: flex;
-                align-items: center;
-                gap: 8px;
-            }
-            
-            .custom-zoom-controls {
-                position: absolute;
-                bottom: 120px;
-                right: 15px;
-                display: flex;
-                flex-direction: column;
-                gap: 2px;
-                z-index: 1000;
-            }
-            
-            .zoom-btn {
-                width: 40px;
-                height: 40px;
-                background: white;
-                border: 2px solid #dadce0;
-                border-radius: 6px;
-                display: flex;
-                align-items: center;
-                justify-content: center;
-                cursor: pointer;
-                font-size: 18px;
-                font-weight: bold;
-                color: #3c4043;
-                box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
-                transition: all 0.2s ease;
-                user-select: none;
-            }
-            
-            .zoom-btn:hover {
-                background: #f8f9fa;
-                box-shadow: 0 4px 15px rgba(0, 0, 0, 0.15);
-            }
-            
-            .map-controls {
-                position: absolute;
-                bottom: 15px;
-                left: 15px;
-                display: flex;
-                gap: 8px;
-                z-index: 1000;
-                flex-wrap: wrap;
-            }
-            
-            .control-btn {
-                background: white;
-                border: 1px solid #dadce0;
-                border-radius: 20px;
-                padding: 8px 12px;
-                font-size: 12px;
-                color: #3c4043;
-                cursor: pointer;
-                box-shadow: 0 2px 6px rgba(0, 0, 0, 0.1);
-                transition: all 0.2s ease;
-                font-weight: 500;
-            }
-            
-            .control-btn:hover, .control-btn.active {
-                background: #1a73e8;
-                color: white;
-                box-shadow: 0 4px 12px rgba(26, 115, 232, 0.3);
-            }
-            
-            .exit-fullscreen {
-                position: absolute;
-                top: 15px;
-                right: 70px;
-                background: rgba(255, 255, 255, 0.95);
-                backdrop-filter: blur(10px);
-                border-radius: 50px;
-                padding: 12px;
-                cursor: pointer;
-                box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
-                z-index: 1000;
-                color: #1a73e8;
-                font-size: 20px;
-                font-weight: bold;
-                transition: all 0.2s ease;
-                display: none;
-            }
-            
-            .exit-fullscreen:hover {
-                background: #1a73e8;
-                color: white;
-            }
-            
-            .exit-fullscreen.show {
-                display: block;
-            }
-            
-            .progress-container {
-                position: absolute;
-                bottom: 70px;
-                left: 15px;
-                right: 15px;
-                background: rgba(255, 255, 255, 0.95);
-                backdrop-filter: blur(10px);
-                border-radius: 8px;
-                padding: 12px;
-                box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
-                z-index: 1000;
-            }
-            
-            .progress-bar {
-                width: 100%;
-                height: 6px;
-                background: #e8eaed;
-                border-radius: 3px;
-                overflow: hidden;
-                margin-bottom: 8px;
-            }
-            
-            .progress-fill {
-                height: 100%;
-                background: linear-gradient(90deg, #1a73e8, #4285f4);
-                border-radius: 3px;
-                transition: width 0.3s ease;
-                width: 0%;
-            }
-            
-            .progress-text {
-                font-size: 11px;
-                color: #5f6368;
-                text-align: center;
-                font-weight: 500;
-            }
-            
-            .fallback-map {
-                height: 100vh;
-                width: 100%;
-                background: linear-gradient(45deg, #f0f2f5, #e4e6ea);
-                display: flex;
-                align-items: center;
-                justify-content: center;
-                flex-direction: column;
-                color: #1a73e8;
-                font-family: 'Roboto', Arial, sans-serif;
-            }
-            
-            .fallback-content {
-                text-align: center;
-                max-width: 300px;
-                padding: 20px;
-            }
-            
-            .fallback-icon {
-                font-size: 48px;
-                margin-bottom: 16px;
-            }
-            
-            .fallback-title {
-                font-size: 18px;
-                font-weight: bold;
-                margin-bottom: 8px;
-                color: #1a73e8;
-            }
-            
-            .fallback-text {
-                font-size: 14px;
-                color: #5f6368;
-                line-height: 1.4;
-                margin-bottom: 16px;
-            }
-            
-            .route-display {
-                background: white;
-                border-radius: 8px;
-                padding: 16px;
-                box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
-                margin-top: 20px;
-            }
-            
-            .route-step {
-                padding: 8px 0;
-                border-bottom: 1px solid #e8eaed;
-                font-size: 12px;
-                color: #5f6368;
-            }
-            
-            .route-step:last-child {
-                border-bottom: none;
-            }
-            
-            .route-step.active {
-                color: #1a73e8;
-                font-weight: 600;
-            }
-        </style>
-    </head>
-    <body>
-        <div id="map"></div>
-        <div id="fallback-map" class="fallback-map" style="display: none;">
-            <div class="fallback-content">
-                <div class="fallback-icon">🗺️</div>
-                <div class="fallback-title">Route Navigation</div>
-                <div class="fallback-text">
-                    Trip ${trip.id}: ${trip.pickup.location} to ${trip.delivery.location}
-                </div>
-                <div class="route-display" id="route-display">
-                    <!-- Route steps will be populated here -->
-                </div>
-            </div>
-        </div>
-        
-        <div class="exit-fullscreen" id="exitFullscreen" onclick="exitFullScreen()">
-            ✕
-        </div>
-        
-        <div class="control-panel">
-            <div class="route-header">
-                🚛 Trip ${trip.id}
-            </div>
-            <div class="trip-info">
-                <div><strong>From:</strong> ${trip.pickup.location}</div>
-                <div><strong>To:</strong> ${trip.delivery.location}</div>
-                <div><strong>Cargo:</strong> ${trip.cargo}</div>
-                <div><strong>Weight:</strong> ${trip.cargoWeight}</div>
-                <div id="next-instruction" style="margin-top: 8px; font-weight: 500; color: #1a73e8;">
-                    Ready for navigation
-                </div>
-            </div>
-            <div class="route-stats">
-                <div class="stat-item">
-                    <div class="stat-value" id="total-distance">${trip.distance}</div>
-                    <div class="stat-label">Distance</div>
-                </div>
-                <div class="stat-item">
-                    <div class="stat-value" id="total-time">${trip.duration}</div>
-                    <div class="stat-label">Duration</div>
-                </div>
-                <div class="stat-item">
-                    <div class="stat-value" id="remaining-distance">${trip.distance}</div>
-                    <div class="stat-label">Remaining</div>
-                </div>
-            </div>
-        </div>
-        
-        <div class="speed-indicator">
-            <span>🚛</span>
-            <span id="current-speed">0 km/h</span>
-        </div>
-        
-        <div class="custom-zoom-controls">
-            <div class="zoom-btn" onclick="zoomIn()">+</div>
-            <div class="zoom-btn" onclick="zoomOut()">−</div>
-        </div>
-        
-        <div class="map-controls">
-            <div class="control-btn active" onclick="setMapType('roadmap')">Map</div>
-            <div class="control-btn" onclick="setMapType('satellite')">Satellite</div>
-            <div class="control-btn" onclick="setMapType('hybrid')">Hybrid</div>
-            <div class="control-btn" onclick="toggleTraffic()">Traffic</div>
-            <div class="control-btn" onclick="fitRoute()">Fit Route</div>
-        </div>
-        
-        <div class="progress-container">
-            <div class="progress-bar">
-                <div class="progress-fill" id="route-progress"></div>
-            </div>
-            <div class="progress-text" id="progress-text">Ready to start navigation</div>
-        </div>
-        
-        <script>
-            let map, directionsService, directionsRenderer;
-            let driverMarker, currentPosition = 0;
-            let trafficLayer, isTrafficVisible = false;
-            let routeWaypoints = [];
-            let isNavigating = false;
-            let isFullScreen = false;
-            let routeSteps = ${JSON.stringify(trip.routeSteps)};
-            
-            function showFallbackRoute() {
-                document.getElementById('map').style.display = 'none';
-                document.getElementById('fallback-map').style.display = 'flex';
-                
-                const routeDisplay = document.getElementById('route-display');
-                routeSteps.forEach((step, index) => {
-                    const stepDiv = document.createElement('div');
-                    stepDiv.className = 'route-step';
-                    stepDiv.innerHTML = \`
-                        <strong>Step \${index + 1}:</strong> \${step.instruction}<br>
-                        <small>Distance: \${step.distance}</small>
-                    \`;
-                    routeDisplay.appendChild(stepDiv);
-                });
-                
-                simulateFallbackNavigation();
-            }
-            
-            function simulateFallbackNavigation() {
-                window.fallbackNavigation = function(stepIndex) {
-                    const steps = document.querySelectorAll('.route-step');
-                    steps.forEach((step, index) => {
-                        step.classList.toggle('active', index === stepIndex);
-                    });
-                };
-            }
-            
-            function initMap() {
-                try {
-                    map = new google.maps.Map(document.getElementById('map'), {
-                        zoom: 8,
-                        center: { lat: ${(trip.pickup.lat + trip.delivery.lat) / 2}, lng: ${(trip.pickup.lng + trip.delivery.lng) / 2} },
-                        mapTypeId: 'roadmap',
-                        styles: [
-                            {
-                                featureType: 'poi',
-                                elementType: 'labels',
-                                stylers: [{ visibility: 'off' }]
-                            },
-                            {
-                                featureType: 'transit',
-                                elementType: 'labels',
-                                stylers: [{ visibility: 'off' }]
-                            }
-                        ],
-                        disableDefaultUI: true,
-                        zoomControl: false,
-                        mapTypeControl: false,
-                        scaleControl: true,
-                        streetViewControl: false,
-                        rotateControl: false,
-                        fullscreenControl: false,
-                        gestureHandling: 'greedy'
-                    });
-                    
-                    directionsService = new google.maps.DirectionsService();
-                    directionsRenderer = new google.maps.DirectionsRenderer({
-                        suppressMarkers: true,
-                        polylineOptions: {
-                            strokeColor: '#1a73e8',
-                            strokeWeight: 6,
-                            strokeOpacity: 0.8
-                        }
-                    });
-                    directionsRenderer.setMap(map);
-                    
-                    trafficLayer = new google.maps.TrafficLayer();
-                    
-                    createRoute();
-                } catch (error) {
-                    console.error('Google Maps initialization failed:', error);
-                    showFallbackRoute();
-                }
-            }
-            
-            function createRoute() {
-                const start = { lat: ${trip.pickup.lat}, lng: ${trip.pickup.lng} };
-                const end = { lat: ${trip.delivery.lat}, lng: ${trip.delivery.lng} };
-                
-                const waypoints = routeSteps.slice(1, -1).map(step => ({
-                    location: { lat: step.lat, lng: step.lng },
-                    stopover: false
-                }));
-                
-                const request = {
-                    origin: start,
-                    destination: end,
-                    waypoints: waypoints,
-                    travelMode: google.maps.TravelMode.DRIVING,
-                    drivingOptions: {
-                        departureTime: new Date(),
-                        trafficModel: 'bestguess'
-                    },
-                    unitSystem: google.maps.UnitSystem.METRIC,
-                    avoidHighways: false,
-                    avoidTolls: false
-                };
-                
-                directionsService.route(request, (result, status) => {
-                    if (status === 'OK') {
-                        directionsRenderer.setDirections(result);
-                        
-                        const route = result.routes[0];
-                        const leg = route.legs[0];
-                        
-                        document.getElementById('total-distance').textContent = leg.distance.text;
-                        document.getElementById('total-time').textContent = leg.duration.text;
-                        document.getElementById('remaining-distance').textContent = leg.distance.text;
-                        
-                        routeWaypoints = route.overview_path;
-                        
-                        createCustomMarkers(start, end);
-                        
-                        if (route.legs[0].steps.length > 0) {
-                            document.getElementById('next-instruction').textContent = 
-                                route.legs[0].steps[0].instructions.replace(/<[^>]*>/g, '');
-                        }
-                    } else {
-                        console.error('Directions request failed:', status);
-                        document.getElementById('next-instruction').textContent = 
-                            'Using offline route data for navigation';
-                        showFallbackRoute();
-                    }
-                });
-            }
-            
-            function createCustomMarkers(start, end) {
-                driverMarker = new google.maps.Marker({
-                    position: start,
-                    map: map,
-                    icon: {
-                        path: google.maps.SymbolPath.CIRCLE,
-                        scale: 12,
-                        fillColor: '#1a73e8',
-                        fillOpacity: 1,
-                        strokeColor: '#ffffff',
-                        strokeWeight: 3
-                    },
-                    title: 'Driver Location',
-                    zIndex: 1000
-                });
-                
-                const destinationMarker = new google.maps.Marker({
-                    position: end,
-                    map: map,
-                    icon: {
-                        path: google.maps.SymbolPath.CIRCLE,
-                        scale: 10,
-                        fillColor: '#ea4335',
-                        fillOpacity: 1,
-                        strokeColor: '#ffffff',
-                        strokeWeight: 2
-                    },
-                    title: 'Destination: ${trip.delivery.location}'
-                });
-                
-                const driverInfoWindow = new google.maps.InfoWindow({
-                    content: \`
-                        <div style="padding: 10px; font-family: 'Roboto', sans-serif;">
-                            <h4 style="margin: 0 0 8px 0; color: #1a73e8;">Driver Location</h4>
-                            <p style="margin: 0; color: #5f6368; font-size: 12px;">
-                                Trip ${trip.id}<br>
-                                <strong>Speed:</strong> <span id="popup-speed">0 km/h</span><br>
-                                <strong>Status:</strong> <span id="popup-status">Ready</span>
-                            </p>
-                        </div>
-                    \`
-                });
-                
-                const destInfoWindow = new google.maps.InfoWindow({
-                    content: \`
-                        <div style="padding: 10px; font-family: 'Roboto', sans-serif;">
-                            <h4 style="margin: 0 0 8px 0; color: #ea4335;">Destination</h4>
-                            <p style="margin: 0; color: #5f6368; font-size: 12px;">
-                                ${trip.delivery.location}<br>
-                                ${trip.delivery.address}<br>
-                                <strong>ETA:</strong> ${trip.delivery.time}
-                            </p>
-                        </div>
-                    \`
-                });
-                
-                driverMarker.addListener('click', () => {
-                    destInfoWindow.close();
-                    driverInfoWindow.open(map, driverMarker);
-                });
-                
-                destinationMarker.addListener('click', () => {
-                    driverInfoWindow.close();
-                    destInfoWindow.open(map, destinationMarker);
-                });
-            }
-            
-            function zoomIn() {
-                if (map) map.setZoom(map.getZoom() + 1);
-            }
-            
-            function zoomOut() {
-                if (map) map.setZoom(map.getZoom() - 1);
-            }
-            
-            function setMapType(type) {
-                if (map) {
-                    map.setMapTypeId(type);
-                    
-                    document.querySelectorAll('.control-btn').forEach(btn => {
-                        btn.classList.remove('active');
-                    });
-                    event.target.classList.add('active');
-                }
-            }
-            
-            function toggleTraffic() {
-                if (map && trafficLayer) {
-                    if (isTrafficVisible) {
-                        trafficLayer.setMap(null);
-                        event.target.classList.remove('active');
-                    } else {
-                        trafficLayer.setMap(map);
-                        event.target.classList.add('active');
-                    }
-                    isTrafficVisible = !isTrafficVisible;
-                }
-            }
-            
-            function fitRoute() {
-                if (map) {
-                    const bounds = new google.maps.LatLngBounds();
-                    bounds.extend({ lat: ${trip.pickup.lat}, lng: ${trip.pickup.lng} });
-                    bounds.extend({ lat: ${trip.delivery.lat}, lng: ${trip.delivery.lng} });
-                    map.fitBounds(bounds, { padding: 50 });
-                }
-            }
-            
-            function enterFullScreen() {
-                isFullScreen = true;
-                document.getElementById('exitFullscreen').classList.add('show');
-                if (map) {
-                    setTimeout(() => {
-                        google.maps.event.trigger(map, 'resize');
-                        fitRoute();
-                    }, 100);
-                }
-            }
-            
-            function exitFullScreen() {
-                window.ReactNativeWebView?.postMessage('EXIT_FULLSCREEN');
-            }
-            
-            function startNavigation() {
-                if (isNavigating) return;
-                
-                isNavigating = true;
-                currentPosition = 0;
-                
-                document.getElementById('current-speed').textContent = '65 km/h';
-                document.getElementById('progress-text').textContent = 'Navigation in progress...';
-                
-                const moveDriver = () => {
-                    if (currentPosition < routeSteps.length - 1) {
-                        currentPosition++;
-                        
-                        if (window.fallbackNavigation) {
-                            window.fallbackNavigation(currentPosition);
-                        }
-                        
-                        if (driverMarker && routeWaypoints.length > 0) {
-                            const stepProgress = Math.floor((currentPosition / (routeSteps.length - 1)) * routeWaypoints.length);
-                            const clampedProgress = Math.min(stepProgress, routeWaypoints.length - 1);
-                            
-                            if (routeWaypoints[clampedProgress]) {
-                                driverMarker.setPosition(routeWaypoints[clampedProgress]);
-                            }
-                        }
-                        
-                        const progress = (currentPosition / (routeSteps.length - 1)) * 100;
-                        document.getElementById('route-progress').style.width = progress + '%';
-                        
-                        const totalDistance = parseInt('${trip.distance}'.replace(' km', ''));
-                        const remainingKm = Math.round(totalDistance * (1 - progress / 100));
-                        document.getElementById('remaining-distance').textContent = remainingKm + ' km';
-                        
-                        if (routeSteps[currentPosition]) {
-                            document.getElementById('next-instruction').textContent = 
-                                routeSteps[currentPosition].instruction;
-                        }
-                        
-                        const speeds = [45, 55, 65, 75, 60, 50, 70];
-                        const speed = speeds[Math.floor(Math.random() * speeds.length)];
-                        document.getElementById('current-speed').textContent = speed + ' km/h';
-                        
-                        if (currentPosition < routeSteps.length - 1) {
-                            setTimeout(moveDriver, 3000);
-                        } else {
-                            document.getElementById('current-speed').textContent = '0 km/h';
-                            document.getElementById('progress-text').textContent = 'Destination reached!';
-                            document.getElementById('remaining-distance').textContent = '0 km';
-                            document.getElementById('next-instruction').textContent = 'Trip completed successfully!';
-                            isNavigating = false;
-                        }
-                    }
-                };
-                
-                setTimeout(moveDriver, 1000);
-            }
-            
-            window.addEventListener('message', function(event) {
-                if (event.data === 'START_TRACKING') {
-                    startNavigation();
-                } else if (event.data === 'ENTER_FULLSCREEN') {
-                    enterFullScreen();
-                }
-            });
-            
-            function loadGoogleMaps() {
-                const script = document.createElement('script');
-                script.src = 'https://maps.googleapis.com/maps/api/js?key=AIzaSyAMIfypjgj4ARy3ldyvSTNZ4y_-fbwDJ7E&callback=initMap&libraries=geometry';
-                script.async = true;
-                script.defer = true;
-                script.onerror = function() {
-                    console.error('Failed to load Google Maps API - falling back to route display');
-                    showFallbackRoute();
-                };
-                document.head.appendChild(script);
-            }
-            
-            window.initMap = function() {
-                try {
-                    initMap();
-                } catch (error) {
-                    console.error('Error initializing Google Maps:', error);
-                    showFallbackRoute();
-                }
-            };
-            
-            if (document.readyState === 'loading') {
-                document.addEventListener('DOMContentLoaded', function() {
-                    if (typeof google === 'undefined') {
-                        loadGoogleMaps();
-                    } else {
-                        initMap();
-                    }
-                });
-            } else {
-                if (typeof google === 'undefined') {
-                    loadGoogleMaps();
-                } else {
-                    initMap();
-                }
-            }
-            
-            setTimeout(function() {
-                if (!map && document.getElementById('map').style.display !== 'none') {
-                    console.log('Google Maps failed to initialize, showing fallback');
-                    showFallbackRoute();
-                }
-            }, 5000);
-        </script>
-    </body>
-    </html>
-`;
-
-    const webViewRef = useRef(null);
-
-    const handleWebViewMessage = (event: any) => {
-        const message = event.nativeEvent.data;
-        console.log('WebView message:', message);
-
-        if (message === 'EXIT_FULLSCREEN') {
-            setFullScreenMap(false);
-        }
-    };
-
-    const renderNavigationView = () => {
+    const renderMapView = (isFullScreen = false) => {
         if (!selectedTrip) return null;
 
-        const renderMap = (isFullScreen = false) => (
-            <View style={isFullScreen ? styles.fullScreenMapContainer : styles.mapContainer}>
-                <WebView
-                    ref={webViewRef}
-                    source={{ html: generateMapHtml(selectedTrip) }}
-                    style={isFullScreen ? styles.fullScreenMap : styles.map}
-                    javaScriptEnabled={true}
-                    domStorageEnabled={true}
-                    startInLoadingState={true}
-                    onMessage={handleWebViewMessage}
-                    injectedJavaScript={
-                        tripStarted
-                            ? (isFullScreen
-                                ? "window.postMessage('START_TRACKING', '*'); window.postMessage('ENTER_FULLSCREEN', '*');"
-                                : "window.postMessage('START_TRACKING', '*');")
-                            : (isFullScreen
-                                ? "window.postMessage('ENTER_FULLSCREEN', '*');"
-                                : "")
-                    }
-                />
+        const pickup = { latitude: selectedTrip.pickup.lat, longitude: selectedTrip.pickup.lng };
+        const delivery = { latitude: selectedTrip.delivery.lat, longitude: selectedTrip.delivery.lng };
 
+        // Calculate region to show both pickup and delivery
+        const allPoints = [pickup, delivery];
+        if (driverLocation) {
+            allPoints.push(driverLocation);
+        }
+
+        const latitudes = allPoints.map(p => p.latitude);
+        const longitudes = allPoints.map(p => p.longitude);
+
+        const minLat = Math.min(...latitudes);
+        const maxLat = Math.max(...latitudes);
+        const minLng = Math.min(...longitudes);
+        const maxLng = Math.max(...longitudes);
+
+        const centerLat = (minLat + maxLat) / 2;
+        const centerLng = (minLng + maxLng) / 2;
+
+        // Add padding around the region
+        const latPadding = Math.max((maxLat - minLat) * 0.3, 0.005);
+        const lngPadding = Math.max((maxLng - minLng) * 0.3, 0.005);
+
+        const region = {
+            latitude: centerLat,
+            longitude: centerLng,
+            latitudeDelta: (maxLat - minLat) + latPadding,
+            longitudeDelta: (maxLng - minLng) + lngPadding,
+        };
+
+        // Validate and prepare route coordinates
+        const routeCoordinates = selectedTrip.routeSteps
+            .filter(step =>
+                typeof step.lat === 'number' &&
+                typeof step.lng === 'number' &&
+                !isNaN(step.lat) &&
+                !isNaN(step.lng) &&
+                Math.abs(step.lat) <= 90 &&
+                Math.abs(step.lng) <= 180
+            )
+            .map(step => ({
+                latitude: step.lat,
+                longitude: step.lng
+            }));
+
+        console.log("Route coordinates count:", routeCoordinates.length);
+
+        return (
+            <View style={isFullScreen ? styles.fullScreenMapContainer : styles.mapContainer}>
+                <MapView
+                    {...(Platform.OS === 'android' ? { provider: PROVIDER_GOOGLE } : {})}
+                    style={styles.map}
+                    initialRegion={region}
+                    showsUserLocation={true}
+                    showsMyLocationButton={true}
+                    showsCompass={true}
+                    showsScale={true}
+                    loadingEnabled={true}
+                    loadingIndicatorColor="#1a73e8"
+                    onMapReady={() => {
+                        console.log("Map ready - setting loading to false");
+                        setMapLoading(false);
+                    }}
+                    onRegionChangeComplete={(region) => {
+                        console.log("Region changed:", region);
+                    }}
+                >
+                    {/* Pickup Marker */}
+                    <Marker
+                        coordinate={pickup}
+                        title="PICKUP"
+                        description={selectedTrip.pickup.location}
+                        identifier="pickup"
+                    >
+                        <View style={[styles.customMarker, { backgroundColor: '#10B981' }]}>
+                            <Text style={styles.markerText}>P</Text>
+                        </View>
+                    </Marker>
+
+                    {/* Delivery Marker */}
+                    <Marker
+                        coordinate={delivery}
+                        title="DELIVERY"
+                        description={selectedTrip.delivery.location}
+                        identifier="delivery"
+                    >
+                        <View style={[styles.customMarker, { backgroundColor: '#EF4444' }]}>
+                            <Text style={styles.markerText}>D</Text>
+                        </View>
+                    </Marker>
+
+                    {/* Driver Location Marker */}
+                    {driverLocation && (
+                        <Marker
+                            coordinate={driverLocation}
+                            title="YOU ARE HERE"
+                            description="Current Driver Position"
+                            identifier="driver"
+                        >
+                            <Animated.View
+                                style={[
+                                    styles.customMarker,
+                                    {
+                                        backgroundColor: '#1a73e8',
+                                        transform: [{ scale: tripStarted ? pulseAnim : 1 }]
+                                    }
+                                ]}
+                            >
+                                <Text style={styles.markerText}>🚛</Text>
+                            </Animated.View>
+                        </Marker>
+                    )}
+
+                    {/* Route Polyline */}
+                    {routeCoordinates.length >= 2 && (
+                        <Polyline
+                            coordinates={routeCoordinates}
+                            strokeColor="#1a73e8"
+                            strokeWidth={4}
+                            geodesic={true}
+                        />
+                    )}
+
+                    {/* Driver's traveled path */}
+                    {locationHistory.length > 1 && tripStarted && (
+                        <Polyline
+                            coordinates={locationHistory}
+                            strokeColor="#10B981"
+                            strokeWidth={6}
+                            geodesic={true}
+                        />
+                    )}
+                </MapView>
+
+                {/* Loading Overlay */}
+                {mapLoading && (
+                    <View style={styles.mapLoadingOverlay}>
+                        <ActivityIndicator size="large" color="#1a73e8" />
+                        <Text style={styles.loadingText}>Loading Map...</Text>
+                    </View>
+                )}
+
+                {/* Expand Button */}
                 {!isFullScreen && (
                     <TouchableOpacity
                         style={styles.expandButton}
@@ -1203,8 +661,82 @@ export default function DriverTrackingScreen() {
                         <Text style={styles.expandButtonText}>⛶</Text>
                     </TouchableOpacity>
                 )}
+
+                {/* Route summary overlay */}
+                {!isFullScreen && !mapLoading && (
+                    <View style={styles.mapOverlay}>
+                        <Text style={styles.overlayText}>
+                            {selectedTrip.pickup.location} → {selectedTrip.delivery.location}
+                        </Text>
+                        <Text style={styles.overlaySubtext}>
+                            {selectedTrip.distance} • {selectedTrip.duration}
+                        </Text>
+                        {routeCoordinates.length >= 2 && (
+                            <Text style={styles.overlaySubtext}>
+                                Route: {routeCoordinates.length} waypoints
+                            </Text>
+                        )}
+                    </View>
+                )}
             </View>
         );
+    };
+
+    const renderStatsSection = () => {
+        if (!selectedTrip) return null;
+
+        const totalTripDistance = parseInt(selectedTrip.distance.replace(' km', ''));
+        const remainingDistance = Math.max(0, totalTripDistance - distanceCovered);
+        const progressPercent = totalTripDistance > 0 ? (distanceCovered / totalTripDistance) * 100 : 0;
+
+        // Calculate distance to destination if we have driver location
+        const distanceToDestination = driverLocation ?
+            calculateDistance(
+                driverLocation.latitude,
+                driverLocation.longitude,
+                selectedTrip.delivery.lat,
+                selectedTrip.delivery.lng
+            ) : 0;
+
+        return (
+            <View style={styles.statsContainer}>
+                <View style={styles.statBox}>
+                    <Text style={styles.statLabel}>Traveled</Text>
+                    <Text style={styles.statValue}>{distanceCovered.toFixed(1)} KM</Text>
+                    <Text style={styles.statSubtext}>
+                        {progressPercent.toFixed(1)}% of route
+                    </Text>
+                </View>
+
+                <View style={styles.statBox}>
+                    <Text style={styles.statLabel}>Remaining</Text>
+                    <Text style={styles.statValue}>{remainingDistance.toFixed(1)} KM</Text>
+                    <Text style={styles.statSubtext}>
+                        {Math.round(remainingDistance / 80)} hrs left
+                    </Text>
+                </View>
+
+                <View style={styles.statBox}>
+                    <Text style={styles.statLabel}>To Destination</Text>
+                    <Text style={styles.statValue}>
+                        {distanceToDestination > 0 ? `${distanceToDestination.toFixed(1)} KM` : "Calculating..."}
+                    </Text>
+                    <Text style={styles.statSubtext}>Direct distance</Text>
+                </View>
+
+                <View style={styles.statBox}>
+                    <Text style={styles.statLabel}>GPS Points</Text>
+                    <Text style={styles.statValue}>{locationHistory.length}</Text>
+                    <Text style={styles.statSubtext}>
+                        {tripStarted ? "Tracking active" : "Not tracking"}
+                    </Text>
+                </View>
+            </View>
+        );
+    };
+
+    const renderNavigationView = () => {
+        if (!selectedTrip) return null;
 
         return (
             <>
@@ -1216,9 +748,16 @@ export default function DriverTrackingScreen() {
                     statusBarTranslucent={true}
                     onRequestClose={() => setFullScreenMap(false)}
                 >
-                    <View style={styles.fullScreenContainer}>
-                        {renderMap(true)}
-                    </View>
+                    <SafeAreaView style={styles.fullScreenMapContainer}>
+                        {renderMapView(true)}
+                        <TouchableOpacity
+                            style={styles.exitFullScreenButton}
+                            onPress={() => setFullScreenMap(false)}
+                            activeOpacity={0.8}
+                        >
+                            <Text style={styles.exitButtonText}>✕</Text>
+                        </TouchableOpacity>
+                    </SafeAreaView>
                 </Modal>
 
                 <ScrollView style={styles.container} showsVerticalScrollIndicator={false}>
@@ -1283,7 +822,23 @@ export default function DriverTrackingScreen() {
                         </View>
                     </View>
 
-                    {tripStarted && currentLocation && (
+                    {/* Location Permission Status */}
+                    {!locationPermission && (
+                        <View style={styles.permissionCard}>
+                            <Text style={styles.permissionTitle}>Location Access Required</Text>
+                            <Text style={styles.permissionText}>Enable location access for navigation features</Text>
+                            <TouchableOpacity
+                                style={styles.permissionButton}
+                                onPress={requestLocationPermission}
+                                activeOpacity={0.8}
+                            >
+                                <Text style={styles.permissionButtonText}>Enable Location</Text>
+                            </TouchableOpacity>
+                        </View>
+                    )}
+
+                    {/* Current Navigation Step */}
+                    {tripStarted && selectedTrip.routeSteps[currentStep] && (
                         <View style={styles.navigationCard}>
                             <Text style={styles.navigationTitle}>Current Navigation</Text>
                             <View style={styles.stepContainer}>
@@ -1291,89 +846,58 @@ export default function DriverTrackingScreen() {
                                     <Text style={styles.stepText}>{currentStep + 1}</Text>
                                 </View>
                                 <View style={styles.stepInfo}>
-                                    <Text style={styles.stepInstruction}>{currentLocation.instruction}</Text>
-                                    <Text style={styles.stepDistance}>Distance: {currentLocation.distance}</Text>
+                                    <Text style={styles.stepInstruction}>
+                                        {selectedTrip.routeSteps[currentStep].instruction}
+                                    </Text>
+                                    <Text style={styles.stepDistance}>
+                                        Distance: {selectedTrip.routeSteps[currentStep].distance}
+                                    </Text>
                                 </View>
                             </View>
                         </View>
                     )}
 
-                    {!showMap ? (
-                        <TouchableOpacity
-                            style={styles.loadButton}
-                            onPress={() => setShowMap(true)}
-                            activeOpacity={0.8}
-                        >
-                            <Text style={styles.loadButtonText}>Load Google Maps Navigation</Text>
-                        </TouchableOpacity>
-                    ) : (
-                        <>
-                            {renderMap(false)}
+                    {/* Map View - Using React Native Maps */}
+                    {renderMapView(false)}
 
-                            <View style={styles.controlsContainer}>
-                                {!tripStarted ? (
-                                    <TouchableOpacity
-                                        style={styles.startButton}
-                                        onPress={handleStartTrip}
-                                        activeOpacity={0.8}
-                                    >
-                                        <Text style={styles.startButtonText}>Start Navigation</Text>
-                                    </TouchableOpacity>
-                                ) : (
-                                    <View style={styles.tripControls}>
-                                        <TouchableOpacity
-                                            style={styles.pauseButton}
-                                            activeOpacity={0.8}
-                                        >
-                                            <Text style={styles.pauseButtonText}>Pause</Text>
-                                        </TouchableOpacity>
+                    {/* Navigation Controls */}
+                    <View style={styles.controlsContainer}>
+                        {!tripStarted ? (
+                            <TouchableOpacity
+                                style={[
+                                    styles.startButton,
+                                    !locationPermission && styles.disabledButton
+                                ]}
+                                onPress={handleStartTrip}
+                                activeOpacity={0.8}
+                                disabled={!locationPermission}
+                            >
+                                <Text style={styles.startButtonText}>
+                                    {locationPermission ? "Start Navigation" : "Location Access Required"}
+                                </Text>
+                            </TouchableOpacity>
+                        ) : (
+                            <View style={styles.tripControls}>
+                                <TouchableOpacity
+                                    style={styles.pauseButton}
+                                    activeOpacity={0.8}
+                                >
+                                    <Text style={styles.pauseButtonText}>Pause</Text>
+                                </TouchableOpacity>
 
-                                        <TouchableOpacity
-                                            style={styles.stopButton}
-                                            onPress={handleStopTrip}
-                                            activeOpacity={0.8}
-                                        >
-                                            <Text style={styles.stopButtonText}>Stop Trip</Text>
-                                        </TouchableOpacity>
-                                    </View>
-                                )}
+                                <TouchableOpacity
+                                    style={styles.stopButton}
+                                    onPress={handleStopTrip}
+                                    activeOpacity={0.8}
+                                >
+                                    <Text style={styles.stopButtonText}>Stop Trip</Text>
+                                </TouchableOpacity>
                             </View>
+                        )}
+                    </View>
 
-                            <View style={styles.statsContainer}>
-                                <View style={styles.statBox}>
-                                    <Text style={styles.statLabel}>Distance Covered</Text>
-                                    <Text style={styles.statValue}>{distanceCovered} KM</Text>
-                                    <Text style={styles.statSubtext}>
-                                        {Math.round((distanceCovered / parseInt(selectedTrip.distance.replace(' km', ''))) * 100)}% Complete
-                                    </Text>
-                                </View>
 
-                                <View style={styles.statBox}>
-                                    <Text style={styles.statLabel}>Remaining</Text>
-                                    <Text style={styles.statValue}>{parseInt(selectedTrip.distance.replace(' km', '')) - distanceCovered} KM</Text>
-                                    <Text style={styles.statSubtext}>
-                                        Est. {Math.round((parseInt(selectedTrip.distance.replace(' km', '')) - distanceCovered) / 60 * 60)} mins
-                                    </Text>
-                                </View>
-
-                                <View style={styles.statBox}>
-                                    <Text style={styles.statLabel}>Current Speed</Text>
-                                    <Text style={styles.statValue}>
-                                        {tripStarted ? "65 KM/H" : "0 KM/H"}
-                                    </Text>
-                                    <Text style={styles.statSubtext}>
-                                        {tripStarted ? "Highway" : "Stopped"}
-                                    </Text>
-                                </View>
-
-                                <View style={styles.statBox}>
-                                    <Text style={styles.statLabel}>ETA</Text>
-                                    <Text style={styles.statValue}>{selectedTrip.estimatedArrival}</Text>
-                                    <Text style={styles.statSubtext}>Today</Text>
-                                </View>
-                            </View>
-                        </>
-                    )}
+                    {renderStatsSection()}
                 </ScrollView>
             </>
         );
@@ -1732,6 +1256,45 @@ const styles = StyleSheet.create({
         marginTop: 4,
     },
 
+    // NEW: Location Permission Styles
+    permissionCard: {
+        backgroundColor: "#FEF3C7",
+        marginHorizontal: 16,
+        marginBottom: 16,
+        borderRadius: 12,
+        padding: 16,
+        borderLeftWidth: 4,
+        borderLeftColor: "#F59E0B",
+        elevation: 2,
+        shadowColor: "#000",
+        shadowOffset: { width: 0, height: 1 },
+        shadowOpacity: 0.1,
+        shadowRadius: 2,
+    },
+    permissionTitle: {
+        fontSize: 16,
+        fontWeight: "bold",
+        color: "#92400E",
+        marginBottom: 8,
+    },
+    permissionText: {
+        fontSize: 14,
+        color: "#92400E",
+        marginBottom: 12,
+        lineHeight: 20,
+    },
+    permissionButton: {
+        backgroundColor: "#F59E0B",
+        padding: 12,
+        borderRadius: 8,
+        alignItems: "center",
+    },
+    permissionButtonText: {
+        color: "white",
+        fontWeight: "600",
+        fontSize: 14,
+    },
+
     // Navigation Card
     navigationCard: {
         backgroundColor: "#1F2937",
@@ -1740,6 +1303,10 @@ const styles = StyleSheet.create({
         borderRadius: 12,
         padding: 16,
         elevation: 4,
+        shadowColor: "#000",
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.25,
+        shadowRadius: 4,
     },
     navigationTitle: {
         fontSize: 16,
@@ -1779,36 +1346,7 @@ const styles = StyleSheet.create({
         color: "#9CA3AF",
     },
 
-    // Map and Controls
-    loadButton: {
-        backgroundColor: "#1a73e8",
-        marginHorizontal: 16,
-        marginBottom: 16,
-        padding: 16,
-        borderRadius: 12,
-        alignItems: "center",
-        elevation: 3,
-    },
-    loadButtonText: {
-        color: "#fff",
-        fontSize: 16,
-        fontWeight: "600",
-    },
-
-    fullScreenContainer: {
-        flex: 1,
-        backgroundColor: "#000",
-    },
-    fullScreenMapContainer: {
-        flex: 1,
-        position: "relative",
-    },
-    fullScreenMap: {
-        flex: 1,
-        width: width,
-        height: height,
-    },
-
+    // NEW: React Native MapView Styles
     mapContainer: {
         marginHorizontal: 16,
         marginBottom: 16,
@@ -1820,12 +1358,81 @@ const styles = StyleSheet.create({
         shadowOpacity: 0.15,
         shadowRadius: 6,
         position: "relative",
-    },
-    map: {
-        width: width - 32,
         height: 400,
     },
+    map: {
+        width: "100%",
+        height: "100%"
+    },
+    pickupMarker: {
+        backgroundColor: '#10B981',
+        borderRadius: 25,
+        width: 50,
+        height: 50,
+        alignItems: 'center',
+        justifyContent: 'center',
+        borderWidth: 4,
+        borderColor: 'white',
+        elevation: 8,
+    },
+    deliveryMarker: {
+        backgroundColor: '#EF4444',
+        borderRadius: 25,
+        width: 50,
+        height: 50,
+        alignItems: 'center',
+        justifyContent: 'center',
+        borderWidth: 4,
+        borderColor: 'white',
+        elevation: 8,
+    },
+    driverMarker: {
+        backgroundColor: '#1a73e8',
+        borderRadius: 25,
+        width: 50,
+        height: 50,
+        alignItems: 'center',
+        justifyContent: 'center',
+        borderWidth: 4,
+        borderColor: 'white',
+        elevation: 8,
+    },
+    markerEmoji: {
+        fontSize: 24,
+    },
 
+    fullScreenMapContainer: {
+        flex: 1,
+        backgroundColor: '#f0f0f0',
+    },
+
+    fullScreenMap: {
+        flex: 1,
+        width: "100%",
+        height: "100%",
+    },
+
+    // NEW: Map Loading Overlay
+    mapLoadingOverlay: {
+        position: "absolute",
+        top: 0,
+        left: 0,
+        right: 0,
+        bottom: 0,
+        backgroundColor: "rgba(245, 247, 250, 0.95)",
+        alignItems: "center",
+        justifyContent: "center",
+        zIndex: 1000,
+        borderRadius: 12,
+    },
+    loadingText: {
+        marginTop: 12,
+        fontSize: 16,
+        color: "#1a73e8",
+        fontWeight: "500",
+    },
+
+    // Map Controls
     expandButton: {
         position: "absolute",
         top: 12,
@@ -1845,7 +1452,49 @@ const styles = StyleSheet.create({
         color: "#1a73e8",
         fontWeight: "bold",
     },
+    exitFullScreenButton: {
+        position: "absolute",
+        top: Platform.OS === 'ios' ? 60 : 40,
+        right: 16,
+        backgroundColor: "rgba(0, 0, 0, 0.8)",
+        borderRadius: 22,
+        width: 44,
+        height: 44,
+        alignItems: "center",
+        justifyContent: "center",
+        zIndex: 1002,
+        elevation: 6,
+        shadowColor: "#000",
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.3,
+        shadowRadius: 8,
+    },
+    customMarker: {
+        backgroundColor: '#10B981',
+        borderRadius: 20,
+        width: 40,
+        height: 40,
+        alignItems: 'center',
+        justifyContent: 'center',
+        borderWidth: 3,
+        borderColor: 'white',
+        elevation: 5,
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.3,
+        shadowRadius: 4,
+    },
+    markerText: {
+        fontSize: 20,
+        fontWeight: 'bold',
+    },
+    exitButtonText: {
+        color: "white",
+        fontSize: 24,
+        fontWeight: "bold",
+    },
 
+    // Navigation Controls
     controlsContainer: {
         marginHorizontal: 16,
         marginBottom: 16,
@@ -1856,12 +1505,24 @@ const styles = StyleSheet.create({
         borderRadius: 12,
         alignItems: "center",
         elevation: 3,
+        shadowColor: "#000",
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.1,
+        shadowRadius: 4,
     },
     startButtonText: {
         color: "#fff",
         fontSize: 16,
         fontWeight: "600",
     },
+
+    // NEW: Disabled Button Style
+    disabledButton: {
+        backgroundColor: "#9CA3AF",
+        elevation: 0,
+        shadowOpacity: 0,
+    },
+
     tripControls: {
         flexDirection: "row",
         gap: 12,
@@ -1873,6 +1534,33 @@ const styles = StyleSheet.create({
         borderRadius: 12,
         alignItems: "center",
         elevation: 3,
+        shadowColor: "#000",
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.1,
+        shadowRadius: 4,
+    },
+    mapOverlay: {
+        position: 'absolute',
+        bottom: 12,
+        left: 12,
+        right: 12,
+        backgroundColor: 'rgba(26, 115, 232, 0.9)',
+        padding: 12,
+        borderRadius: 8,
+        elevation: 5,
+    },
+    overlayText: {
+        color: 'white',
+        fontSize: 14,
+        fontWeight: 'bold',
+        textAlign: 'center',
+    },
+    overlaySubtext: {
+        color: 'white',
+        fontSize: 12,
+        textAlign: 'center',
+        opacity: 0.8,
+        marginTop: 2,
     },
     pauseButtonText: {
         color: "#fff",
@@ -1886,6 +1574,10 @@ const styles = StyleSheet.create({
         borderRadius: 12,
         alignItems: "center",
         elevation: 3,
+        shadowColor: "#000",
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.1,
+        shadowRadius: 4,
     },
     stopButtonText: {
         color: "#fff",
@@ -1893,7 +1585,7 @@ const styles = StyleSheet.create({
         fontWeight: "600",
     },
 
-    // Stats Container
+    // Stats Container - Updated for new functionality
     statsContainer: {
         flexDirection: "row",
         flexWrap: "wrap",
@@ -1909,6 +1601,10 @@ const styles = StyleSheet.create({
         borderRadius: 8,
         alignItems: "center",
         elevation: 2,
+        shadowColor: "#000",
+        shadowOffset: { width: 0, height: 1 },
+        shadowOpacity: 0.1,
+        shadowRadius: 2,
         borderLeftWidth: 4,
         borderLeftColor: "#1a73e8",
     },
@@ -1924,30 +1620,12 @@ const styles = StyleSheet.create({
         color: "#1a1a1a",
         fontWeight: "bold",
         marginBottom: 2,
+        textAlign: "center",
     },
     statSubtext: {
         fontSize: 10,
         color: "#9CA3AF",
-    },
-
-    // Responsive design for tablets
-    '@media (min-width: 768px)': {
-        container: {
-            paddingHorizontal: 24,
-        },
-        tripCard: {
-            marginHorizontal: 24,
-        },
-        mapContainer: {
-            marginHorizontal: 24,
-            height: 500,
-        },
-        map: {
-            width: width - 48,
-            height: 500,
-        },
-        statBox: {
-            minWidth: (width - 80) / 4,
-        },
+        textAlign: "center",
     },
 });
+
