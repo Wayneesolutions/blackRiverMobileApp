@@ -1,24 +1,41 @@
 {
   "expo": {
-    "name": "blackRiverMobileApp",
-    "slug": "blackRiverMobileApp",
+    "name": "Black River Logistics",
+    "slug": "black-river-logistics",
+    "owner": "blackriverlogistics",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "platforms": [
+      "ios",
+      "android"
+    ],
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.blackriver.mobileapp", 
+      "bundleIdentifier": "com.blackriverlogistics.app",
       "config": {
         "googleMapsApiKey": "AIzaSyCGvKdOZfbOUVLR5xs-IlHQA1HFc0Xlokk"
       }
     },
     "android": {
-      "package": "com.blackriver.mobileapp", 
-      "adaptiveIcon": {
-        "foregroundImage": "./assets/adaptive-icon.png",
-        "backgroundColor": "#ffffff"
-      },
+      "package": "com.blackriverlogistics.app",
+      "permissions": [
+        "ACCESS_FINE_LOCATION",
+        "ACCESS_COARSE_LOCATION",
+        "android.permission.ACCESS_COARSE_LOCATION",
+        "android.permission.ACCESS_FINE_LOCATION"
+      ],
       "config": {
         "googleMaps": {
           "apiKey": "AIzaSyCGvKdOZfbOUVLR5xs-IlHQA1HFc0Xlokk"
         }
+      }
+    },
+    "plugins": [
+      "expo-location"
+    ],
+    "extra": {
+      "eas": {
+        "projectId": "b8c01171-73cc-416a-a15e-2008a48c8fc1"
       }
     }
   }

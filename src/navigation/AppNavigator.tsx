@@ -31,6 +31,7 @@ import PendingTrips from "../screens/dashboard/PendingTrips";
 import NotificationsScreen from "../screens/notifications/index";
 import HelpScreen from "../screens/help/index";
 import SearchScreen from "../screens/search/index";
+import TripInfoScreen from "../screens/tripInfo/index";
 
 // Constants for storage keys
 const STORAGE_KEYS = {
@@ -61,7 +62,7 @@ interface PlaceholderScreenProps {
     title: string;
 }
 
-// Navigation Types
+// Navigation Types - Include all screens in MainTabParamList
 export type MainTabParamList = {
     Dashboard: undefined;
     NewTrip: undefined;
@@ -77,8 +78,10 @@ export type MainTabParamList = {
     ActiveTrips: undefined;
     CompleteTrips: undefined;
     PendingTrips: undefined;
-    // Note: Notifications, Help, Search, and Trips are NOT included here
-    // They will be modal screens only
+    Notifications: undefined;
+    Help: undefined;
+    Search: undefined;
+    Trips: undefined;
 };
 
 export type RootStackParamList = {
@@ -172,14 +175,19 @@ const PlaceholderScreen: React.FC<PlaceholderScreenProps> = ({ title }) => (
     </View>
 );
 
-// Trip Info Screen Component (temporary until real screen is created)
-const TripInfoScreen: React.FC = () => (
-    <View style={styles.placeholder}>
-        <Ionicons name="information-circle" size={64} color="#906AD1" />
-        <Text style={styles.placeholderText}>Trip Information</Text>
-        <Text style={styles.placeholderSubtext}>
-            Detailed trip data and analytics
-        </Text>
+
+// Wrapper component for screens with Header and Footer
+const ScreenWithHeaderFooter: React.FC<{ 
+    component: React.ComponentType<any>;
+    navigation: any;
+    route: any;
+}> = ({ component: Component, navigation, route }) => (
+    <View style={{ flex: 1 }}>
+        <Header />
+        <View style={{ flex: 1 }}>
+            <Component navigation={navigation} route={route} />
+        </View>
+        <Footer navigation={navigation} />
     </View>
 );
 
@@ -210,6 +218,10 @@ function MainTabNavigator({ onLogout, navigation }: MainTabNavigatorProps) {
                     <MainTab.Screen name="ActiveTrips" component={ActiveTrips} />
                     <MainTab.Screen name="CompleteTrips" component={CompleteTrips} />
                     <MainTab.Screen name="PendingTrips" component={PendingTrips} />
+                    <MainTab.Screen name="Notifications" component={NotificationsScreen} />
+                    <MainTab.Screen name="Help" component={HelpScreen} />
+                    <MainTab.Screen name="Search" component={SearchScreen} />
+                    <MainTab.Screen name="Trips" component={TripInfoScreen} />
                 </MainTab.Navigator>
             </View>
             <Footer navigation={navigation} />
@@ -324,160 +336,142 @@ export default function AppNavigator() {
                 )}
             </RootStack.Screen>
 
-            {/* Modal Screens - These will NOT have Header and Footer */}
-            <RootStack.Screen
-                name="Notifications"
-                component={NotificationsScreen}
-                options={{ 
-                    presentation: 'modal',
-                    headerShown: false 
-                }}
-            />
-            <RootStack.Screen
-                name="Help"
-                component={HelpScreen}
-                options={{ 
-                    presentation: 'modal',
-                    headerShown: false 
-                }}
-            />
-            <RootStack.Screen
-                name="Search"
-                component={SearchScreen}
-                options={{ 
-                    presentation: 'modal',
-                    headerShown: false 
-                }}
-            />
-            <RootStack.Screen
-                name="Trips"
-                component={TripInfoScreen}
-                options={{
-                    presentation: 'modal',
-                    headerShown: false
-                }}
-            />
-
             {/* Additional Stack Screens for direct access (with Header/Footer) */}
             <RootStack.Screen name="NewTrip">
                 {(props) => (
-                    <View style={{ flex: 1 }}>
-                        <Header />
-                        <View style={{ flex: 1 }}>
-                            <NewTripScreen {...props} />
-                        </View>
-                        <Footer navigation={props.navigation} />
-                    </View>
+                    <ScreenWithHeaderFooter
+                        component={NewTripScreen}
+                        navigation={props.navigation}
+                        route={props.route}
+                    />
                 )}
             </RootStack.Screen>
             <RootStack.Screen name="Vehicle">
                 {(props) => (
-                    <View style={{ flex: 1 }}>
-                        <Header />
-                        <View style={{ flex: 1 }}>
-                            <VehicleScreen {...props} />
-                        </View>
-                        <Footer navigation={props.navigation} />
-                    </View>
+                    <ScreenWithHeaderFooter
+                        component={VehicleScreen}
+                        navigation={props.navigation}
+                        route={props.route}
+                    />
                 )}
             </RootStack.Screen>
             <RootStack.Screen name="Trailer">
                 {(props) => (
-                    <View style={{ flex: 1 }}>
-                        <Header />
-                        <View style={{ flex: 1 }}>
-                            <TrailerScreen {...props} />
-                        </View>
-                        <Footer navigation={props.navigation} />
-                    </View>
+                    <ScreenWithHeaderFooter
+                        component={TrailerScreen}
+                        navigation={props.navigation}
+                        route={props.route}
+                    />
                 )}
             </RootStack.Screen>
             <RootStack.Screen name="Documents">
                 {(props) => (
-                    <View style={{ flex: 1 }}>
-                        <Header />
-                        <View style={{ flex: 1 }}>
-                            <DocumentsScreen {...props} />
-                        </View>
-                        <Footer navigation={props.navigation} />
-                    </View>
+                    <ScreenWithHeaderFooter
+                        component={DocumentsScreen}
+                        navigation={props.navigation}
+                        route={props.route}
+                    />
                 )}
             </RootStack.Screen>
             <RootStack.Screen name="Settings">
                 {(props) => (
-                    <View style={{ flex: 1 }}>
-                        <Header />
-                        <View style={{ flex: 1 }}>
-                            <SettingsScreen {...props} />
-                        </View>
-                        <Footer navigation={props.navigation} />
-                    </View>
+                    <ScreenWithHeaderFooter
+                        component={SettingsScreen}
+                        navigation={props.navigation}
+                        route={props.route}
+                    />
                 )}
             </RootStack.Screen>
             <RootStack.Screen name="LoadMap">
                 {(props) => (
-                    <View style={{ flex: 1 }}>
-                        <Header />
-                        <View style={{ flex: 1 }}>
-                            <LoadMapScreen {...props} />
-                        </View>
-                        <Footer navigation={props.navigation} />
-                    </View>
+                    <ScreenWithHeaderFooter
+                        component={LoadMapScreen}
+                        navigation={props.navigation}
+                        route={props.route}
+                    />
                 )}
             </RootStack.Screen>
             <RootStack.Screen name="Transfer">
                 {(props) => (
-                    <View style={{ flex: 1 }}>
-                        <Header />
-                        <View style={{ flex: 1 }}>
-                            <TransferScreen {...props} />
-                        </View>
-                        <Footer navigation={props.navigation} />
-                    </View>
+                    <ScreenWithHeaderFooter
+                        component={TransferScreen}
+                        navigation={props.navigation}
+                        route={props.route}
+                    />
                 )}
             </RootStack.Screen>
             <RootStack.Screen name="Fuel">
                 {(props) => (
-                    <View style={{ flex: 1 }}>
-                        <Header />
-                        <View style={{ flex: 1 }}>
-                            <FuelScreen {...props} />
-                        </View>
-                        <Footer navigation={props.navigation} />
-                    </View>
+                    <ScreenWithHeaderFooter
+                        component={FuelScreen}
+                        navigation={props.navigation}
+                        route={props.route}
+                    />
                 )}
             </RootStack.Screen>
             <RootStack.Screen name="ActiveTrips">
                 {(props) => (
-                    <View style={{ flex: 1 }}>
-                        <Header />
-                        <View style={{ flex: 1 }}>
-                            <ActiveTrips {...props} />
-                        </View>
-                        <Footer navigation={props.navigation} />
-                    </View>
+                    <ScreenWithHeaderFooter
+                        component={ActiveTrips}
+                        navigation={props.navigation}
+                        route={props.route}
+                    />
                 )}
             </RootStack.Screen>
             <RootStack.Screen name="CompleteTrips">
                 {(props) => (
-                    <View style={{ flex: 1 }}>
-                        <Header />
-                        <View style={{ flex: 1 }}>
-                            <CompleteTrips {...props} />
-                        </View>
-                        <Footer navigation={props.navigation} />
-                    </View>
+                    <ScreenWithHeaderFooter
+                        component={CompleteTrips}
+                        navigation={props.navigation}
+                        route={props.route}
+                    />
                 )}
             </RootStack.Screen>
             <RootStack.Screen name="PendingTrips">
                 {(props) => (
-                    <View style={{ flex: 1 }}>
-                        <Header />
-                        <View style={{ flex: 1 }}>
-                            <PendingTrips {...props} />
-                        </View>
-                        <Footer navigation={props.navigation} />
-                    </View>
+                    <ScreenWithHeaderFooter
+                        component={PendingTrips}
+                        navigation={props.navigation}
+                        route={props.route}
+                    />
+                )}
+            </RootStack.Screen>
+
+            {/* Footer Screens - Now with Header and Footer */}
+            <RootStack.Screen name="Notifications">
+                {(props) => (
+                    <ScreenWithHeaderFooter
+                        component={NotificationsScreen}
+                        navigation={props.navigation}
+                        route={props.route}
+                    />
+                )}
+            </RootStack.Screen>
+            <RootStack.Screen name="Help">
+                {(props) => (
+                    <ScreenWithHeaderFooter
+                        component={HelpScreen}
+                        navigation={props.navigation}
+                        route={props.route}
+                    />
+                )}
+            </RootStack.Screen>
+            <RootStack.Screen name="Search">
+                {(props) => (
+                    <ScreenWithHeaderFooter
+                        component={SearchScreen}
+                        navigation={props.navigation}
+                        route={props.route}
+                    />
+                )}
+            </RootStack.Screen>
+            <RootStack.Screen name="Trips">
+                {(props) => (
+                    <ScreenWithHeaderFooter
+                        component={TripInfoScreen}
+                        navigation={props.navigation}
+                        route={props.route}
+                    />
                 )}
             </RootStack.Screen>
 

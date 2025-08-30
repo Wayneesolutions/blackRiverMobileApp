@@ -7,7 +7,7 @@ import {
     FlatList,
     TouchableOpacity,
     RefreshControl,
-    Alert,
+    Alert
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -165,7 +165,7 @@ export default function NotificationsScreen({ }) {
     };
 
     // Render notification item
-    const renderNotificationItem = ({ item }) => (
+    const renderNotificationItem = ({ item }: { item: any }) => (
         <TouchableOpacity
             style={[
                 styles.notificationItem,
@@ -203,51 +203,6 @@ export default function NotificationsScreen({ }) {
 
     return (
         <SafeAreaView style={styles.container}>
-            {/* Header */}
-            <View style={styles.header}>
-                <TouchableOpacity
-                    style={styles.backButton}
-                    onPress={() => navigation.goBack()}
-                >
-                    <Ionicons name="arrow-back" size={24} color="#1F2937" />
-                </TouchableOpacity>
-                <Text style={styles.headerTitle}>Notifications</Text>
-                {unreadCount > 0 && (
-                    <TouchableOpacity onPress={markAllAsRead}>
-                        <Text style={styles.markAllButton}>Mark All Read</Text>
-                    </TouchableOpacity>
-                )}
-            </View>
-
-            {/* Filter Tabs */}
-            <View style={styles.filterContainer}>
-                <TouchableOpacity
-                    style={[styles.filterTab, filter === 'all' && styles.activeFilterTab]}
-                    onPress={() => setFilter('all')}
-                >
-                    <Text style={[styles.filterText, filter === 'all' && styles.activeFilterText]}>
-                        All ({notifications.length})
-                    </Text>
-                </TouchableOpacity>
-                <TouchableOpacity
-                    style={[styles.filterTab, filter === 'unread' && styles.activeFilterTab]}
-                    onPress={() => setFilter('unread')}
-                >
-                    <Text style={[styles.filterText, filter === 'unread' && styles.activeFilterText]}>
-                        Unread ({unreadCount})
-                    </Text>
-                </TouchableOpacity>
-                <TouchableOpacity
-                    style={[styles.filterTab, filter === 'high' && styles.activeFilterTab]}
-                    onPress={() => setFilter('high')}
-                >
-                    <Text style={[styles.filterText, filter === 'high' && styles.activeFilterText]}>
-                        Priority
-                    </Text>
-                </TouchableOpacity>
-            </View>
-
-            {/* Notifications List */}
             <FlatList
                 data={filteredNotifications}
                 renderItem={renderNotificationItem}
@@ -257,6 +212,47 @@ export default function NotificationsScreen({ }) {
                 }
                 showsVerticalScrollIndicator={false}
                 contentContainerStyle={styles.listContainer}
+                ListHeaderComponent={
+                    <>
+                        {/* Header */}
+                        <View style={styles.header}>
+                            <Text style={styles.headerTitle}>Notifications</Text>
+                            {unreadCount > 0 && (
+                                <TouchableOpacity onPress={markAllAsRead}>
+                                    <Text style={styles.markAllButton}>Mark All Read</Text>
+                                </TouchableOpacity>
+                            )}
+                        </View>
+
+                        {/* Filter Tabs */}
+                        <View style={styles.filterContainer}>
+                            <TouchableOpacity
+                                style={[styles.filterTab, filter === 'all' && styles.activeFilterTab]}
+                                onPress={() => setFilter('all')}
+                            >
+                                <Text style={[styles.filterText, filter === 'all' && styles.activeFilterText]}>
+                                    All ({notifications.length})
+                                </Text>
+                            </TouchableOpacity>
+                            <TouchableOpacity
+                                style={[styles.filterTab, filter === 'unread' && styles.activeFilterTab]}
+                                onPress={() => setFilter('unread')}
+                            >
+                                <Text style={[styles.filterText, filter === 'unread' && styles.activeFilterText]}>
+                                    Unread ({unreadCount})
+                                </Text>
+                            </TouchableOpacity>
+                            <TouchableOpacity
+                                style={[styles.filterTab, filter === 'high' && styles.activeFilterTab]}
+                                onPress={() => setFilter('high')}
+                            >
+                                <Text style={[styles.filterText, filter === 'high' && styles.activeFilterText]}>
+                                    Priority
+                                </Text>
+                            </TouchableOpacity>
+                        </View>
+                    </>
+                }
                 ListEmptyComponent={
                     <View style={styles.emptyContainer}>
                         <Ionicons name="notifications-outline" size={64} color="#9CA3AF" />
@@ -270,6 +266,7 @@ export default function NotificationsScreen({ }) {
                 }
             />
         </SafeAreaView>
+
     );
 }
 
@@ -278,25 +275,26 @@ const styles = StyleSheet.create({
         flex: 1,
         backgroundColor: '#F8FAFC',
     },
+    scrollContainer: {
+        flex: 1,
+    },
+    scrollContent: {
+        paddingBottom: 40, // Add padding to account for footer
+    },
     header: {
         flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'space-between',
         paddingHorizontal: 16,
         paddingVertical: 16,
-        backgroundColor: '#fff',
-        borderBottomWidth: 1,
-        borderBottomColor: '#E5E7EB',
     },
-    backButton: {
-        padding: 8,
-    },
+
     headerTitle: {
-        fontSize: 20,
+        fontSize: 24,
         fontWeight: 'bold',
         color: '#1F2937',
         flex: 1,
-        textAlign: 'center',
+        textAlign: 'left',
         marginRight: 40, // Offset for back button
     },
     markAllButton: {
@@ -306,7 +304,6 @@ const styles = StyleSheet.create({
     },
     filterContainer: {
         flexDirection: 'row',
-        backgroundColor: '#fff',
         paddingHorizontal: 16,
         paddingVertical: 12,
     },

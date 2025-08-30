@@ -1,35 +1,41 @@
 import React, { useState } from "react";
-import { 
-  View, 
-  TouchableOpacity, 
-  Text, 
-  StyleSheet, 
-  Modal, 
+import {
+  View,
+  TouchableOpacity,
+  Text,
+  StyleSheet,
+  Modal,
   Alert,
-  Dimensions 
+  Dimensions
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { useNavigation } from '@react-navigation/native';
+import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import { RootStackParamList } from '../../navigation/AppNavigator';
+
+type NavigationProp = NativeStackNavigationProp<RootStackParamList>;
 
 const { width } = Dimensions.get('window');
 
-export default function Footer({ navigation, onLogout }: any) {
+export default function Footer({ onLogout }: any) {
+  const navigation = useNavigation<NavigationProp>();
   const [showMoreMenu, setShowMoreMenu] = useState(false);
   const [showLogoutModal, setShowLogoutModal] = useState(false);
 
   // Handle navigation for trips - show trip info page
   const handleTripsNavigation = () => {
-    navigation.navigate("ActiveTrips"); // or create a TripInfo screen
+    navigation.navigate("Trips"); // or create a TripInfo screen
   };
 
   // Handle search - open search functionality
   const handleSearchNavigation = () => {
-    navigation.navigate("Vehicle"); // You can create a dedicated SearchScreen
+    navigation.navigate("Search"); // You can create a dedicated SearchScreen
   };
 
   // Handle dashboard navigation
   const handleDashboardNavigation = () => {
-    navigation.navigate("Dashboard");
+    navigation.navigate("MainTabs", { screen: "Dashboard" });
   };
 
   // Handle notifications navigation
@@ -121,9 +127,9 @@ export default function Footer({ navigation, onLogout }: any) {
               <Ionicons name="help-circle-outline" size={20} color="#374151" />
               <Text style={styles.menuItemText}>Help</Text>
             </TouchableOpacity>
-            
+
             <View style={styles.menuDivider} />
-            
+
             <TouchableOpacity style={styles.menuItem} onPress={handleLogoutPress}>
               <Ionicons name="log-out-outline" size={20} color="#EF4444" />
               <Text style={[styles.menuItemText, { color: "#EF4444" }]}>Logout</Text>
@@ -145,11 +151,11 @@ export default function Footer({ navigation, onLogout }: any) {
               <Ionicons name="warning-outline" size={32} color="#F59E0B" />
               <Text style={styles.modalTitle}>Confirm Logout</Text>
             </View>
-            
+
             <Text style={styles.modalMessage}>
               Are you sure you want to log out? You'll need to sign in again to access your account.
             </Text>
-            
+
             <View style={styles.modalButtons}>
               <TouchableOpacity
                 style={[styles.modalButton, styles.cancelButton]}
@@ -157,7 +163,7 @@ export default function Footer({ navigation, onLogout }: any) {
               >
                 <Text style={styles.cancelButtonText}>Cancel</Text>
               </TouchableOpacity>
-              
+
               <TouchableOpacity
                 style={[styles.modalButton, styles.logoutButton]}
                 onPress={confirmLogout}
@@ -214,16 +220,16 @@ const styles = StyleSheet.create({
     borderRadius: 30,
     alignItems: "center",
     justifyContent: "center",
- 
+
   },
-  
+
   // Modal Styles
   modalOverlay: {
     flex: 1,
     backgroundColor: "rgba(0, 0, 0, 0.5)",
     justifyContent: "flex-end",
   },
-  
+
   // More Menu Styles
   moreMenu: {
     position: "absolute",
@@ -259,7 +265,7 @@ const styles = StyleSheet.create({
     backgroundColor: "#E5E7EB",
     marginHorizontal: 16,
   },
-  
+
   // Logout Modal Styles
   logoutModal: {
     backgroundColor: "#fff",

@@ -1,3 +1,5 @@
+// Replace the imports section completely with this:
+
 import React, { useState, useEffect, useRef, useCallback } from "react";
 import {
     View,
@@ -16,8 +18,28 @@ import {
     SafeAreaView,
     ActivityIndicator
 } from "react-native";
-// CRITICAL CHANGE: Replace WebView with react-native-maps
-import MapView, { Marker, Polyline, PROVIDER_GOOGLE, Region } from "react-native-maps";
+
+import type { ComponentType } from "react";
+
+// Conditional map imports - only import types when needed
+let MapView: any = null;
+let Marker: any = null;
+let Polyline: any = null;
+let PROVIDER_GOOGLE: any = null;
+
+// Import map components only on native platforms
+if (Platform.OS !== "web") {
+    try {
+        const MapModule = require("react-native-maps");
+        MapView = MapModule.default;
+        Marker = MapModule.Marker;
+        Polyline = MapModule.Polyline;
+        PROVIDER_GOOGLE = MapModule.PROVIDER_GOOGLE;
+    } catch (error) {
+        console.warn("react-native-maps not available:", error);
+    }
+}
+
 import * as Location from "expo-location";
 
 const { width, height } = Dimensions.get("window");
@@ -99,7 +121,6 @@ const SAMPLE_TRIPS: Trip[] = [
             { lat: 42.3601, lng: -71.0589, instruction: "Exit to downtown Boston - Destination reached", distance: "30 km", type: "destination" }
         ]
     },
-    // ... your other sample trips
 ];
 
 export default function DriverTrackingScreen() {
@@ -112,7 +133,7 @@ export default function DriverTrackingScreen() {
     const [currentStep, setCurrentStep] = useState<number>(0);
     const [distanceCovered, setDistanceCovered] = useState<number>(0);
 
-    // NEW: Add real location tracking states
+    // Location tracking states
     const [driverLocation, setDriverLocation] = useState<{ latitude: number, longitude: number } | null>(null);
     const [locationHistory, setLocationHistory] = useState<{ latitude: number, longitude: number }[]>([]);
     const [locationPermission, setLocationPermission] = useState<boolean>(false);
@@ -125,10 +146,10 @@ export default function DriverTrackingScreen() {
     const activeTrips = trips.filter(trip => trip.status === 'active');
     const scheduledTrips = trips.filter(trip => trip.status === 'scheduled');
     const completedTrips = trips.filter(trip => trip.status === 'completed');
-    const mapRef = useRef<MapView>(null);
+    const mapRef = useRef<any>(null);
     const mapReadyRef = useRef(false);
 
-    // NEW: Request location permissions and start tracking
+    // Request location permissions and start tracking
     useEffect(() => {
         requestLocationPermission();
     }, []);
@@ -139,7 +160,7 @@ export default function DriverTrackingScreen() {
         mapReadyRef.current = true;
     }, []);
 
-    // FIXED: Reset map ready state when switching trips
+    // Reset map ready state when switching trips
     useEffect(() => {
         if (selectedTrip) {
             mapReadyRef.current = false;
@@ -147,7 +168,7 @@ export default function DriverTrackingScreen() {
     }, [selectedTrip]);
 
     useEffect(() => {
-        if (mapRef.current && selectedTrip && currentView === 'navigation') {
+        if (Platform.OS !== 'web' && mapRef.current && selectedTrip && currentView === 'navigation') {
             setTimeout(() => {
                 const pickup = { latitude: selectedTrip.pickup.lat, longitude: selectedTrip.pickup.lng };
                 const delivery = { latitude: selectedTrip.delivery.lat, longitude: selectedTrip.delivery.lng };
@@ -159,7 +180,7 @@ export default function DriverTrackingScreen() {
                     edgePadding: { top: 50, right: 50, bottom: 50, left: 50 },
                     animated: true,
                 });
-            }, 500); // Give map time to render
+            }, 500);
         }
     }, [selectedTrip, driverLocation, currentView]);
 
@@ -192,14 +213,11 @@ export default function DriverTrackingScreen() {
 
             console.log('Location permission granted');
             setLocationPermission(true);
-            // REMOVED: Don't call getCurrentLocation here - let useEffect handle it
         } catch (error) {
             console.error('Location permission error:', error);
             setLocationPermission(false);
         }
     };
-
-
 
     const calculateDistance = (lat1: number, lon1: number, lat2: number, lon2: number): number => {
         const R = 6371; // Radius of the Earth in kilometers
@@ -212,18 +230,20 @@ export default function DriverTrackingScreen() {
         const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
         return R * c;
     };
+    type Coordinates = {
+        latitude: number;
+        longitude: number;
+    };
 
     const getCurrentLocation = async () => {
-        // REMOVED: Don't check permission here - it causes infinite loop
         try {
             console.log("Getting location...");
 
             const location = await Location.getCurrentPositionAsync({
                 accuracy: Location.Accuracy.Balanced,
-                maximumAge: 60000,
             });
 
-            const newLocation = {
+            const newLocation: Coordinates = {
                 latitude: location.coords.latitude,
                 longitude: location.coords.longitude,
             };
@@ -233,14 +253,16 @@ export default function DriverTrackingScreen() {
 
             // Update tracking if trip is started
             if (tripStarted && selectedTrip) {
-                setLocationHistory(prev => {
+                setLocationHistory((prev) => {
                     const newHistory = [...prev, newLocation];
 
                     let totalDistance = 0;
                     for (let i = 1; i < newHistory.length; i++) {
                         totalDistance += calculateDistance(
-                            newHistory[i - 1].latitude, newHistory[i - 1].longitude,
-                            newHistory[i].latitude, newHistory[i].longitude
+                            newHistory[i - 1].latitude,
+                            newHistory[i - 1].longitude,
+                            newHistory[i].latitude,
+                            newHistory[i].longitude
                         );
                     }
 
@@ -249,26 +271,27 @@ export default function DriverTrackingScreen() {
                 });
             }
         } catch (error) {
-            console.error('Location error:', error);
+            console.error("Location error:", error);
+
             // Use a default location for testing
-            const fallbackLocation = {
+            const fallbackLocation: Coordinates = {
                 latitude: 40.7589,
-                longitude: -73.9851
+                longitude: -73.9851,
             };
+
             console.log("Using fallback location:", fallbackLocation);
             setDriverLocation(fallbackLocation);
         }
     };
 
-
-    // FIXED: Add useEffect to call getCurrentLocation when permission is granted
+    // Call getCurrentLocation when permission is granted
     useEffect(() => {
         if (locationPermission) {
             getCurrentLocation();
         }
     }, [locationPermission]);
 
-    // FIXED: Update location tracking effect
+    // Update location tracking effect
     useEffect(() => {
         if (tripStarted && locationPermission) {
             locationInterval.current = setInterval(() => {
@@ -315,10 +338,12 @@ export default function DriverTrackingScreen() {
         setDistanceCovered(0);
         setLocationHistory([]);
 
-        // FIXED: Set loading state only after a brief delay to ensure clean state
-        setTimeout(() => {
-            setMapLoading(true);
-        }, 100);
+        // Set loading state only for non-web platforms
+        if (Platform.OS !== 'web') {
+            setTimeout(() => {
+                setMapLoading(true);
+            }, 100);
+        }
 
         // Get location if we have permission
         if (locationPermission) {
@@ -340,6 +365,7 @@ export default function DriverTrackingScreen() {
         // Start location tracking immediately
         getCurrentLocation();
     };
+
     const handleStopTrip = () => {
         Alert.alert(
             "Stop Trip",
@@ -425,7 +451,7 @@ export default function DriverTrackingScreen() {
             <View style={styles.routeInfo}>
                 <View style={styles.locationRow}>
                     <View style={[styles.locationDot, { backgroundColor: '#10B981' }]}>
-                        <Text style={styles.locationIcon}>📦</Text>
+                        <Text style={styles.locationIcon}>P</Text>
                     </View>
                     <View style={styles.locationDetails}>
                         <Text style={styles.locationName}>{item.pickup.location}</Text>
@@ -438,7 +464,7 @@ export default function DriverTrackingScreen() {
 
                 <View style={styles.locationRow}>
                     <View style={[styles.locationDot, { backgroundColor: '#EF4444' }]}>
-                        <Text style={styles.locationIcon}>🏁</Text>
+                        <Text style={styles.locationIcon}>D</Text>
                     </View>
                     <View style={styles.locationDetails}>
                         <Text style={styles.locationName}>{item.delivery.location}</Text>
@@ -467,7 +493,7 @@ export default function DriverTrackingScreen() {
             </View>
 
             <TouchableOpacity style={styles.viewDetailsButton}>
-                <Text style={styles.viewDetailsText}>View Route & Navigate →</Text>
+                <Text style={styles.viewDetailsText}>View Route & Navigate</Text>
             </TouchableOpacity>
         </TouchableOpacity>
     );
@@ -492,7 +518,7 @@ export default function DriverTrackingScreen() {
             {activeTrips.length > 0 && (
                 <View style={styles.section}>
                     <View style={styles.sectionHeader}>
-                        <Text style={styles.sectionTitle}>🔴 Active Trips</Text>
+                        <Text style={styles.sectionTitle}>Active Trips</Text>
                         <Text style={styles.sectionCount}>{activeTrips.length}</Text>
                     </View>
                     <FlatList
@@ -508,7 +534,7 @@ export default function DriverTrackingScreen() {
             {scheduledTrips.length > 0 && (
                 <View style={styles.section}>
                     <View style={styles.sectionHeader}>
-                        <Text style={styles.sectionTitle}>📅 Scheduled Trips</Text>
+                        <Text style={styles.sectionTitle}>Scheduled Trips</Text>
                         <Text style={styles.sectionCount}>{scheduledTrips.length}</Text>
                     </View>
                     <FlatList
@@ -524,7 +550,7 @@ export default function DriverTrackingScreen() {
             {completedTrips.length > 0 && (
                 <View style={styles.section}>
                     <View style={styles.sectionHeader}>
-                        <Text style={styles.sectionTitle}>✅ Recently Completed</Text>
+                        <Text style={styles.sectionTitle}>Recently Completed</Text>
                         <Text style={styles.sectionCount}>{completedTrips.length}</Text>
                     </View>
                     <FlatList
@@ -539,7 +565,7 @@ export default function DriverTrackingScreen() {
 
             {trips.length === 0 && (
                 <View style={styles.emptyState}>
-                    <Text style={styles.emptyIcon}>📋</Text>
+                    <Text style={styles.emptyIcon}>No Trips</Text>
                     <Text style={styles.emptyTitle}>No Trips Found</Text>
                     <Text style={styles.emptyText}>Pull down to refresh and check for new assignments</Text>
                 </View>
@@ -547,27 +573,66 @@ export default function DriverTrackingScreen() {
         </ScrollView>
     );
 
+    // Replace the renderMapView function with this corrected version:
+
     const renderMapView = useCallback((isFullScreen = false) => {
         if (!selectedTrip) return null;
+
+        // For web platform, show a placeholder
+        if (Platform.OS === 'web' || !MapView) {
+            return (
+                <View style={isFullScreen ? styles.fullScreenMapContainer : styles.mapContainer}>
+                    <View style={styles.webMapPlaceholder}>
+                        <Text style={styles.webMapTitle}>Map View</Text>
+                        <Text style={styles.webMapText}>
+                            Route: {selectedTrip.pickup.location} to {selectedTrip.delivery.location}
+                        </Text>
+                        <Text style={styles.webMapText}>
+                            Distance: {selectedTrip.distance} • Duration: {selectedTrip.duration}
+                        </Text>
+                        <Text style={styles.webMapSubtext}>
+                            Map functionality is available on mobile devices
+                        </Text>
+                        {driverLocation && (
+                            <Text style={styles.webMapText}>
+                                Current Location: {driverLocation.latitude.toFixed(4)}, {driverLocation.longitude.toFixed(4)}
+                            </Text>
+                        )}
+                    </View>
+
+                    {!isFullScreen && (
+                        <TouchableOpacity
+                            style={styles.expandButton}
+                            onPress={() => setFullScreenMap(true)}
+                            activeOpacity={0.8}
+                        >
+                            <Text style={styles.expandButtonText}>⛶</Text>
+                        </TouchableOpacity>
+                    )}
+                </View>
+            );
+        }
+
+        // Native map rendering (iOS/Android) - with null checks
+        if (!MapView || !Marker || !Polyline) {
+            return (
+                <View style={isFullScreen ? styles.fullScreenMapContainer : styles.mapContainer}>
+                    <View style={styles.webMapPlaceholder}>
+                        <Text style={styles.webMapTitle}>Map Loading Error</Text>
+                        <Text style={styles.webMapText}>
+                            Map components not available
+                        </Text>
+                    </View>
+                </View>
+            );
+        }
 
         const pickup = { latitude: selectedTrip.pickup.lat, longitude: selectedTrip.pickup.lng };
         const delivery = { latitude: selectedTrip.delivery.lat, longitude: selectedTrip.delivery.lng };
 
         let regionPoints = [pickup, delivery];
-
         if (driverLocation) {
-            const distanceToPickup = calculateDistance(
-                driverLocation.latitude, driverLocation.longitude,
-                pickup.latitude, pickup.longitude
-            );
-            const distanceToDelivery = calculateDistance(
-                driverLocation.latitude, driverLocation.longitude,
-                delivery.latitude, delivery.longitude
-            );
-
-            if (distanceToPickup < 500 || distanceToDelivery < 500) {
-                regionPoints.push(driverLocation);
-            }
+            regionPoints.push(driverLocation);
         }
 
         const latitudes = regionPoints.map(p => p.latitude);
@@ -590,7 +655,6 @@ export default function DriverTrackingScreen() {
             latitudeDelta: (maxLat - minLat) + latPadding || 0.05,
             longitudeDelta: (maxLng - minLng) + lngPadding || 0.05,
         };
-
 
         const routeCoordinates = selectedTrip.routeSteps
             .filter(step => {
@@ -622,8 +686,6 @@ export default function DriverTrackingScreen() {
                             clearMapLoading();
                         }
                     }}
-                // REMOVED: Multiple conflicting event handlers that cause issues
-                // Only keep onMapReady as the primary loading clear mechanism
                 >
                     {/* Pickup Marker */}
                     <Marker
@@ -651,36 +713,23 @@ export default function DriverTrackingScreen() {
 
                     {/* Driver Location */}
                     {driverLocation && (
-                        (() => {
-                            const distanceToRoute = Math.min(
-                                calculateDistance(driverLocation.latitude, driverLocation.longitude, pickup.latitude, pickup.longitude),
-                                calculateDistance(driverLocation.latitude, driverLocation.longitude, delivery.latitude, delivery.longitude)
-                            );
-
-                            if (distanceToRoute < 1000) {
-                                return (
-                                    <Marker
-                                        coordinate={driverLocation}
-                                        title="YOU ARE HERE"
-                                        description={`Distance to route: ${distanceToRoute.toFixed(1)}km`}
-                                        identifier="driver"
-                                    >
-                                        <Animated.View
-                                            style={[
-                                                styles.customMarker,
-                                                {
-                                                    backgroundColor: '#1a73e8',
-                                                    transform: [{ scale: tripStarted ? pulseAnim : 1 }]
-                                                }
-                                            ]}
-                                        >
-                                            <Text style={styles.markerText}>🚛</Text>
-                                        </Animated.View>
-                                    </Marker>
-                                );
-                            }
-                            return null;
-                        })()
+                        <Marker
+                            coordinate={driverLocation}
+                            title="YOU ARE HERE"
+                            identifier="driver"
+                        >
+                            <Animated.View
+                                style={[
+                                    styles.customMarker,
+                                    {
+                                        backgroundColor: '#1a73e8',
+                                        transform: [{ scale: tripStarted ? pulseAnim : 1 }]
+                                    }
+                                ]}
+                            >
+                                <Text style={styles.markerText}>T</Text>
+                            </Animated.View>
+                        </Marker>
                     )}
 
                     {/* Route Line */}
@@ -704,7 +753,7 @@ export default function DriverTrackingScreen() {
                     )}
                 </MapView>
 
-                {/* FIXED: Simplified loading overlay with better timeout */}
+                {/* Loading overlay */}
                 {mapLoading && (
                     <View style={styles.mapLoadingOverlay}>
                         <ActivityIndicator size="large" color="#1a73e8" />
@@ -749,15 +798,16 @@ export default function DriverTrackingScreen() {
         );
     }, [selectedTrip, driverLocation, mapLoading, tripStarted, pulseAnim, locationHistory, locationPermission, clearMapLoading]);
 
+    // Failsafe timeout for map loading
     useEffect(() => {
         let timeoutId: NodeJS.Timeout;
 
-        if (mapLoading && selectedTrip) {
+        if (mapLoading && selectedTrip && Platform.OS !== 'web') {
             timeoutId = setTimeout(() => {
                 console.log("Failsafe timeout - forcing map loading clear");
                 setMapLoading(false);
                 mapReadyRef.current = true;
-            }, 5000); // 5 second failsafe
+            }, 5000);
         }
 
         return () => {
@@ -767,10 +817,9 @@ export default function DriverTrackingScreen() {
         };
     }, [mapLoading, selectedTrip]);
 
-    // FIXED: Also clear loading when driver location updates (indicates map is working)
+    // Clear loading when driver location updates
     useEffect(() => {
-        if (driverLocation && mapLoading && selectedTrip) {
-            // If we have location data and map is still loading, clear it
+        if (driverLocation && mapLoading && selectedTrip && Platform.OS !== 'web') {
             setTimeout(() => {
                 if (mapLoading) {
                     console.log("Clearing loading due to location update");
@@ -780,8 +829,6 @@ export default function DriverTrackingScreen() {
             }, 1000);
         }
     }, [driverLocation, mapLoading, selectedTrip]);
-
-
 
     const renderStatsSection = () => {
         if (!selectedTrip) return null;
@@ -893,7 +940,7 @@ export default function DriverTrackingScreen() {
                         <View style={styles.routeSection}>
                             <View style={styles.locationRow}>
                                 <View style={[styles.locationDot, { backgroundColor: '#10B981' }]}>
-                                    <Text style={styles.locationIcon}>📦</Text>
+                                    <Text style={styles.locationIcon}>P</Text>
                                 </View>
                                 <View style={styles.locationDetails}>
                                     <Text style={styles.locationName}>{selectedTrip.pickup.location}</Text>
@@ -906,7 +953,7 @@ export default function DriverTrackingScreen() {
 
                             <View style={styles.locationRow}>
                                 <View style={[styles.locationDot, { backgroundColor: '#EF4444' }]}>
-                                    <Text style={styles.locationIcon}>🏁</Text>
+                                    <Text style={styles.locationIcon}>D</Text>
                                 </View>
                                 <View style={styles.locationDetails}>
                                     <Text style={styles.locationName}>{selectedTrip.delivery.location}</Text>
@@ -958,7 +1005,7 @@ export default function DriverTrackingScreen() {
                         </View>
                     )}
 
-                    {/* Map View - Using React Native Maps */}
+                    {/* Map View */}
                     {renderMapView(false)}
 
                     {/* Navigation Controls */}
@@ -969,7 +1016,7 @@ export default function DriverTrackingScreen() {
                                     styles.startButton,
                                     !locationPermission && styles.disabledButton
                                 ]}
-                                onPress={handleStartTrip} // FIXED: Changed from handleStopTrip
+                                onPress={handleStartTrip}
                                 activeOpacity={0.8}
                                 disabled={!locationPermission}
                             >
@@ -996,7 +1043,6 @@ export default function DriverTrackingScreen() {
                             </View>
                         )}
                     </View>
-
 
                     {renderStatsSection()}
                 </ScrollView>
@@ -1148,6 +1194,8 @@ const styles = StyleSheet.create({
     },
     locationIcon: {
         fontSize: 20,
+        fontWeight: "bold",
+        color: "white",
     },
     locationDetails: {
         flex: 1,
@@ -1357,7 +1405,7 @@ const styles = StyleSheet.create({
         marginTop: 4,
     },
 
-    // NEW: Location Permission Styles
+    // Location Permission Styles
     permissionCard: {
         backgroundColor: "#FEF3C7",
         marginHorizontal: 16,
@@ -1447,7 +1495,7 @@ const styles = StyleSheet.create({
         color: "#9CA3AF",
     },
 
-    // NEW: React Native MapView Styles
+    // Map Styles
     mapContainer: {
         marginHorizontal: 16,
         marginBottom: 16,
@@ -1465,41 +1513,35 @@ const styles = StyleSheet.create({
         width: "100%",
         height: "100%"
     },
-    pickupMarker: {
-        backgroundColor: '#10B981',
-        borderRadius: 25,
-        width: 50,
-        height: 50,
-        alignItems: 'center',
-        justifyContent: 'center',
-        borderWidth: 4,
-        borderColor: 'white',
-        elevation: 8,
+
+    // FIXED: Web Map Placeholder Styles
+    webMapPlaceholder: {
+        width: "100%",
+        height: "100%",
+        backgroundColor: "#E5E7EB",
+        alignItems: "center",
+        justifyContent: "center",
+        padding: 20,
     },
-    deliveryMarker: {
-        backgroundColor: '#EF4444',
-        borderRadius: 25,
-        width: 50,
-        height: 50,
-        alignItems: 'center',
-        justifyContent: 'center',
-        borderWidth: 4,
-        borderColor: 'white',
-        elevation: 8,
-    },
-    driverMarker: {
-        backgroundColor: '#1a73e8',
-        borderRadius: 25,
-        width: 50,
-        height: 50,
-        alignItems: 'center',
-        justifyContent: 'center',
-        borderWidth: 4,
-        borderColor: 'white',
-        elevation: 8,
-    },
-    markerEmoji: {
+    webMapTitle: {
         fontSize: 24,
+        fontWeight: "bold",
+        color: "#374151",
+        marginBottom: 16,
+        textAlign: "center",
+    },
+    webMapText: {
+        fontSize: 16,
+        color: "#4B5563",
+        marginBottom: 8,
+        textAlign: "center",
+    },
+    webMapSubtext: {
+        fontSize: 14,
+        color: "#6B7280",
+        marginTop: 16,
+        textAlign: "center",
+        fontStyle: "italic",
     },
 
     fullScreenMapContainer: {
@@ -1507,13 +1549,7 @@ const styles = StyleSheet.create({
         backgroundColor: '#f0f0f0',
     },
 
-    fullScreenMap: {
-        flex: 1,
-        width: "100%",
-        height: "100%",
-    },
-
-    // NEW: Map Loading Overlay
+    // Map Loading Overlay
     mapLoadingOverlay: {
         position: "absolute",
         top: 0,
@@ -1531,6 +1567,12 @@ const styles = StyleSheet.create({
         fontSize: 16,
         color: "#1a73e8",
         fontWeight: "500",
+    },
+    loadingSubtext: {
+        marginTop: 4,
+        fontSize: 12,
+        color: "#666",
+        fontStyle: "italic",
     },
 
     // Map Controls
@@ -1588,57 +1630,12 @@ const styles = StyleSheet.create({
     markerText: {
         fontSize: 20,
         fontWeight: 'bold',
+        color: 'white',
     },
     exitButtonText: {
         color: "white",
         fontSize: 24,
         fontWeight: "bold",
-    },
-
-    // Navigation Controls
-    controlsContainer: {
-        marginHorizontal: 16,
-        marginBottom: 16,
-    },
-    startButton: {
-        backgroundColor: "#1a73e8",
-        padding: 16,
-        borderRadius: 12,
-        alignItems: "center",
-        elevation: 3,
-        shadowColor: "#000",
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.1,
-        shadowRadius: 4,
-    },
-    startButtonText: {
-        color: "#fff",
-        fontSize: 16,
-        fontWeight: "600",
-    },
-
-    // NEW: Disabled Button Style
-    disabledButton: {
-        backgroundColor: "#9CA3AF",
-        elevation: 0,
-        shadowOpacity: 0,
-    },
-
-    tripControls: {
-        flexDirection: "row",
-        gap: 12,
-    },
-    pauseButton: {
-        flex: 1,
-        backgroundColor: "#F59E0B",
-        padding: 16,
-        borderRadius: 12,
-        alignItems: "center",
-        elevation: 3,
-        shadowColor: "#000",
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.1,
-        shadowRadius: 4,
     },
     mapOverlay: {
         position: 'absolute',
@@ -1663,6 +1660,49 @@ const styles = StyleSheet.create({
         opacity: 0.8,
         marginTop: 2,
     },
+
+    // Navigation Controls
+    controlsContainer: {
+        marginHorizontal: 16,
+        marginBottom: 16,
+    },
+    startButton: {
+        backgroundColor: "#1a73e8",
+        padding: 16,
+        borderRadius: 12,
+        alignItems: "center",
+        elevation: 3,
+        shadowColor: "#000",
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.1,
+        shadowRadius: 4,
+    },
+    startButtonText: {
+        color: "#fff",
+        fontSize: 16,
+        fontWeight: "600",
+    },
+    disabledButton: {
+        backgroundColor: "#9CA3AF",
+        elevation: 0,
+        shadowOpacity: 0,
+    },
+    tripControls: {
+        flexDirection: "row",
+        gap: 12,
+    },
+    pauseButton: {
+        flex: 1,
+        backgroundColor: "#F59E0B",
+        padding: 16,
+        borderRadius: 12,
+        alignItems: "center",
+        elevation: 3,
+        shadowColor: "#000",
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.1,
+        shadowRadius: 4,
+    },
     pauseButtonText: {
         color: "#fff",
         fontSize: 14,
@@ -1686,19 +1726,13 @@ const styles = StyleSheet.create({
         fontWeight: "600",
     },
 
-    // Stats Container - Updated for new functionality
+    // Stats Container
     statsContainer: {
         flexDirection: "row",
         flexWrap: "wrap",
         marginHorizontal: 16,
         marginBottom: 20,
         gap: 12,
-    },
-    loadingSubtext: {
-        marginTop: 4,
-        fontSize: 12,
-        color: "#666",
-        fontStyle: "italic",
     },
     statBox: {
         flex: 1,
@@ -1735,4 +1769,3 @@ const styles = StyleSheet.create({
         textAlign: "center",
     },
 });
-

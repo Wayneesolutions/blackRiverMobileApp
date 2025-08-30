@@ -1,4 +1,4 @@
-package com.blackriver.mobileapp
+package com.blackriverlogistics.app
 import expo.modules.splashscreen.SplashScreenManager
 
 import android.os.Build

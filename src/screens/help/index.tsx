@@ -76,36 +76,7 @@ const helpSections = [
     }
 ];
 
-const supportOptions = [
-    {
-        id: '1',
-        title: 'Contact Support',
-        subtitle: '24/7 technical assistance',
-        icon: 'headset-outline',
-        action: 'phone'
-    },
-    {
-        id: '2',
-        title: 'Live Chat',
-        subtitle: 'Chat with our support team',
-        icon: 'chatbubbles-outline',
-        action: 'chat'
-    },
-    {
-        id: '3',
-        title: 'Email Support',
-        subtitle: 'Send us your questions',
-        icon: 'mail-outline',
-        action: 'email'
-    },
-    {
-        id: '4',
-        title: 'Video Tutorials',
-        subtitle: 'Watch step-by-step guides',
-        icon: 'play-outline',
-        action: 'video'
-    }
-];
+
 
 export default function HelpScreen({ }) {
     const navigation = useNavigation<NavigationProp>();
@@ -150,43 +121,43 @@ export default function HelpScreen({ }) {
 
     return (
         <SafeAreaView style={styles.container}>
-            {/* Header */}
-            <View style={styles.header}>
-                <TouchableOpacity
-                    style={styles.backButton}
-                    onPress={() => navigation.goBack()}
-                >
-                    <Ionicons name="arrow-back" size={24} color="#1F2937" />
-                </TouchableOpacity>
-                <Text style={styles.headerTitle}>Help & Support</Text>
-            </View>
-
-            <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
-            
-
-                {/* FAQ Sections */}
-                <View style={styles.faqContainer}>
-                    <Text style={styles.sectionHeaderTitle}>Frequently Asked Questions</Text>
-                    {helpSections.map(renderHelpSection)}
+            <ScrollView
+                style={styles.scrollContainer}
+                contentContainerStyle={styles.scrollContent}
+                showsVerticalScrollIndicator={false}
+            >
+                {/* Header */}
+                <View style={styles.header}>
+                    <Text style={styles.headerTitle}>Help & Support</Text>
                 </View>
 
-                {/* App Info */}
-                <View style={styles.appInfoContainer}>
-                    <Text style={styles.sectionHeaderTitle}>App Information</Text>
-                    <View style={styles.infoItem}>
-                        <Text style={styles.infoLabel}>Version</Text>
-                        <Text style={styles.infoValue}>1.0.0</Text>
-                    </View>
-                    <View style={styles.infoItem}>
-                        <Text style={styles.infoLabel}>Last Updated</Text>
-                        <Text style={styles.infoValue}>August 2025</Text>
-                    </View>
-                    <View style={styles.infoItem}>
-                        <Text style={styles.infoLabel}>Build Number</Text>
-                        <Text style={styles.infoValue}>100.1.0</Text>
-                    </View>
-                </View>
+                <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
 
+
+                    {/* FAQ Sections */}
+                    <View style={styles.faqContainer}>
+                        <Text style={styles.sectionHeaderTitle}>Frequently Asked Questions</Text>
+                        {helpSections.map(renderHelpSection)}
+                    </View>
+
+                    {/* App Info */}
+                    <View style={styles.appInfoContainer}>
+                        <Text style={styles.sectionHeaderTitle}>App Information</Text>
+                        <View style={styles.infoItem}>
+                            <Text style={styles.infoLabel}>Version</Text>
+                            <Text style={styles.infoValue}>1.0.0</Text>
+                        </View>
+                        <View style={styles.infoItem}>
+                            <Text style={styles.infoLabel}>Last Updated</Text>
+                            <Text style={styles.infoValue}>August 2025</Text>
+                        </View>
+                        <View style={styles.infoItem}>
+                            <Text style={styles.infoLabel}>Build Number</Text>
+                            <Text style={styles.infoValue}>100.1.0</Text>
+                        </View>
+                    </View>
+
+                </ScrollView>
             </ScrollView>
         </SafeAreaView>
     );
@@ -197,24 +168,27 @@ const styles = StyleSheet.create({
         flex: 1,
         backgroundColor: '#F8FAFC',
     },
+    scrollContainer: {
+        flex: 1,
+    },
+    scrollContent: {
+        paddingBottom: 40, // Add padding to account for footer
+    },
     header: {
         flexDirection: 'row',
         alignItems: 'center',
         paddingHorizontal: 16,
         paddingVertical: 16,
-        backgroundColor: '#fff',
-        borderBottomWidth: 1,
-        borderBottomColor: '#E5E7EB',
     },
     backButton: {
         padding: 8,
     },
     headerTitle: {
-        fontSize: 20,
+        fontSize: 24,
         fontWeight: 'bold',
         color: '#1F2937',
         flex: 1,
-        textAlign: 'center',
+        textAlign: 'left',
         marginRight: 40,
     },
     content: {

@@ -42,7 +42,6 @@ interface CombinedSearchResultsProps<T extends SearchableItem> {
   showSkip?: boolean;
 }
 
-
 // Types
 type RootStackParamList = {
   Dashboard: undefined;
@@ -51,36 +50,17 @@ type RootStackParamList = {
 
 type NavigationProp = NativeStackNavigationProp<RootStackParamList, 'Inspection'>;
 
-interface VehicleItem {
-  id: string;
-  name: string;
-  serialNo: string;
-  status: string;
-  statusColor: string;
-  location: string;
-  distance: string;
+interface VehicleItem extends SearchableItem {
   hasTrailer: boolean;
   trailerInfo?: string;
 }
 
-interface TrailerItem {
-  id: string;
-  name: string;
-  serialNo: string;
-  status: string;
-  statusColor: string;
-  location: string;
-  distance: string;
+interface TrailerItem extends SearchableItem {
+  hasTrailer?: boolean; // Make this optional for TrailerItem
 }
 
-interface ShipmentItem {
-  id: string;
-  name: string;
-  serialNo: string;
-  status: string;
-  statusColor: string;
-  location: string;
-  distance: string;
+interface ShipmentItem extends SearchableItem {
+  hasTrailer?: boolean; // Make this optional for ShipmentItem
 }
 
 interface InspectionItem {
@@ -184,7 +164,6 @@ const dummyShipments: ShipmentItem[] = [
     location: "Holding Area",
     distance: "6.1 km"
   },
-
 ];
 
 const inspectionItems: InspectionItem[] = [
@@ -271,7 +250,7 @@ function CombinedSearchResults<T extends SearchableItem>({
   onSkip,
   selectedItem,
   data,
-  showSkip = false,
+  showSkip,
 }: CombinedSearchResultsProps<T>) {
   const [filteredResults, setFilteredResults] = useState(data);
 
@@ -391,8 +370,6 @@ function CombinedSearchResults<T extends SearchableItem>({
     </View>
   );
 }
-
-
 
 // Inspection Screen Component
 const InspectionScreen = ({
@@ -624,7 +601,7 @@ const NewTripScreen = () => {
   const navigation = useNavigation<NavigationProp>();
 
   // Main flow states
-  const [currentStep, setCurrentStep] = useState<number>(1); // 1=Vehicle, 2=Trailer, 3=Shipment, 4=Inspection, 5=Success
+  const [currentStep, setCurrentStep] = useState<number>(1);
   const [currentView, setCurrentView] = useState<'search' | 'results' | 'inspection' | 'success'>('search');
 
   // Search states
@@ -632,8 +609,8 @@ const NewTripScreen = () => {
   const [searchResults, setSearchResults] = useState<VehicleItem[]>([]);
   const [selectedItems, setSelectedItems] = useState<{
     vehicle: VehicleItem | null;
-    trailer: VehicleItem | null;
-    shipment: VehicleItem | null;
+    trailer: TrailerItem | null;
+    shipment: ShipmentItem | null;
   }>({
     vehicle: null,
     trailer: null,
@@ -647,50 +624,24 @@ const NewTripScreen = () => {
   const [inspectionType, setInspectionType] = useState<string>("");
   const [showInspectionForm, setShowInspectionForm] = useState<boolean>(false);
 
-  const getStepConfig = () => {
-    switch (currentStep) {
-      case 1:
-        return {
-          title: "Find Vehicle",
-          placeholder: "Search by Plate or Serial No",
-          data: dummyVehicles,
-          listTitle: "Vehicle List"
-        };
-      case 2:
-        return {
-          title: "Find Trailer",
-          placeholder: "Search by Plate or Serial No",
-          data: dummyTrailers,
-          listTitle: "Trailer List"
-        };
-      case 3:
-        return {
-          title: "Attach Shipment",
-          placeholder: "Search Shipment",
-          data: dummyShipments,
-          listTitle: "Shipment List"
-        };
-      default:
-        return null;
+  // Generic handler for item selection
+  const handleItemSelect = <T extends SearchableItem>(item: T) => {
+    if (currentStep === 1) {
+      setSelectedItems(prev => ({ ...prev, vehicle: item as VehicleItem }));
+    } else if (currentStep === 2) {
+      setSelectedItems(prev => ({ ...prev, trailer: item as TrailerItem }));
+    } else if (currentStep === 3) {
+      setSelectedItems(prev => ({ ...prev, shipment: item as ShipmentItem }));
     }
-  };
-
-
-
-  const handleItemSelect = (item: VehicleItem) => {
-    const key = currentStep === 1 ? 'vehicle' : currentStep === 2 ? 'trailer' : 'shipment';
-    setSelectedItems(prev => ({ ...prev, [key]: item }));
   };
 
   const handleNext = () => {
     if (currentStep < 3) {
-      // Move to next step
       setCurrentStep(currentStep + 1);
       setCurrentView('search');
       setSearchQuery("");
       setSearchResults([]);
     } else {
-      // Move to inspection
       setCurrentStep(4);
       setCurrentView('inspection');
     }
@@ -698,31 +649,26 @@ const NewTripScreen = () => {
 
   const handleBack = () => {
     if (currentView === 'results') {
-      // Go back from results to search
       setCurrentView('search');
       setSearchResults([]);
     } else if (currentView === 'inspection') {
-      // Go back from inspection to previous step (shipment search)
       setCurrentStep(3);
       setCurrentView('search');
       setShowInspectionForm(false);
     } else if (currentView === 'search') {
-      // Go back from search to previous step or dashboard
       if (currentStep > 1) {
         setCurrentStep(currentStep - 1);
         setSearchQuery("");
         setSearchResults([]);
-        // Reset selection for current step when going back
         const currentKey = currentStep === 1 ? 'vehicle' : currentStep === 2 ? 'trailer' : 'shipment';
         setSelectedItems(prev => ({ ...prev, [currentKey]: null }));
       } else {
-        // Only go to dashboard if we're at the first step
         navigation.navigate('Dashboard');
       }
     }
   };
+
   const handleSkipTrailer = () => {
-    // Skip trailer selection and move to shipment
     setCurrentStep(3);
     setSearchQuery("");
   };
@@ -741,7 +687,6 @@ const NewTripScreen = () => {
   };
 
   const handleFinish = () => {
-    // Reset all states
     setCurrentStep(1);
     setCurrentView('search');
     setSearchQuery("");
@@ -761,8 +706,6 @@ const NewTripScreen = () => {
   };
 
   const renderContent = () => {
-    const config = getStepConfig();
-
     // Success Screen
     if (currentView === 'success') {
       return (
@@ -794,29 +737,58 @@ const NewTripScreen = () => {
       );
     }
 
-    // Combined Search & Results (default for steps 1-3)
-    if (config) {
-      return (
-        <View style={styles.mainContainer}>
-          <ProgressIndicator currentStep={currentStep} />
-          <CombinedSearchResults
-            title={config.title}
-            placeholder={config.placeholder}
+    // Search screens
+    return (
+      <View style={styles.mainContainer}>
+        <ProgressIndicator currentStep={currentStep} />
+
+        {currentStep === 1 && (
+          <CombinedSearchResults<VehicleItem>
+            title="Select Vehicle"
+            placeholder="Search vehicles..."
             searchQuery={searchQuery}
             setSearchQuery={setSearchQuery}
             onItemSelect={handleItemSelect}
             onNext={handleNext}
             onBack={handleBack}
-            onSkip={currentStep === 2 ? handleSkipTrailer : undefined}
-            selectedItem={getCurrentSelectedItem()}
-            data={config.data}
-            showSkip={currentStep === 2} // Only show skip for trailer step
+            selectedItem={selectedItems.vehicle}
+            data={dummyVehicles}
+            showSkip={false}
           />
-        </View>
-      );
-    }
+        )}
 
-    return null;
+        {currentStep === 2 && (
+          <CombinedSearchResults<TrailerItem>
+            title="Select Trailer"
+            placeholder="Search trailers..."
+            searchQuery={searchQuery}
+            setSearchQuery={setSearchQuery}
+            onItemSelect={handleItemSelect}
+            onNext={handleNext}
+            onBack={handleBack}
+            onSkip={handleSkipTrailer}
+            selectedItem={selectedItems.trailer}
+            data={dummyTrailers}
+            showSkip={true}
+          />
+        )}
+
+        {currentStep === 3 && (
+          <CombinedSearchResults<ShipmentItem>
+            title="Select Shipment"
+            placeholder="Search shipments..."
+            searchQuery={searchQuery}
+            setSearchQuery={setSearchQuery}
+            onItemSelect={handleItemSelect}
+            onNext={handleNext}
+            onBack={handleBack}
+            selectedItem={selectedItems.shipment}
+            data={dummyShipments}
+            showSkip={false}
+          />
+        )}
+      </View>
+    );
   };
 
   return (
@@ -826,6 +798,7 @@ const NewTripScreen = () => {
     </SafeAreaView>
   );
 };
+
 
 // Styles
 const styles = StyleSheet.create({

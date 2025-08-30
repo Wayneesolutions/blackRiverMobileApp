@@ -1,4 +1,4 @@
-package com.blackriver.mobileapp
+package com.blackriverlogistics.app
 
 import android.app.Application
 import android.content.res.Configuration

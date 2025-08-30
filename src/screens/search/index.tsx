@@ -251,27 +251,27 @@ export default function SearchScreen({ navigation }: Props) {
 
   const performSearch = (query: string) => {
     const searchTerm = query.toLowerCase().trim();
-    
+
     // Enhanced search algorithm
     const filtered = searchablePages.filter(page => {
       // Exact name match gets highest priority
       if (page.name.toLowerCase() === searchTerm) return true;
-      
+
       // Name contains search term
       if (page.name.toLowerCase().includes(searchTerm)) return true;
-      
+
       // Description contains search term
       if (page.description.toLowerCase().includes(searchTerm)) return true;
-      
+
       // Category contains search term
       if (page.category.toLowerCase().includes(searchTerm)) return true;
-      
+
       // Keywords contain search term
       if (page.keywords.some(keyword => keyword.toLowerCase().includes(searchTerm))) return true;
-      
+
       // Check for partial word matches
       const words = searchTerm.split(' ');
-      return words.every(word => 
+      return words.every(word =>
         page.name.toLowerCase().includes(word) ||
         page.description.toLowerCase().includes(word) ||
         page.keywords.some(keyword => keyword.toLowerCase().includes(word))
@@ -283,19 +283,19 @@ export default function SearchScreen({ navigation }: Props) {
       // Exact name match first
       if (a.name.toLowerCase() === searchTerm) return -1;
       if (b.name.toLowerCase() === searchTerm) return 1;
-      
+
       // Name starts with search term
       if (a.name.toLowerCase().startsWith(searchTerm)) return -1;
       if (b.name.toLowerCase().startsWith(searchTerm)) return 1;
-      
+
       // Name contains search term (closer to beginning is better)
       const aIndex = a.name.toLowerCase().indexOf(searchTerm);
       const bIndex = b.name.toLowerCase().indexOf(searchTerm);
-      
+
       if (aIndex !== -1 && bIndex !== -1) {
         return aIndex - bIndex;
       }
-      
+
       return a.name.localeCompare(b.name);
     });
 
@@ -306,7 +306,7 @@ export default function SearchScreen({ navigation }: Props) {
 
   const handlePagePress = (page: SearchablePage) => {
     Keyboard.dismiss();
-    
+
     // Add to recent searches if not already there
     if (!recentSearches.includes(page.name)) {
       recentSearches.unshift(page.name);
@@ -314,10 +314,10 @@ export default function SearchScreen({ navigation }: Props) {
         recentSearches.pop();
       }
     }
-    
+
     // Check if we're trying to navigate to a tab screen
     const tabScreens = ['Dashboard', 'NewTrip', 'Vehicle', 'Trailer', 'HOS', 'AssetIncidents', 'Documents', 'Settings', 'LoadMap', 'Transfer', 'Fuel', 'ActiveTrips', 'CompleteTrips', 'PendingTrips'];
-    
+
     if (page.route === 'MainTabs') {
       // Navigate to MainTabs with Dashboard as default
       navigation.navigate('MainTabs', { screen: 'Dashboard' } as any);
@@ -392,180 +392,193 @@ export default function SearchScreen({ navigation }: Props) {
 
   return (
     <SafeAreaView style={styles.container}>
-      {/* Header */}
-      <View style={styles.header}>
-        <TouchableOpacity
-          style={styles.backButton}
-          onPress={() => navigation.goBack()}
-        >
-          <Ionicons name="arrow-back" size={24} color="#1F2937" />
-        </TouchableOpacity>
-        <Text style={styles.headerTitle}>Search</Text>
-      </View>
+      <ScrollView
+        style={styles.scrollContainer}
+        contentContainerStyle={styles.scrollContent}
+        showsVerticalScrollIndicator={false}
+      >
 
-      {/* Search Bar */}
-      <View style={styles.searchContainer}>
-        <View style={[
-          styles.searchBar,
-          isSearchFocused && styles.searchBarFocused
-        ]}>
-          <Ionicons name="search-outline" size={20} color="#9CA3AF" />
-          <TextInput
-            style={styles.searchInput}
-            placeholder="Search pages, features, or help topics..."
-            value={searchQuery}
-            onChangeText={setSearchQuery}
-            onFocus={() => setIsSearchFocused(true)}
-            onBlur={() => setIsSearchFocused(false)}
-            returnKeyType="search"
-            autoCapitalize="none"
-            autoCorrect={false}
-          />
-          {searchQuery.length > 0 && (
-            <TouchableOpacity onPress={clearSearch}>
-              <Ionicons name="close-circle" size={20} color="#9CA3AF" />
-            </TouchableOpacity>
-          )}
+        {/* Header */}
+        <View style={styles.header}>
+          <TouchableOpacity
+            style={styles.backButton}
+            onPress={() => navigation.goBack()}
+          >
+
+          </TouchableOpacity>
+          <Text style={styles.headerTitle}>Search</Text>
         </View>
-      </View>
 
-      <ScrollView style={styles.content} keyboardShouldPersistTaps="handled">
-        {/* Search Results */}
-        {searchPerformed && (
-          <View style={styles.section}>
-            <Text style={styles.sectionTitle}>
-              Search Results {filteredPages.length > 0 && `(${filteredPages.length})`}
-            </Text>
-            {filteredPages.length > 0 ? (
-              <FlatList
-                data={filteredPages}
-                renderItem={renderSearchResult}
-                keyExtractor={(item) => item.id}
-                scrollEnabled={false}
-              />
-            ) : (
-              <View style={styles.noResultsContainer}>
-                <Ionicons name="search-outline" size={48} color="#9CA3AF" />
-                <Text style={styles.noResultsTitle}>No Pages Found</Text>
-                <Text style={styles.noResultsText}>
-                  No pages match "{searchQuery}". Try different keywords or check spelling.
-                </Text>
-                <TouchableOpacity 
-                  style={styles.showAllButton}
-                  onPress={clearSearch}
-                >
-                  <Text style={styles.showAllButtonText}>Show All Pages</Text>
-                </TouchableOpacity>
-              </View>
+        {/* Search Bar */}
+        <View style={styles.searchContainer}>
+          <View style={[
+            styles.searchBar,
+            isSearchFocused && styles.searchBarFocused
+          ]}>
+            <Ionicons name="search-outline" size={20} color="#9CA3AF" />
+            <TextInput
+              style={styles.searchInput}
+              placeholder="Search pages, features, or help topics..."
+              value={searchQuery}
+              onChangeText={setSearchQuery}
+              onFocus={() => setIsSearchFocused(true)}
+              onBlur={() => setIsSearchFocused(false)}
+              returnKeyType="search"
+              autoCapitalize="none"
+              autoCorrect={false}
+            />
+            {searchQuery.length > 0 && (
+              <TouchableOpacity onPress={clearSearch}>
+                <Ionicons name="close-circle" size={20} color="#9CA3AF" />
+              </TouchableOpacity>
             )}
           </View>
-        )}
+        </View>
 
-        {/* Quick Actions */}
-        {showRecent && (
-          <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Quick Actions</Text>
-            <FlatList
-              data={quickActions}
-              renderItem={renderQuickAction}
-              keyExtractor={(item) => item.id}
-              numColumns={2}
-              scrollEnabled={false}
-              columnWrapperStyle={styles.quickActionRow}
-            />
-          </View>
-        )}
-
-        {/* Recent Searches */}
-        {showRecent && recentSearches.length > 0 && (
-          <View style={styles.section}>
-            <View style={styles.sectionHeader}>
-              <Text style={styles.sectionTitle}>Recent Searches</Text>
-              <TouchableOpacity onPress={clearRecentSearches}>
-                <Text style={styles.clearButton}>Clear</Text>
-              </TouchableOpacity>
-            </View>
-            <FlatList
-              data={recentSearches}
-              renderItem={renderRecentSearch}
-              keyExtractor={(item, index) => index.toString()}
-              scrollEnabled={false}
-            />
-          </View>
-        )}
-
-        {/* All Pages (when no search) */}
-        {showRecent && (
-          <View style={styles.section}>
-            <Text style={styles.sectionTitle}>All Pages</Text>
-            {/* Group by category */}
-            {['Main', 'Trip Management', 'Fleet Management', 'Compliance', 'Operations', 'Navigation', 'Communication', 'Support', 'Safety', 'Account'].map(category => {
-              const categoryPages = searchablePages.filter(page => page.category === category);
-              if (categoryPages.length === 0) return null;
-              
-              return (
-                <View key={category} style={styles.categoryContainer}>
-                  <Text style={styles.categoryTitle}>{category}</Text>
-                  {categoryPages.map(page => (
-                    <TouchableOpacity
-                      key={page.id}
-                      style={styles.pageItem}
-                      onPress={() => handlePagePress(page)}
-                    >
-                      <View style={styles.pageIconContainer}>
-                        <Ionicons name={page.icon} size={20} color="#906AD1" />
-                      </View>
-                      <View style={styles.pageContent}>
-                        <Text style={styles.pageTitle}>{page.name}</Text>
-                        <Text style={styles.pageDescription}>{page.description}</Text>
-                      </View>
-                      <Ionicons name="chevron-forward" size={16} color="#9CA3AF" />
-                    </TouchableOpacity>
-                  ))}
+        <View style={styles.content}>
+          {/* Search Results */}
+          {searchPerformed && (
+            <View style={styles.section}>
+              <Text style={styles.sectionTitle}>
+                Search Results {filteredPages.length > 0 && `(${filteredPages.length})`}
+              </Text>
+              {filteredPages.length > 0 ? (
+                <FlatList
+                  data={filteredPages}
+                  renderItem={renderSearchResult}
+                  keyExtractor={(item) => item.id}
+                  scrollEnabled={false}
+                />
+              ) : (
+                <View style={styles.noResultsContainer}>
+                  <Ionicons name="search-outline" size={48} color="#9CA3AF" />
+                  <Text style={styles.noResultsTitle}>No Pages Found</Text>
+                  <Text style={styles.noResultsText}>
+                    No pages match "{searchQuery}". Try different keywords or check spelling.
+                  </Text>
+                  <TouchableOpacity
+                    style={styles.showAllButton}
+                    onPress={clearSearch}
+                  >
+                    <Text style={styles.showAllButtonText}>Show All Pages</Text>
+                  </TouchableOpacity>
                 </View>
-              );
-            })}
-          </View>
-        )}
+              )}
+            </View>
+          )}
+
+          {/* Quick Actions */}
+          {showRecent && (
+            <View style={styles.section}>
+              <Text style={styles.sectionTitle}>Quick Actions</Text>
+              <FlatList
+                data={quickActions}
+                renderItem={renderQuickAction}
+                keyExtractor={(item) => item.id}
+                numColumns={2}
+                scrollEnabled={false}
+                columnWrapperStyle={styles.quickActionRow}
+              />
+            </View>
+          )}
+
+          {/* Recent Searches */}
+          {showRecent && recentSearches.length > 0 && (
+            <View style={styles.section}>
+              <View style={styles.sectionHeader}>
+                <Text style={styles.sectionTitle}>Recent Searches</Text>
+                <TouchableOpacity onPress={clearRecentSearches}>
+                  <Text style={styles.clearButton}>Clear</Text>
+                </TouchableOpacity>
+              </View>
+              <FlatList
+                data={recentSearches}
+                renderItem={renderRecentSearch}
+                keyExtractor={(item, index) => index.toString()}
+                scrollEnabled={false}
+              />
+            </View>
+          )}
+
+          {/* All Pages (when no search) */}
+          {showRecent && (
+            <View style={styles.section}>
+              <Text style={styles.sectionTitle}>All Pages</Text>
+              {/* Group by category */}
+              {['Main', 'Trip Management', 'Fleet Management', 'Compliance', 'Operations', 'Navigation', 'Communication', 'Support', 'Safety', 'Account'].map(category => {
+                const categoryPages = searchablePages.filter(page => page.category === category);
+                if (categoryPages.length === 0) return null;
+
+                return (
+                  <View key={category} style={styles.categoryContainer}>
+                    <Text style={styles.categoryTitle}>{category}</Text>
+                    {categoryPages.map(page => (
+                      <TouchableOpacity
+                        key={page.id}
+                        style={styles.pageItem}
+                        onPress={() => handlePagePress(page)}
+                      >
+                        <View style={styles.pageIconContainer}>
+                          <Ionicons name={page.icon} size={20} color="#906AD1" />
+                        </View>
+                        <View style={styles.pageContent}>
+                          <Text style={styles.pageTitle}>{page.name}</Text>
+                          <Text style={styles.pageDescription}>{page.description}</Text>
+                        </View>
+                        <Ionicons name="chevron-forward" size={16} color="#9CA3AF" />
+                      </TouchableOpacity>
+                    ))}
+                  </View>
+                );
+              })}
+            </View>
+          )}
+        </View>
       </ScrollView>
     </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
+
   container: {
     flex: 1,
     backgroundColor: '#F8FAFC',
   },
+  scrollContainer: {
+    flex: 1,
+  },
+  scrollContent: {
+    paddingBottom: 40, // Add padding to account for footer
+  },
+
   header: {
     flexDirection: 'row',
     alignItems: 'center',
     paddingHorizontal: 16,
     paddingVertical: 16,
-    backgroundColor: '#fff',
-    borderBottomWidth: 1,
-    borderBottomColor: '#E5E7EB',
+
   },
   backButton: {
     padding: 8,
   },
   headerTitle: {
-    fontSize: 20,
+    fontSize: 24,
     fontWeight: 'bold',
     color: '#1F2937',
     flex: 1,
-    textAlign: 'center',
+    textAlign: 'left',
     marginRight: 40,
   },
   searchContainer: {
     paddingHorizontal: 16,
     paddingVertical: 12,
-    backgroundColor: '#fff',
+
   },
   searchBar: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#F3F4F6',
+    backgroundColor: '#fff',
     borderRadius: 12,
     paddingHorizontal: 12,
     paddingVertical: 12,
@@ -617,7 +630,7 @@ const styles = StyleSheet.create({
     color: '#906AD1',
     fontWeight: '600',
   },
-  
+
   // Quick Actions
   quickActionRow: {
     justifyContent: 'space-between',
@@ -637,7 +650,7 @@ const styles = StyleSheet.create({
     marginTop: 8,
     textAlign: 'center',
   },
-  
+
   // Recent Searches
   recentItem: {
     flexDirection: 'row',
@@ -653,7 +666,7 @@ const styles = StyleSheet.create({
     flex: 1,
     marginLeft: 8,
   },
-  
+
   // Search Results
   searchResultItem: {
     flexDirection: 'row',
@@ -692,7 +705,7 @@ const styles = StyleSheet.create({
     fontWeight: '500',
     textTransform: 'uppercase',
   },
-  
+
   // Category Pages
   categoryContainer: {
     marginBottom: 20,
@@ -735,7 +748,7 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: '#6B7280',
   },
-  
+
   // No Results
   noResultsContainer: {
     alignItems: 'center',
