@@ -175,19 +175,19 @@ const PlaceholderScreen: React.FC<PlaceholderScreenProps> = ({ title }) => (
     </View>
 );
 
-
 // Wrapper component for screens with Header and Footer
 const ScreenWithHeaderFooter: React.FC<{ 
     component: React.ComponentType<any>;
     navigation: any;
     route: any;
-}> = ({ component: Component, navigation, route }) => (
+    onLogout: () => void;
+}> = ({ component: Component, navigation, route, onLogout }) => (
     <View style={{ flex: 1 }}>
         <Header />
         <View style={{ flex: 1 }}>
             <Component navigation={navigation} route={route} />
         </View>
-        <Footer navigation={navigation} />
+        <Footer onLogout={onLogout} />
     </View>
 );
 
@@ -224,7 +224,7 @@ function MainTabNavigator({ onLogout, navigation }: MainTabNavigatorProps) {
                     <MainTab.Screen name="Trips" component={TripInfoScreen} />
                 </MainTab.Navigator>
             </View>
-            <Footer navigation={navigation} />
+            <Footer onLogout={onLogout} />
         </View>
     );
 }
@@ -343,6 +343,7 @@ export default function AppNavigator() {
                         component={NewTripScreen}
                         navigation={props.navigation}
                         route={props.route}
+                        onLogout={handleLogout}
                     />
                 )}
             </RootStack.Screen>
@@ -352,6 +353,7 @@ export default function AppNavigator() {
                         component={VehicleScreen}
                         navigation={props.navigation}
                         route={props.route}
+                        onLogout={handleLogout}
                     />
                 )}
             </RootStack.Screen>
@@ -361,6 +363,7 @@ export default function AppNavigator() {
                         component={TrailerScreen}
                         navigation={props.navigation}
                         route={props.route}
+                        onLogout={handleLogout}
                     />
                 )}
             </RootStack.Screen>
@@ -370,6 +373,7 @@ export default function AppNavigator() {
                         component={DocumentsScreen}
                         navigation={props.navigation}
                         route={props.route}
+                        onLogout={handleLogout}
                     />
                 )}
             </RootStack.Screen>
@@ -379,6 +383,7 @@ export default function AppNavigator() {
                         component={SettingsScreen}
                         navigation={props.navigation}
                         route={props.route}
+                        onLogout={handleLogout}
                     />
                 )}
             </RootStack.Screen>
@@ -388,6 +393,7 @@ export default function AppNavigator() {
                         component={LoadMapScreen}
                         navigation={props.navigation}
                         route={props.route}
+                        onLogout={handleLogout}
                     />
                 )}
             </RootStack.Screen>
@@ -397,6 +403,7 @@ export default function AppNavigator() {
                         component={TransferScreen}
                         navigation={props.navigation}
                         route={props.route}
+                        onLogout={handleLogout}
                     />
                 )}
             </RootStack.Screen>
@@ -406,6 +413,7 @@ export default function AppNavigator() {
                         component={FuelScreen}
                         navigation={props.navigation}
                         route={props.route}
+                        onLogout={handleLogout}
                     />
                 )}
             </RootStack.Screen>
@@ -415,6 +423,7 @@ export default function AppNavigator() {
                         component={ActiveTrips}
                         navigation={props.navigation}
                         route={props.route}
+                        onLogout={handleLogout}
                     />
                 )}
             </RootStack.Screen>
@@ -424,6 +433,7 @@ export default function AppNavigator() {
                         component={CompleteTrips}
                         navigation={props.navigation}
                         route={props.route}
+                        onLogout={handleLogout}
                     />
                 )}
             </RootStack.Screen>
@@ -433,6 +443,7 @@ export default function AppNavigator() {
                         component={PendingTrips}
                         navigation={props.navigation}
                         route={props.route}
+                        onLogout={handleLogout}
                     />
                 )}
             </RootStack.Screen>
@@ -444,6 +455,7 @@ export default function AppNavigator() {
                         component={NotificationsScreen}
                         navigation={props.navigation}
                         route={props.route}
+                        onLogout={handleLogout}
                     />
                 )}
             </RootStack.Screen>
@@ -453,6 +465,7 @@ export default function AppNavigator() {
                         component={HelpScreen}
                         navigation={props.navigation}
                         route={props.route}
+                        onLogout={handleLogout}
                     />
                 )}
             </RootStack.Screen>
@@ -462,6 +475,7 @@ export default function AppNavigator() {
                         component={SearchScreen}
                         navigation={props.navigation}
                         route={props.route}
+                        onLogout={handleLogout}
                     />
                 )}
             </RootStack.Screen>
@@ -471,6 +485,7 @@ export default function AppNavigator() {
                         component={TripInfoScreen}
                         navigation={props.navigation}
                         route={props.route}
+                        onLogout={handleLogout}
                     />
                 )}
             </RootStack.Screen>
