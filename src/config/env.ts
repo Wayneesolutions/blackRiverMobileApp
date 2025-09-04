@@ -15,37 +15,35 @@ interface Config {
     DB_NAME: string;
 }
 
-// Get the local IP address for development with fallback options
+
 const getLocalIP = () => {
-    // 🔧 FIX: Use your actual working IP address
-    const LOCAL_IP = '192.168.1.16'; // Your computer's actual IP
+    const LOCAL_IP = '192.168.1.16'; 
 
     if (Platform.OS === 'android') {
-        // 🔧 FIX: Try actual IP first, then fallback to emulator IP
-        return __DEV__ ? LOCAL_IP : LOCAL_IP; // Use LOCAL_IP for both dev and prod on Android
+       
+        return __DEV__ ? LOCAL_IP : LOCAL_IP; 
     }
 
-    // For iOS simulator and physical devices
     return LOCAL_IP;
 };
 
-// Multiple endpoint fallback strategy
+
 const getAPIEndpoints = () => {
-    const LOCAL_IP = '192.168.1.16'; // Your working IP
+    const LOCAL_IP = '192.168.1.16'; 
 
     if (Platform.OS === 'android') {
         return [
-            `http://${LOCAL_IP}:3000/api/v1`,     // Primary: Your actual IP
-            `http://10.0.2.2:3000/api/v1`,       // Fallback: Emulator IP
-            `http://localhost:3000/api/v1`,      // Last resort
+            `http://${LOCAL_IP}:3000/api/v1`,    
+            `http://10.0.2.2:3000/api/v1`,     
+            `http://localhost:3000/api/v1`,   
         ];
     } else if (Platform.OS === 'ios') {
         return [
-            `http://${LOCAL_IP}:3000/api/v1`,     // Primary: Your actual IP
-            `http://localhost:3000/api/v1`,      // Fallback for simulator
+            `http://${LOCAL_IP}:3000/api/v1`,   
+            `http://localhost:3000/api/v1`,    
         ];
     } else {
-        return [`http://localhost:3000/api/v1`]; // Web
+        return [`http://localhost:3000/api/v1`];
     }
 };
 
@@ -146,16 +144,12 @@ export const findWorkingEndpoint = async (): Promise<string | null> => {
         return API_BASE_URL;
     }
 
-    console.log('🔍 Finding working endpoint...');
-
     for (const endpoint of API_ENDPOINTS) {
         const isWorking = await testConnection(endpoint);
         if (isWorking) {
-            console.log(`✅ Found working endpoint: ${endpoint}`);
+            console.log(`Found working endpoint: ${endpoint}`);
             return endpoint;
         }
     }
-
-    console.log('⚠️ No working endpoints found, using default:', API_BASE_URL);
     return API_BASE_URL;
 };
