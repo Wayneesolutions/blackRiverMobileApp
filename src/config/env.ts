@@ -14,45 +14,93 @@ interface Config {
     DB_NAME: string;
 }
 
-const getLocalIP = () => {
-    // Try multiple possible IPs for your network
+
+const getCurrentIP = async (): Promise<string | null> => {
+    try {
+        const networkState = await Network.getNetworkStateAsync();
+
+        if (!networkState.isConnected) {
+            console.log('❌ Not connected to network');
+            return null;
+        }
+
+        const ipAddress = await Network.getIpAddressAsync();
+
+        if (ipAddress && ipAddress !== '127.0.0.1') {
+            console.log(`🌐 Current IP detected: ${ipAddress}`);
+            return ipAddress;
+        }
+
+        return null;
+    } catch (error) {
+        console.log('❌ Failed to get current IP:', error);
+        return null;
+    }
+};
+
+
+const getFallbackIPs = () => {
     const possibleIPs = [
-        '192.168.1.17',  // Your Metro server IP
-        '192.168.1.16',  // Your previous IP
-        '192.168.0.16',  // Common router range
+        '192.168.1.17',
+        '192.168.1.16',
+        '192.168.0.16',
         '192.168.0.17',
-        '10.0.0.16',     // Another common range
-        '10.0.0.17'
+        '10.0.0.16',
+        '10.0.0.17',
+        '192.168.1.100',
+        '192.168.1.101',
+        '192.168.0.100',
+        '192.168.0.101'
     ];
 
-    if (Platform.OS === 'android') {
-        return possibleIPs[0]; // Use Metro server IP first
-    }
-
-    return possibleIPs[0];
+    return possibleIPs;
 };
 
-const getAPIEndpoints = () => {
-    const possibleIPs = ['192.168.1.17', '192.168.1.16', '192.168.0.17', '192.168.0.16'];
+
+const getLocalIP = async (): Promise<string> => {
+    const currentIP = await getCurrentIP();
+
+    if (currentIP) {
+        return currentIP;
+    }
+
+    const fallbackIPs = getFallbackIPs();
+    console.log('🔄 Using fallback IPs, auto-detection failed');
 
     if (Platform.OS === 'android') {
-        return [
-            ...possibleIPs.map(ip => `http://${ip}:3000/api/v1`),
-            'http://10.0.2.2:3000/api/v1',     // Android emulator
+        return fallbackIPs[0];
+    }
+
+    return fallbackIPs[0];
+};
+
+const getAPIEndpoints = async (): Promise<string[]> => {
+    const endpoints: string[] = [];
+
+    const currentIP = await getCurrentIP();
+
+    if (currentIP) {
+        endpoints.push(`http://${currentIP}:3000/api/v1`);
+    }
+
+    const fallbackIPs = getFallbackIPs();
+    endpoints.push(...fallbackIPs.map(ip => `http://${ip}:3000/api/v1`));
+
+    if (Platform.OS === 'android') {
+        endpoints.push(
+            'http://10.0.2.2:3000/api/v1',
             'http://localhost:3000/api/v1',
             'http://127.0.0.1:3000/api/v1'
-        ];
+        );
     } else if (Platform.OS === 'ios') {
-        return [
-            ...possibleIPs.map(ip => `http://${ip}:3000/api/v1`),
-            'http://localhost:3000/api/v1'
-        ];
+        endpoints.push('http://localhost:3000/api/v1');
     } else {
-        return ['http://localhost:3000/api/v1'];
+        endpoints.push('http://localhost:3000/api/v1');
     }
+
+    return [...new Set(endpoints)];
 };
 
-// 🔧 ASYNC Environment configurations
 const createENVConfig = async () => {
     const localIP = await getLocalIP();
 
@@ -80,7 +128,7 @@ const createENVConfig = async () => {
 
 const manifest = Constants.manifest as ManifestWithReleaseChannel;
 
-// 🔧 ASYNC config getter
+
 let configCache: Config | null = null;
 
 const getEnvVars = async (env = manifest?.releaseChannel): Promise<Config> => {
@@ -97,7 +145,7 @@ const getEnvVars = async (env = manifest?.releaseChannel): Promise<Config> => {
     return config;
 };
 
-// 🔧 Initialize config asynchronously
+// Global variables
 let config: Config;
 let API_BASE_URL: string;
 let SOCKET_URL: string;
@@ -107,8 +155,10 @@ let IS_DEV: boolean;
 let IS_PROD: boolean;
 let API_ENDPOINTS: string[];
 
-// Initialize configuration
+
 const initConfig = async () => {
+    console.log('🚀 Initializing config with IP detection...');
+
     config = await getEnvVars();
 
     API_BASE_URL = config.API_BASE_URL;
@@ -117,35 +167,39 @@ const initConfig = async () => {
     DB_NAME = config.DB_NAME;
     IS_DEV = NODE_ENV === 'development';
     IS_PROD = NODE_ENV === 'production';
-    API_ENDPOINTS = IS_DEV ? await getAPIEndpoints() : [API_BASE_URL];
 
-    // Debug logging in development
     if (IS_DEV) {
+        API_ENDPOINTS = await getAPIEndpoints();
+    } else {
+        API_ENDPOINTS = [API_BASE_URL];
+    }
+
+    if (IS_DEV) {
+        const currentIP = await getCurrentIP();
         console.log('🚀 Environment Config:', {
+            'Detected IP': currentIP,
             API_BASE_URL,
             SOCKET_URL,
             NODE_ENV,
             DB_NAME,
             Platform: Platform.OS,
-            'Available Endpoints': API_ENDPOINTS,
+            'Available Endpoints': API_ENDPOINTS.slice(0, 5),
+            'Total Endpoints': API_ENDPOINTS.length
         });
     }
 };
 
-// Initialize immediately
 initConfig().catch(console.error);
 
-// 🔧 IMPROVED: Enhanced connection test with better error handling
 export const testConnection = async (url?: string): Promise<boolean> => {
-    const testUrl = url || API_BASE_URL || 'http://192.168.1.17:3000/api/v1';
+    const testUrl = url || API_BASE_URL || 'http://localhost:3000/api/v1';
 
     try {
         console.log(`🧪 Testing connection to: ${testUrl}`);
 
         const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 8000); // Increased timeout
+        const timeoutId = setTimeout(() => controller.abort(), 5000);
 
-        // Try health endpoint first, then fallback to base endpoint
         const healthUrl = `${testUrl.replace('/api/v1', '')}/api/v1/health`;
 
         const response = await fetch(healthUrl, {
@@ -173,24 +227,45 @@ export const testConnection = async (url?: string): Promise<boolean> => {
     }
 };
 
-// 🔧 IMPROVED: Test all endpoints and return the first working one
+
 export const findWorkingEndpoint = async (): Promise<string | null> => {
     if (!IS_DEV) {
         return API_BASE_URL;
     }
 
-    console.log('🔍 Testing all available endpoints...');
+    const currentIP = await getCurrentIP();
+    if (currentIP) {
+        const currentEndpoint = `http://${currentIP}:3000/api/v1`;
+        console.log(`🎯 Testing current IP endpoint: ${currentEndpoint}`);
+
+        if (await testConnection(currentEndpoint)) {
+            console.log(`✅ Current IP endpoint works: ${currentEndpoint}`);
+
+
+            if (config) {
+                config.API_BASE_URL = currentEndpoint;
+                config.SOCKET_URL = currentEndpoint.replace('/api/v1', '');
+            }
+
+            return currentEndpoint;
+        }
+    }
 
     for (const endpoint of API_ENDPOINTS) {
-        console.log(`Testing endpoint: ${endpoint}`);
-        const isWorking = await testConnection(endpoint);
-        if (isWorking) {
+        if (currentIP && endpoint.includes(currentIP)) {
+            continue;
+        }
+
+        console.log(`Testing fallback endpoint: ${endpoint}`);
+        if (await testConnection(endpoint)) {
             console.log(`✅ Found working endpoint: ${endpoint}`);
-            // Update the cached config with working endpoint
+
+
             if (config) {
                 config.API_BASE_URL = endpoint;
                 config.SOCKET_URL = endpoint.replace('/api/v1', '');
             }
+
             return endpoint;
         }
     }
@@ -199,7 +274,15 @@ export const findWorkingEndpoint = async (): Promise<string | null> => {
     return API_BASE_URL;
 };
 
-// 🔧 NEW: Get config with initialization check
+
+export const refreshConfig = async (): Promise<void> => {
+    console.log('🔄 Refreshing configuration...');
+    configCache = null;
+    await initConfig();
+    console.log('✅ Configuration refreshed');
+};
+
+// Export functions
 export const getConfig = async (): Promise<Config> => {
     if (!config) {
         await initConfig();
@@ -207,7 +290,6 @@ export const getConfig = async (): Promise<Config> => {
     return config;
 };
 
-// Export the config getter for async access
 export const getAPIBaseURL = async (): Promise<string> => {
     if (!API_BASE_URL) {
         await initConfig();
@@ -215,7 +297,7 @@ export const getAPIBaseURL = async (): Promise<string> => {
     return API_BASE_URL;
 };
 
-// Export other values (will be undefined until initConfig completes)
+// Export variables
 export {
     config,
     API_BASE_URL,
@@ -224,10 +306,11 @@ export {
     DB_NAME,
     IS_DEV,
     IS_PROD,
-    API_ENDPOINTS
+    API_ENDPOINTS,
+    getCurrentIP
 };
 
-// 🔧 NEW: Hook for React components
+
 export const useConfig = () => {
     return {
         API_BASE_URL,
@@ -236,6 +319,8 @@ export const useConfig = () => {
         DB_NAME,
         IS_DEV,
         IS_PROD,
-        API_ENDPOINTS
+        API_ENDPOINTS,
+        refreshConfig,
+        getCurrentIP
     };
 };
