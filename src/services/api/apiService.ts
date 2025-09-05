@@ -1,6 +1,6 @@
-// src/services/ApiService.ts
+// src/services/ApiService.ts - CORRECTED VERSION
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { API_BASE_URL, API_ENDPOINTS, IS_DEV, findWorkingEndpoint } from '../../config/env';
+import { API_BASE_URL, API_ENDPOINTS, IS_DEV } from '../../config/env';
 import { logger } from '../../utils/loggerHelper';
 
 interface ApiResponse<T = any> {
@@ -26,41 +26,81 @@ class ApiService {
     private baseURL: string;
     private token: string | null = null;
     private isInitialized: boolean = false;
+    private requestCache = new Map();
 
     constructor() {
         this.baseURL = API_BASE_URL;
-        this.initialize();
+        // Initialize immediately without async operations
+        this.loadTokenSync();
     }
 
-    // 🔧 NEW: Initialize with working endpoint detection
-    private async initialize() {
+    // 🔧 FIXED: Synchronous token loading
+    private loadTokenSync() {
+        AsyncStorage.getItem('auth_token').then(token => {
+            if (token) {
+                this.token = token;
+                logger.info('Token loaded from storage');
+            }
+        }).catch(error => {
+            logger.error('Failed to load token from storage', error);
+        });
+    }
+
+    // 🔧 FIXED: Simplified initialization - only find working endpoint in dev
+    private async ensureInitialized() {
         if (this.isInitialized) return;
-        
+
         try {
-            // Load token from storage
-            const storedToken = await AsyncStorage.getItem('auth_token');
-            this.token = storedToken;
-            
-            // Find working endpoint in development
-            if (IS_DEV) {
-                const workingEndpoint = await findWorkingEndpoint();
+            // In development, try to find working endpoint
+            if (IS_DEV && API_ENDPOINTS && API_ENDPOINTS.length > 0) {
+                const workingEndpoint = await this.findWorkingEndpoint();
                 if (workingEndpoint) {
                     this.baseURL = workingEndpoint;
-                    logger.info('API Service initialized with endpoint', { endpoint: this.baseURL });
+                    logger.info('Using working endpoint', { endpoint: this.baseURL });
                 }
             }
             
             this.isInitialized = true;
+            logger.info('API Service initialized', { baseURL: this.baseURL });
         } catch (error) {
             logger.error('Failed to initialize API service', error);
+            // Continue with default endpoint
+            this.isInitialized = true;
         }
     }
 
-    // 🔧 NEW: Ensure initialization before requests
-    private async ensureInitialized() {
-        if (!this.isInitialized) {
-            await this.initialize();
+    // 🔧 FIXED: Better endpoint detection with shorter timeout
+    private async findWorkingEndpoint(): Promise<string | null> {
+        const endpoints = [...(API_ENDPOINTS || []), this.baseURL];
+        const uniqueEndpoints = [...new Set(endpoints)];
+        
+        logger.info('Testing endpoints', { endpoints: uniqueEndpoints });
+
+        for (const endpoint of uniqueEndpoints) {
+            try {
+                const controller = new AbortController();
+                const timeoutId = setTimeout(() => controller.abort(), 3000); // 3s timeout
+
+                const response = await fetch(`${endpoint}/health`, {
+                    method: 'GET',
+                    headers: { 'Content-Type': 'application/json' },
+                    signal: controller.signal,
+                });
+
+                clearTimeout(timeoutId);
+
+                // Accept any response that's not a network error
+                logger.info(`Endpoint test result: ${endpoint} - Status: ${response.status}`);
+                return endpoint;
+
+            } catch (error: any) {
+                logger.warn(`Endpoint failed: ${endpoint}`, { error: error.name });
+                continue;
+            }
         }
+
+        logger.warn('No working endpoint found');
+        return null;
     }
 
     // Set authorization token
@@ -85,23 +125,23 @@ class ApiService {
         }
     }
 
-    // 🔧 ENHANCED: Request method with endpoint fallback
+    // 🔧 FIXED: Improved request method with proper endpoint handling
     private async request<T>(
         endpoint: string,
         options: RequestInit = {},
         requiresAuth: boolean = false
     ): Promise<ApiResponse<T>> {
         await this.ensureInitialized();
-        
+
         const requestId = Math.random().toString(36).substr(2, 9);
-        
+
         // Prepare headers
         const headers: Record<string, string> = {
             'Content-Type': 'application/json',
             ...options.headers as Record<string, string>,
         };
 
-        // Add auth token if required
+        // Add auth token if required and available
         if (requiresAuth && this.token) {
             headers.Authorization = `Bearer ${this.token}`;
         }
@@ -111,29 +151,42 @@ class ApiService {
             headers,
         };
 
-        // 🔧 NEW: Try multiple endpoints in development
-        const endpointsToTry = IS_DEV ? API_ENDPOINTS : [this.baseURL];
-        let lastError: ApiResponse<T> = { success: false, error: 'Unknown error' };
+        // 🔧 FIXED: Create proper endpoint list for fallback
+        const endpointsToTry: string[] = [];
+        
+        // Always try current baseURL first
+        endpointsToTry.push(this.baseURL);
+        
+        // In development, add other endpoints as fallbacks
+        if (IS_DEV && API_ENDPOINTS && API_ENDPOINTS.length > 0) {
+            API_ENDPOINTS.forEach(ep => {
+                if (ep !== this.baseURL && !endpointsToTry.includes(ep)) {
+                    endpointsToTry.push(ep);
+                }
+            });
+        }
+
+        let lastError: ApiResponse<T> = { 
+            success: false, 
+            error: 'Unable to connect to server',
+            statusCode: 0
+        };
 
         for (let i = 0; i < endpointsToTry.length; i++) {
             const baseUrl = endpointsToTry[i];
             const url = `${baseUrl}${endpoint}`;
 
-            // Log request (professional logging)
             logger.debug('API Request', {
                 requestId,
                 attempt: i + 1,
                 totalAttempts: endpointsToTry.length,
                 method: options.method || 'GET',
                 url,
-                headers: this.sanitizeHeaders(headers),
-                body: options.body ? JSON.parse(options.body as string) : null,
+                hasAuth: requiresAuth && !!this.token,
             });
 
             try {
                 const startTime = Date.now();
-                
-                // Create timeout controller
                 const controller = new AbortController();
                 const timeoutId = setTimeout(() => controller.abort(), 15000); // 15s timeout
 
@@ -141,94 +194,96 @@ class ApiService {
                     ...requestOptions,
                     signal: controller.signal,
                 });
-                
+
                 clearTimeout(timeoutId);
-                const endTime = Date.now();
-                const duration = endTime - startTime;
+                const duration = Date.now() - startTime;
 
                 // Parse response
                 let responseData: any;
                 const contentType = response.headers.get('content-type');
 
-                if (contentType && contentType.includes('application/json')) {
-                    responseData = await response.json();
-                } else {
-                    responseData = await response.text();
+                try {
+                    if (contentType && contentType.includes('application/json')) {
+                        responseData = await response.json();
+                    } else {
+                        responseData = await response.text();
+                    }
+                } catch (parseError) {
+                    logger.warn('Failed to parse response', { parseError, status: response.status });
+                    responseData = null;
                 }
 
-                // Log response
                 logger.debug('API Response', {
                     requestId,
                     attempt: i + 1,
                     status: response.status,
-                    statusText: response.statusText,
                     duration: `${duration}ms`,
                     url,
                 });
 
-                // Handle different response statuses
+                // Handle successful responses
                 if (response.ok) {
-                    // Success - update baseURL if it was different
+                    // Update baseURL if we switched to a working endpoint
                     if (baseUrl !== this.baseURL) {
                         this.baseURL = baseUrl;
                         logger.info('Switched to working endpoint', { endpoint: baseUrl });
                     }
-                    
+
                     return {
                         success: true,
                         data: responseData,
                         statusCode: response.status,
                     };
-                } else {
-                    // Handle specific error codes
-                    let errorMessage = responseData?.message || `HTTP Error: ${response.status}`;
-
-                    switch (response.status) {
-                        case 401:
-                            errorMessage = 'Authentication failed. Please login again.';
-                            await this.removeAuthToken();
-                            break;
-                        case 403:
-                            errorMessage = 'Access denied. Insufficient permissions.';
-                            break;
-                        case 404:
-                            errorMessage = 'Service not found. Please contact support.';
-                            break;
-                        case 422:
-                            errorMessage = responseData?.message || 'Invalid data provided.';
-                            break;
-                        case 429:
-                            errorMessage = 'Too many requests. Please try again later.';
-                            break;
-                        case 500:
-                            errorMessage = 'Server error. Please try again later.';
-                            break;
-                        case 502:
-                        case 503:
-                        case 504:
-                            errorMessage = 'Service temporarily unavailable.';
-                            break;
-                    }
-
-                    logger.warn('API Error Response', {
-                        requestId,
-                        attempt: i + 1,
-                        status: response.status,
-                        error: errorMessage,
-                        url,
-                    });
-
-                    lastError = {
-                        success: false,
-                        error: errorMessage,
-                        statusCode: response.status,
-                    };
-
-                    // Don't try other endpoints for client errors (4xx)
-                    if (response.status >= 400 && response.status < 500) {
-                        return lastError;
-                    }
                 }
+
+                // Handle HTTP errors
+                let errorMessage = 'Request failed';
+                
+                if (responseData && typeof responseData === 'object' && responseData.message) {
+                    errorMessage = responseData.message;
+                } else if (responseData && typeof responseData === 'string') {
+                    errorMessage = responseData;
+                }
+
+                switch (response.status) {
+                    case 401:
+                        errorMessage = 'Authentication failed. Please login again.';
+                        await this.removeAuthToken();
+                        break;
+                    case 403:
+                        errorMessage = 'Access denied. Insufficient permissions.';
+                        break;
+                    case 404:
+                        errorMessage = 'Service not found.';
+                        break;
+                    case 422:
+                        errorMessage = responseData?.message || 'Invalid data provided.';
+                        break;
+                    case 500:
+                        errorMessage = 'Server error. Please try again later.';
+                        break;
+                }
+
+                logger.warn('API HTTP Error', {
+                    requestId,
+                    attempt: i + 1,
+                    status: response.status,
+                    error: errorMessage,
+                    url,
+                });
+
+                lastError = {
+                    success: false,
+                    error: errorMessage,
+                    statusCode: response.status,
+                };
+
+                // Don't try other endpoints for client errors (4xx) except 401, 403, 404
+                if (response.status >= 400 && response.status < 500 && 
+                    ![401, 403, 404, 502, 503, 504].includes(response.status)) {
+                    return lastError;
+                }
+
             } catch (error: any) {
                 logger.error('API Network Error', {
                     requestId,
@@ -242,10 +297,11 @@ class ApiService {
 
                 if (error.name === 'AbortError') {
                     errorMessage = 'Request timed out. Please check your connection.';
-                } else if (error.message === 'Network request failed') {
+                } else if (error.message?.includes('Network request failed') || 
+                          error.message?.includes('fetch')) {
                     errorMessage = 'Unable to connect. Please check your internet connection.';
-                } else if (error.message.includes('ECONNREFUSED')) {
-                    errorMessage = 'Server is not available. Please try again later.';
+                } else if (error.message?.includes('ECONNREFUSED')) {
+                    errorMessage = 'Server is not available.';
                 }
 
                 lastError = {
@@ -254,7 +310,7 @@ class ApiService {
                     statusCode: 0,
                 };
 
-                // Continue to try next endpoint if available
+                // Continue to next endpoint
             }
         }
 
@@ -262,19 +318,10 @@ class ApiService {
         logger.error('All endpoints failed', {
             requestId,
             totalAttempts: endpointsToTry.length,
-            lastError,
+            lastError: lastError.error,
         });
 
         return lastError;
-    }
-
-    // Sanitize headers for logging (remove sensitive data)
-    private sanitizeHeaders(headers: Record<string, string>) {
-        const sanitized = { ...headers };
-        if (sanitized.Authorization) {
-            sanitized.Authorization = 'Bearer ***';
-        }
-        return sanitized;
     }
 
     // Auth endpoints
@@ -292,7 +339,6 @@ class ApiService {
             await this.setAuthToken(response.data.driver.token);
             logger.info('User logged in successfully', {
                 userId: response.data.driver.id,
-                email: response.data.driver.email,
             });
         }
 
@@ -304,7 +350,7 @@ class ApiService {
             method: 'POST'
         }, true);
 
-        // Always remove local token, even if API call fails
+        // Always remove local token
         await this.removeAuthToken();
         logger.info('User logged out');
 
@@ -336,7 +382,6 @@ class ApiService {
         }
     }
 
-    // 🔧 NEW: Get current endpoint info for debugging
     getEndpointInfo() {
         return {
             current: this.baseURL,
@@ -345,17 +390,24 @@ class ApiService {
         };
     }
 
-    // 🔧 NEW: Test current connection
     async testConnection(): Promise<boolean> {
         try {
-            const response = await this.request('/health', { method: 'GET' });
-            return response.success;
+            const controller = new AbortController();
+            const timeoutId = setTimeout(() => controller.abort(), 5000);
+
+            const response = await fetch(`${this.baseURL}/health`, {
+                method: 'GET',
+                signal: controller.signal,
+            });
+
+            clearTimeout(timeoutId);
+            return response.status < 500;
         } catch {
             return false;
         }
     }
 
-    // Generic CRUD methods for any resource
+    // Generic CRUD methods
     async get<T>(endpoint: string, requiresAuth: boolean = true): Promise<ApiResponse<T>> {
         return this.request(endpoint, { method: 'GET' }, requiresAuth);
     }
@@ -376,6 +428,16 @@ class ApiService {
 
     async delete<T>(endpoint: string, requiresAuth: boolean = true): Promise<ApiResponse<T>> {
         return this.request(endpoint, { method: 'DELETE' }, requiresAuth);
+    }
+
+    clearCache() {
+        this.requestCache.clear();
+    }
+
+    async forceReInitialize() {
+        this.isInitialized = false;
+        this.clearCache();
+        await this.ensureInitialized();
     }
 }
 

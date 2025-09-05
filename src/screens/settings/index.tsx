@@ -1,35 +1,91 @@
-import React, { useState } from 'react';
-import { 
-  View, 
-  Text, 
-  ScrollView, 
-  StyleSheet, 
-  TouchableOpacity, 
+import React, { useState, useEffect } from 'react';
+import {
+  View,
+  Text,
+  ScrollView,
+  StyleSheet,
+  TouchableOpacity,
   Alert,
   Modal,
   TextInput,
-  ActivityIndicator
+  ActivityIndicator,
+  RefreshControl
 } from 'react-native';
+import { profileService } from '../../services/ProfileService';
+
+interface DriverProfile {
+  id: string;
+  name: string;
+  email: string;
+  phone: string;
+  country: string;
+  profileImage?: string | null;
+  status: string;
+  memberSince: string;
+  lastUpdated: string;
+}
+
 
 const SettingsScreen = () => {
   const [isUpdating, setIsUpdating] = useState(false);
   const [showPasswordModal, setShowPasswordModal] = useState(false);
   const [showFeedbackModal, setShowFeedbackModal] = useState(false);
   const [updateStatus, setUpdateStatus] = useState('');
-  
+  const [isLoadingProfile, setIsLoadingProfile] = useState(true);
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  const [driverProfile, setDriverProfile] = useState<DriverProfile | null>(null);
+
+
   // Password form states
   const [currentPassword, setCurrentPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
-  
+
   // Feedback form states
   const [feedbackType, setFeedbackType] = useState('General');
   const [feedbackText, setFeedbackText] = useState('');
 
+  // Load profile data on component mount
+  useEffect(() => {
+    loadProfileData();
+  }, []);
+
+  const loadProfileData = async (forceRefresh = false) => {
+    try {
+      setIsLoadingProfile(true);
+      const profile = await profileService.getProfile(forceRefresh);
+
+      if (profile) {
+        const formattedProfile = profileService.formatProfileForDisplay(profile);
+        setDriverProfile(formattedProfile);
+      } else {
+        Alert.alert(
+          "Error",
+          "Failed to load profile data. Please check your connection and try again.",
+          [
+            { text: "Retry", onPress: () => loadProfileData(true) },
+            { text: "Cancel", style: "cancel" }
+          ]
+        );
+      }
+    } catch (error) {
+      console.error('Error loading profile:', error);
+      Alert.alert("Error", "An unexpected error occurred while loading your profile.");
+    } finally {
+      setIsLoadingProfile(false);
+      setIsRefreshing(false);
+    }
+  };
+
+  const handleRefresh = () => {
+    setIsRefreshing(true);
+    loadProfileData(true);
+  };
+
   const handleCheckUpdates = async () => {
     setIsUpdating(true);
     setUpdateStatus('Checking for updates...');
-    
+
     // Simulate update check process
     setTimeout(() => {
       setUpdateStatus('Downloading updates...');
@@ -39,7 +95,7 @@ const SettingsScreen = () => {
           setIsUpdating(false);
           setUpdateStatus('');
           Alert.alert(
-            "Update Complete", 
+            "Update Complete",
             "App has been updated to version 5.7.2026.FG\n\nNew Features:\n• Improved performance\n• Bug fixes\n• Enhanced security",
             [{ text: "OK", style: "default" }]
           );
@@ -57,12 +113,12 @@ const SettingsScreen = () => {
       Alert.alert("Error", "Please fill all password fields");
       return;
     }
-    
+
     if (newPassword !== confirmPassword) {
       Alert.alert("Error", "New passwords don't match");
       return;
     }
-    
+
     if (newPassword.length < 6) {
       Alert.alert("Error", "Password must be at least 6 characters long");
       return;
@@ -70,11 +126,11 @@ const SettingsScreen = () => {
 
     // Simulate password change
     Alert.alert(
-      "Success", 
+      "Success",
       "Password changed successfully!\nYou will be logged out for security.",
       [{ text: "OK", onPress: () => setShowPasswordModal(false) }]
     );
-    
+
     // Reset form
     setCurrentPassword('');
     setNewPassword('');
@@ -93,11 +149,11 @@ const SettingsScreen = () => {
 
     // Simulate feedback submission
     Alert.alert(
-      "Feedback Sent", 
+      "Feedback Sent",
       `Thank you for your ${feedbackType.toLowerCase()} feedback!\n\nTicket ID: #FB${Date.now().toString().slice(-6)}\n\nWe'll review it within 24-48 hours.`,
       [{ text: "OK", onPress: () => setShowFeedbackModal(false) }]
     );
-    
+
     // Reset form
     setFeedbackText('');
     setFeedbackType('General');
@@ -112,7 +168,7 @@ const SettingsScreen = () => {
       <View style={styles.modalOverlay}>
         <View style={styles.modalContent}>
           <Text style={styles.modalTitle}>Change Password</Text>
-          
+
           <TextInput
             style={styles.input}
             placeholder="Current Password"
@@ -120,7 +176,7 @@ const SettingsScreen = () => {
             value={currentPassword}
             onChangeText={setCurrentPassword}
           />
-          
+
           <TextInput
             style={styles.input}
             placeholder="New Password"
@@ -128,7 +184,7 @@ const SettingsScreen = () => {
             value={newPassword}
             onChangeText={setNewPassword}
           />
-          
+
           <TextInput
             style={styles.input}
             placeholder="Confirm New Password"
@@ -136,17 +192,17 @@ const SettingsScreen = () => {
             value={confirmPassword}
             onChangeText={setConfirmPassword}
           />
-          
+
           <View style={styles.modalButtons}>
-            <TouchableOpacity 
-              style={[styles.modalBtn, styles.cancelBtn]} 
+            <TouchableOpacity
+              style={[styles.modalBtn, styles.cancelBtn]}
               onPress={() => setShowPasswordModal(false)}
             >
               <Text style={styles.cancelBtnText}>Cancel</Text>
             </TouchableOpacity>
-            
-            <TouchableOpacity 
-              style={[styles.modalBtn, styles.submitBtn]} 
+
+            <TouchableOpacity
+              style={[styles.modalBtn, styles.submitBtn]}
               onPress={handlePasswordSubmit}
             >
               <Text style={styles.submitBtnText}>Change Password</Text>
@@ -166,7 +222,7 @@ const SettingsScreen = () => {
       <View style={styles.modalOverlay}>
         <View style={styles.modalContent}>
           <Text style={styles.modalTitle}>Send Feedback</Text>
-          
+
           <Text style={styles.label}>Feedback Type</Text>
           <View style={styles.feedbackTypes}>
             {['General', 'Bug Report', 'Feature Request', 'Complaint'].map((type) => (
@@ -187,7 +243,7 @@ const SettingsScreen = () => {
               </TouchableOpacity>
             ))}
           </View>
-          
+
           <TextInput
             style={styles.textArea}
             placeholder="Describe your feedback, problem, or feature request..."
@@ -197,17 +253,17 @@ const SettingsScreen = () => {
             onChangeText={setFeedbackText}
             textAlignVertical="top"
           />
-          
+
           <View style={styles.modalButtons}>
-            <TouchableOpacity 
-              style={[styles.modalBtn, styles.cancelBtn]} 
+            <TouchableOpacity
+              style={[styles.modalBtn, styles.cancelBtn]}
               onPress={() => setShowFeedbackModal(false)}
             >
               <Text style={styles.cancelBtnText}>Cancel</Text>
             </TouchableOpacity>
-            
-            <TouchableOpacity 
-              style={[styles.modalBtn, styles.submitBtn]} 
+
+            <TouchableOpacity
+              style={[styles.modalBtn, styles.submitBtn]}
               onPress={handleFeedbackSubmit}
             >
               <Text style={styles.submitBtnText}>Send Feedback</Text>
@@ -218,11 +274,77 @@ const SettingsScreen = () => {
     </Modal>
   );
 
+  const renderDriverInfo = () => {
+    if (isLoadingProfile) {
+      return (
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="small" color="#007AFF" />
+          <Text style={styles.loadingText}>Loading profile...</Text>
+        </View>
+      );
+    }
+
+    if (!driverProfile) {
+      return (
+        <View style={styles.errorContainer}>
+          <Text style={styles.errorText}>Failed to load profile data</Text>
+          <TouchableOpacity
+            style={styles.retryBtn}
+            onPress={() => loadProfileData(true)}
+          >
+            <Text style={styles.retryBtnText}>Retry</Text>
+          </TouchableOpacity>
+        </View>
+      );
+    }
+
+    return (
+      <View style={styles.card}>
+        <View style={styles.row}>
+          <Text style={styles.label}>Current Driver</Text>
+          <Text style={styles.value}>{driverProfile.name}</Text>
+        </View>
+        <View style={styles.row}>
+          <Text style={styles.label}>Email</Text>
+          <Text style={styles.value}>{driverProfile.email}</Text>
+        </View>
+        <View style={styles.row}>
+          <Text style={styles.label}>Phone</Text>
+          <Text style={styles.value}>{driverProfile.phone}</Text>
+        </View>
+        <View style={styles.row}>
+          <Text style={styles.label}>Country</Text>
+          <Text style={styles.value}>{driverProfile.country}</Text>
+        </View>
+        <View style={styles.row}>
+          <Text style={styles.label}>Status</Text>
+          <Text style={[styles.value, styles.statusActive]}>
+            {driverProfile.status?.toUpperCase() || 'ACTIVE'}
+          </Text>
+        </View>
+        <View style={styles.row}>
+          <Text style={styles.label}>Member Since</Text>
+          <Text style={styles.value}>{driverProfile.memberSince}</Text>
+        </View>
+      </View>
+    );
+  };
+
   return (
-    <ScrollView style={styles.container}>
+    <ScrollView
+      style={styles.container}
+      refreshControl={
+        <RefreshControl
+          refreshing={isRefreshing}
+          onRefresh={handleRefresh}
+          colors={['#007AFF']}
+          tintColor="#007AFF"
+        />
+      }
+    >
       {/* Action Buttons */}
-      <TouchableOpacity 
-        style={[styles.actionBtn, isUpdating && styles.disabledBtn]} 
+      <TouchableOpacity
+        style={[styles.actionBtn, isUpdating && styles.disabledBtn]}
         onPress={handleCheckUpdates}
         disabled={isUpdating}
       >
@@ -251,28 +373,7 @@ const SettingsScreen = () => {
 
       {/* Driver Info */}
       <Text style={styles.sectionTitle}>Driver Information</Text>
-      <View style={styles.card}>
-        <View style={styles.row}>
-          <Text style={styles.label}>Current Driver</Text>
-          <Text style={styles.value}>Morgan</Text>
-        </View>
-        <View style={styles.row}>
-          <Text style={styles.label}></Text>
-          <Text style={styles.value}>Morecrunk@gmail.com</Text>
-        </View>
-        <View style={styles.row}>
-          <Text style={styles.label}>Units</Text>
-          <Text style={styles.value}>Metric units (Kilometers, Liter)</Text>
-        </View>
-        <View style={styles.row}>
-          <Text style={styles.label}>Home Terminal</Text>
-          <Text style={styles.value}>Zendumo Demo</Text>
-        </View>
-        <View style={styles.row}>
-          <Text style={styles.label}>Time Zone</Text>
-          <Text style={styles.value}>Canada/UAS</Text>
-        </View>
-      </View>
+      {renderDriverInfo()}
 
       {/* Company Info */}
       <Text style={styles.sectionTitle}>Company Information</Text>
@@ -281,20 +382,34 @@ const SettingsScreen = () => {
           <Text style={styles.label}>Company Name</Text>
           <Text style={styles.value}>Zendo Demo</Text>
         </View>
-        <View style={styles.row}>
-          <Text style={styles.label}>Database Name</Text>
-          <Text style={styles.value}>Zendo Demo</Text>
-        </View>
+
+        <TouchableOpacity style={styles.row} onPress={() => Alert.alert(
+          "Units Information",
+          "Units determine how distances and fuel are displayed:\n\n• Imperial: Miles, Gallons (MPG)\n• Metric: Kilometers, Liters (L/100km)\n\nThis affects fuel calculations, trip planning, and expense reporting. Contact your fleet manager to change units.",
+          [{ text: "OK" }]
+        )}>
+          <Text style={styles.label}>Units ℹ️</Text>
+          <Text style={styles.value}>Metric units (Kilometers, Liter)</Text>
+        </TouchableOpacity>
+        <TouchableOpacity style={styles.row} onPress={() => Alert.alert(
+          "Home Terminal Information",
+          "Your Home Terminal is your official base location set by your carrier.\n\nImportant:\n• All HOS logs use this terminal's time zone\n• Required for DOT compliance\n• Used for route planning and payroll\n• Cannot be changed without fleet manager approval\n\nIf this appears incorrect, contact dispatch immediately.",
+          [{ text: "OK" }]
+        )}>
+          <Text style={styles.label}>Home Terminal ℹ️</Text>
+          <Text style={styles.value}>Zendumo Demo</Text>
+        </TouchableOpacity>
+        <TouchableOpacity style={styles.row} onPress={() => Alert.alert(
+          "Time Zone Information",
+          "This is your Home Terminal time zone for all HOS logging.\n\nCritical Rules:\n• ALL log entries must use this time zone\n• Never changes based on your location\n• Required for DOT compliance\n• Used for 14-hour duty calculations\n\nEven if you're in a different time zone, your logs stay in Home Terminal time. Contact fleet manager if this is incorrect.",
+          [{ text: "OK" }]
+        )}>
+          <Text style={styles.label}>Time Zone ℹ️</Text>
+          <Text style={styles.value}>Canada/UAS</Text>
+        </TouchableOpacity>
       </View>
 
-      {/* App Info */}
-      <Text style={styles.sectionTitle}>APP Information</Text>
-      <View style={styles.card}>
-        <View style={styles.row}>
-          <Text style={styles.label}>Software Version</Text>
-          <Text style={styles.value}>5.7.2025.FG</Text>
-        </View>
-      </View>
+
 
       {renderPasswordModal()}
       {renderFeedbackModal()}
@@ -339,9 +454,55 @@ const styles = StyleSheet.create({
     borderBottomWidth: 0.5,
     borderBottomColor: '#eee',
   },
-  label: { fontSize: 14, color: '#555', fontWeight: '500' },
-  value: { fontSize: 14, color: '#333', fontWeight: '600', flexShrink: 1, textAlign: 'right' },
-  
+  label: { fontSize: 14, color: '#555', fontWeight: '500', flex: 1 },
+  value: {
+    fontSize: 14,
+    color: '#333',
+    fontWeight: '600',
+    flex: 1.5,
+    textAlign: 'right',
+    flexWrap: 'wrap',
+  },
+  statusActive: {
+    color: '#28a745',
+    fontWeight: 'bold',
+  },
+
+  // Loading states
+  loadingContainer: {
+    backgroundColor: '#fff',
+    padding: 20,
+    alignItems: 'center',
+    marginBottom: 15,
+  },
+  loadingText: {
+    marginTop: 10,
+    color: '#666',
+    fontSize: 14,
+  },
+  errorContainer: {
+    backgroundColor: '#fff',
+    padding: 20,
+    alignItems: 'center',
+    marginBottom: 15,
+  },
+  errorText: {
+    color: '#dc3545',
+    fontSize: 14,
+    marginBottom: 10,
+  },
+  retryBtn: {
+    backgroundColor: '#007AFF',
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 6,
+  },
+  retryBtnText: {
+    color: 'white',
+    fontSize: 14,
+    fontWeight: '600',
+  },
+
   // Modal styles
   modalOverlay: {
     flex: 1,
