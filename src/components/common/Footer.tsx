@@ -13,12 +13,18 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { RootStackParamList } from '../../navigation/AppNavigator';
+import { AuthService } from '../../navigation/AppNavigator';
 
 type NavigationProp = NativeStackNavigationProp<RootStackParamList>;
 
 const { width } = Dimensions.get('window');
 
-export default function Footer({ onLogout }: any) {
+interface FooterProps {
+  onLogout?: () => void;
+  navigation?: any;
+}
+
+export default function Footer({ onLogout }: FooterProps) {
   const navigation = useNavigation<NavigationProp>();
   const [showMoreMenu, setShowMoreMenu] = useState(false);
   const [showLogoutModal, setShowLogoutModal] = useState(false);
@@ -60,10 +66,27 @@ export default function Footer({ onLogout }: any) {
     navigation.navigate("Help"); // Create HelpScreen
   };
 
-  // Confirm logout
-  const confirmLogout = () => {
+  // Confirm logout - handle both prop and direct logout
+  const confirmLogout = async () => {
     setShowLogoutModal(false);
-    onLogout(); // Call the logout function passed from parent
+    
+    try {
+      if (onLogout && typeof onLogout === 'function') {
+        // Use the passed onLogout function
+        onLogout();
+      } else {
+        // Fallback: Clear auth directly and reset navigation
+        await AuthService.clearAuth();
+        // Reset navigation to login screen
+        navigation.reset({
+          index: 0,
+          routes: [{ name: 'Login' }],
+        });
+      }
+    } catch (error) {
+      console.error('Logout error:', error);
+      Alert.alert('Error', 'Failed to logout. Please try again.');
+    }
   };
 
   // Cancel logout

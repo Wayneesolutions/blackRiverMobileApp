@@ -2,25 +2,47 @@
   "expo": {
     "name": "Black River Logistics",
     "slug": "black-river-logistics",
-    "owner": "blackriverlogistics",
     "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "light",
+    "splash": {
+      "image": "./assets/splash.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#ffffff"
+    },
+    "assetBundlePatterns": [
+      "**/*"
+    ],
     "platforms": [
       "ios",
-      "android"
+      "android",
+      "web"
     ],
     "plugins": [
+      "expo-font",
       "expo-dev-client"
     ],
     "android": {
       "package": "com.blackriverlogistics.app",
-      "compileSdkVersion": 34,
-      "targetSdkVersion": 34,
-      "buildToolsVersion": "34.0.0"
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "backgroundColor": "#FFFFFF"
+      }
+    },
+    "ios": {
+      "bundleIdentifier": "com.blackriverlogistics.app",
+      "supportsTablet": true
+    },
+    "web": {
+      "favicon": "./assets/favicon.png",
+      "bundler": "metro"
     },
     "extra": {
       "eas": {
-        "projectId": "b8c01171-73cc-416a-a15e-2008a48c8fc1"
+        "projectId": "a647baa0-f882-4663-8863-0f38cf52a393"
       }
-    }
+    },
+    "owner": "fleetgo"
   }
 }
