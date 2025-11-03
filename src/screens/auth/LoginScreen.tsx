@@ -19,7 +19,8 @@ import { RootStackParamList } from "../../navigation/AppNavigator";
 import { apiService } from "../../services/api/apiService";
 import { authManager } from "../../types/AuthManager";
 import { logger } from '../../utils/loggerHelper';
-import shape from "../../../assets/images/shape.png";
+// Asset import - using require for better compatibility with Expo Go
+const shape = require("../../../assets/images/shape.png");
 
 type Props = NativeStackScreenProps<RootStackParamList, "Login"> & {
   onAuthSuccess: (userData?: any) => void;
@@ -111,8 +112,23 @@ export default function LoginScreen({ navigation, onAuthSuccess }: Props) {
       // Clear the timeout since we got a response
       clearTimeout(timeoutId);
 
-      if (response.success && response.data) {
-        const { driver } = response.data;
+      // Log the full response for debugging
+      logger.debug('Login response received', {
+        success: response.success,
+        hasData: !!response.data,
+        dataKeys: response.data && typeof response.data === 'object' ? Object.keys(response.data) : null,
+        dataStructure: response.data
+      });
+
+      // Handle both response structures: direct response or wrapped in data
+      // Backend returns: { success: true, message: "...", driver: {...} }
+      // apiService wraps it: { success: true, data: { success: true, message: "...", driver: {...} } }
+      const backendResponse = response.data;
+      const driverData = backendResponse?.driver || (backendResponse && 'id' in backendResponse ? backendResponse : null);
+      
+      // Type guard to check if driverData has the required properties
+      if (response.success && driverData && typeof driverData === 'object' && 'id' in driverData) {
+        const driver = driverData as { id: string; name: string; email: string; token: string };
 
         // Store user data using AuthManager
         await authManager.login({
@@ -128,23 +144,11 @@ export default function LoginScreen({ navigation, onAuthSuccess }: Props) {
           email: driver.email
         }, 'LoginScreen');
 
-        // Show success feedback
-        Alert.alert(
-          "Login Successful",
-          `Welcome back, ${driver.name}!`,
-          [
-            {
-              text: "Continue",
-              onPress: () => {
-                // Call success callback
-                onAuthSuccess(driver);
-
-                // Navigate to next screen (OTP or Main App)
-                navigation.navigate("OTP");
-              }
-            }
-          ]
-        );
+        // Call success callback to update auth state in AppNavigator
+        // This will automatically trigger the AppNavigator to switch from
+        // Login/OTP stack to MainTabs stack (which includes Dashboard)
+        // No manual navigation needed - the conditional rendering handles it
+        onAuthSuccess(driver);
 
       } else {
         // Handle API error

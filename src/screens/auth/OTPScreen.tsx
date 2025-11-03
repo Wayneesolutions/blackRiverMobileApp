@@ -15,7 +15,8 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 import { NativeStackScreenProps } from "@react-navigation/native-stack";
 import { RootStackParamList } from "../../navigation/AppNavigator";
-import otpImage from "../../../assets/images/otp.png";
+// Asset import - using require for better compatibility with Expo Go
+const otpImage = require("../../../assets/images/otp.png");
 
 // Updated interface to work with new auth system
 type Props = NativeStackScreenProps<RootStackParamList, "OTP"> & {

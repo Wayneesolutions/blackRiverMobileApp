@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import {
     View,
     Text,
@@ -7,36 +7,155 @@ import {
     TouchableOpacity,
     Image,
     Dimensions,
+    ActivityIndicator,
+    RefreshControl,
 } from "react-native";
 import { SafeAreaView } from "react-native";
 import { Ionicons, FontAwesome5, MaterialIcons } from "@expo/vector-icons"
-import activeTrip from "../../../assets/icons/active trip.png";
-import completeTrip from "../../../assets/icons/complete trip.png";
-import pendingTrip from "../../../assets/icons/pending trip.png";
+// Asset imports - using require for better compatibility with Expo Go
+const activeTrip = require("../../../assets/icons/active trip.png");
+const completeTrip = require("../../../assets/icons/complete trip.png");
+const pendingTrip = require("../../../assets/icons/pending trip.png");
 
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { RootStackParamList } from '../../navigation/AppNavigator';
+import { apiService } from '../../services/api/apiService';
+import { authManager } from '../../types/AuthManager';
+import { logger } from '../../utils/loggerHelper';
 
 type NavigationProp = NativeStackNavigationProp<RootStackParamList>;
 
 const { width } = Dimensions.get("window");
 
+interface DriverProfile {
+    _id: string;
+    name: string;
+    email: string;
+    phone?: string;
+    profileImageUrl?: string;
+    status?: string;
+    details?: {
+        internalId?: string;
+        licenceNumber?: string;
+    };
+}
+
+interface LoadStats {
+    active: number;
+    pending: number;
+    completed: number;
+    totalMiles: number;
+}
+
 export default function DashboardScreen() {
     const navigation = useNavigation<NavigationProp>();
     const [showAllWishList, setShowAllWishList] = useState(false);
+    const [profile, setProfile] = useState<DriverProfile | null>(null);
+    const [stats, setStats] = useState<LoadStats>({
+        active: 0,
+        pending: 0,
+        completed: 0,
+        totalMiles: 0,
+    });
+    const [loading, setLoading] = useState(true);
+    const [refreshing, setRefreshing] = useState(false);
 
     const wishListItems = [
-        { id: 1, name: "Vehicle", icon: <Ionicons name="car-sport" size={24} color="#fff" />, color: "#906AD1", route: "Vehicle" },
-        { id: 2, name: "Trailer", icon: <FontAwesome5 name="truck-moving" size={24} color="#fff" />, color: "#FF9797", route: "Trailer" },
-        { id: 3, name: "HOS", icon: <MaterialIcons name="schedule" size={24} color="#fff" />, color: "#FFCC00", route: "HOS" },
-        { id: 4, name: "Asset Inspection", icon: <MaterialIcons name="report-problem" size={24} color="#fff" />, color: "#D74848", route: "AssetIncidents" },
-        { id: 5, name: "Settings", icon: <Ionicons name="settings" size={24} color="#fff" />, color: "#2CDBFA", route: "Settings" },
-        { id: 6, name: "Document", icon: <Ionicons name="document-text" size={24} color="#fff" />, color: "#C79EFF", route: "Documents" },
-        { id: 7, name: "Load Map", icon: <Ionicons name="map" size={24} color="#fff" />, color: "#831775", route: "LoadMap" },
-        { id: 8, name: "Transfer", icon: <Ionicons name="swap-horizontal" size={24} color="#fff" />, color: "#E61DCC", route: "Transfer" },
-        { id: 9, name: "Fuel", icon: <FontAwesome5 name="gas-pump" size={24} color="#fff" />, color: "#04AA30", route: "Fuel" },
+        { id: 1, name: "Vehicle", icon: <Ionicons name="car-sport" size={28} color="#fff" />, color: "#906AD1", route: "Vehicle" },
+        { id: 2, name: "Trailer", icon: <FontAwesome5 name="truck-moving" size={28} color="#fff" />, color: "#FF9797", route: "Trailer" },
+        { id: 3, name: "HOS", icon: <MaterialIcons name="schedule" size={28} color="#fff" />, color: "#FFCC00", route: "HOS" },
+        { id: 4, name: "Asset Inspection", icon: <MaterialIcons name="report-problem" size={28} color="#fff" />, color: "#D74848", route: "AssetIncidents" },
+        { id: 5, name: "Settings", icon: <Ionicons name="settings" size={28} color="#fff" />, color: "#2CDBFA", route: "Settings" },
+        { id: 6, name: "Document", icon: <Ionicons name="document-text" size={28} color="#fff" />, color: "#C79EFF", route: "Documents" },
+        { id: 7, name: "Load Map", icon: <Ionicons name="map" size={28} color="#fff" />, color: "#831775", route: "LoadMap" },
+        { id: 8, name: "Transfer", icon: <Ionicons name="swap-horizontal" size={28} color="#fff" />, color: "#E61DCC", route: "Transfer" },
+        { id: 9, name: "Fuel", icon: <FontAwesome5 name="gas-pump" size={28} color="#fff" />, color: "#04AA30", route: "Fuel" },
     ];
+
+    // Fetch driver profile and statistics
+    useEffect(() => {
+        fetchDashboardData();
+    }, []);
+
+    const fetchDashboardData = async () => {
+        try {
+            setLoading(true);
+            
+            // Fetch profile and loads in parallel
+            const [profileRes, activeRes, pendingRes, completedRes] = await Promise.allSettled([
+                apiService.getProfile(),
+                apiService.getActiveLoads(),
+                apiService.getPendingLoads(),
+                apiService.getCompletedLoads(),
+            ]);
+
+            // Update profile
+            if (profileRes.status === 'fulfilled' && profileRes.value.success && profileRes.value.data) {
+                const driverData = profileRes.value.data;
+                setProfile(driverData);
+                
+                // Also update authManager with latest profile
+                const currentUser = authManager.getCurrentUser();
+                if (currentUser) {
+                    await authManager.updateUserData({
+                        name: driverData.name || currentUser.name,
+                        email: driverData.email || currentUser.email,
+                    });
+                }
+            } else {
+                // Fallback to authManager data
+                const currentUser = authManager.getCurrentUser();
+                if (currentUser) {
+                    setProfile({
+                        _id: currentUser.id,
+                        name: currentUser.name,
+                        email: currentUser.email,
+                    });
+                }
+            }
+
+            // Update statistics
+            const newStats: LoadStats = {
+                active: activeRes.status === 'fulfilled' && activeRes.value.success 
+                    ? activeRes.value.data?.count || activeRes.value.data?.loads?.length || 0 
+                    : 0,
+                pending: pendingRes.status === 'fulfilled' && pendingRes.value.success 
+                    ? pendingRes.value.data?.count || pendingRes.value.data?.loads?.length || 0 
+                    : 0,
+                completed: completedRes.status === 'fulfilled' && completedRes.value.success 
+                    ? completedRes.value.data?.count || completedRes.value.data?.loads?.length || 0 
+                    : 0,
+                totalMiles: 0, // Calculate from completed loads if needed
+            };
+            setStats(newStats);
+
+            logger.info('Dashboard data loaded', {
+                hasProfile: !!profile,
+                stats: newStats
+            });
+
+        } catch (error) {
+            logger.error('Failed to fetch dashboard data', error);
+            // Use cached data from authManager as fallback
+            const currentUser = authManager.getCurrentUser();
+            if (currentUser) {
+                setProfile({
+                    _id: currentUser.id,
+                    name: currentUser.name,
+                    email: currentUser.email,
+                });
+            }
+        } finally {
+            setLoading(false);
+            setRefreshing(false);
+        }
+    };
+
+    const onRefresh = () => {
+        setRefreshing(true);
+        fetchDashboardData();
+    };
 
     const handleWishItemPress = (item: any) => {
         if (item.route) {
@@ -55,16 +174,29 @@ export default function DashboardScreen() {
         // }
     };
 
-    const renderWishItem = (item: any) => (
+    const renderWishItem = (item: any, isGrid: boolean = false) => (
         <TouchableOpacity
             key={item.id}
-            style={[styles.wishItem, { backgroundColor: item.color }]}
+            style={[
+                styles.wishItem,
+                { backgroundColor: item.color },
+                isGrid && styles.wishItemGrid
+            ]}
             onPress={() => handleWishItemPress(item)}
+            activeOpacity={0.7}
         >
             <View style={styles.iconWrapper}>
                 {item.icon}
             </View>
-            <Text style={styles.wishText}>{item.name}</Text>
+            <Text 
+                style={[
+                    styles.wishText,
+                    isGrid && styles.wishTextGrid
+                ]}
+                numberOfLines={2}
+            >
+                {item.name}
+            </Text>
         </TouchableOpacity>
     );
 
@@ -74,29 +206,33 @@ export default function DashboardScreen() {
             horizontal
             showsHorizontalScrollIndicator={false}
             contentContainerStyle={styles.horizontalScrollContent}
+            bounces={false}
         >
-            {wishListItems.map(renderWishItem)}
+            {wishListItems.map((item) => renderWishItem(item, false))}
         </ScrollView>
     );
 
-    const renderGridWishList = () => (
-        <View>
-            {/* First Row */}
-            <View style={styles.wishGrid}>
-                {wishListItems.slice(0, 4).map(renderWishItem)}
-            </View>
-            {/* Second Row */}
-            <View style={styles.wishGrid}>
-                {wishListItems.slice(4, 8).map(renderWishItem)}
-            </View>
-            {/* Third Row (if more items) */}
-            {wishListItems.length > 8 && (
-                <View style={styles.wishGrid}>
-                    {wishListItems.slice(8).map(renderWishItem)}
-                </View>
-            )}
+    const renderGridWishList = () => {
+        const itemsPerRow = 3;
+        const rows = [];
+        
+        for (let i = 0; i < wishListItems.length; i += itemsPerRow) {
+            const rowItems = wishListItems.slice(i, i + itemsPerRow);
+            rows.push(
+                <View key={i} style={styles.wishGrid}>
+                    {rowItems.map((item) => renderWishItem(item, true))}
+                    {/* Add empty spaces if row has less than 3 items */}
+                    {rowItems.length < itemsPerRow && 
+                        Array.from({ length: itemsPerRow - rowItems.length }).map((_, idx) => (
+                            <View key={`empty-${idx}`} style={styles.wishItemGrid} />
+                        ))
+                    }
         </View>
     );
+        }
+        
+        return <View style={styles.wishGridContainer}>{rows}</View>;
+    };
 
     return (
         <SafeAreaView style={styles.container}>
@@ -104,28 +240,62 @@ export default function DashboardScreen() {
                 style={styles.scrollContainer}
                 contentContainerStyle={styles.scrollContent}
                 showsVerticalScrollIndicator={false}
+                refreshControl={
+                    <RefreshControl
+                        refreshing={refreshing}
+                        onRefresh={onRefresh}
+                        colors={['#8B5CF6']}
+                        tintColor="#8B5CF6"
+                    />
+                }
             >
                 <View style={styles.content}>
+                    {loading && !profile ? (
+                        <View style={styles.loadingContainer}>
+                            <ActivityIndicator size="large" color="#8B5CF6" />
+                            <Text style={styles.loadingText}>Loading dashboard...</Text>
+                        </View>
+                    ) : (
+                        <>
                     {/* Profile Card */}
                     <View style={styles.profileCard}>
                         <View style={styles.profileContent}>
                             <View style={styles.profileInfo}>
                                 <Text style={styles.driverLabel}>Driver</Text>
                                 <View style={styles.nameRow}>
-                                    <Text style={styles.driverName}>Rajvinder</Text>
+                                            <Text style={styles.driverName}>
+                                                {profile?.name || authManager.getCurrentUser()?.name || 'Driver'}
+                                            </Text>
                                     <View style={styles.statusBadge}>
-                                        <Text style={styles.statusText}>Active</Text>
+                                                <Text style={styles.statusText}>
+                                                    {profile?.status || 'Active'}
+                                                </Text>
                                     </View>
                                 </View>
-                                <Text style={styles.tripLabel}>Total Trip</Text>
-                                <Text style={styles.miles}>600 Miles</Text>
+                                        {profile?.details?.internalId && (
+                                            <Text style={styles.internalIdLabel}>
+                                                ID: {profile.details.internalId}
+                                            </Text>
+                                        )}
+                                        <Text style={styles.tripLabel}>Total Trips</Text>
+                                        <Text style={styles.miles}>
+                                            {stats.active + stats.pending + stats.completed} Loads
+                                        </Text>
                             </View>
+                                    {profile?.profileImageUrl ? (
                             <Image
-                                source={{ uri: "https://randomuser.me/api/portraits/men/75.jpg" }}
+                                            source={{ uri: profile.profileImageUrl }}
                                 style={styles.avatar}
                             />
+                                    ) : (
+                                        <View style={[styles.avatar, styles.avatarPlaceholder]}>
+                                            <Ionicons name="person" size={40} color="#fff" />
+                                        </View>
+                                    )}
                         </View>
                     </View>
+                        </>
+                    )}
 
                     {/* Daily Task Report */}
                     <View style={styles.section}>
@@ -144,7 +314,10 @@ export default function DashboardScreen() {
                                 <View style={styles.taskIconContainer}>
                                     <Image source={activeTrip} style={styles.taskIcon} />
                                 </View>
-                                <Text style={styles.taskText}>Active Trips</Text>
+                                <View style={styles.taskContent}>
+                                    <Text style={styles.taskText}>Active Loads</Text>
+                                    <Text style={styles.taskCount}>{stats.active}</Text>
+                                </View>
                             </TouchableOpacity>
 
                             <TouchableOpacity
@@ -154,7 +327,10 @@ export default function DashboardScreen() {
                                 <View style={[styles.taskIconContainer, { backgroundColor: "#FF6B6B" }]}>
                                     <Image source={completeTrip} style={styles.taskIcon} />
                                 </View>
-                                <Text style={styles.taskText}>Complete Trips</Text>
+                                <View style={styles.taskContent}>
+                                    <Text style={styles.taskText}>Completed Loads</Text>
+                                    <Text style={styles.taskCount}>{stats.completed}</Text>
+                                </View>
                             </TouchableOpacity>
 
                             <TouchableOpacity
@@ -164,7 +340,10 @@ export default function DashboardScreen() {
                                 <View style={[styles.taskIconContainer, { backgroundColor: "#8B4513" }]}>
                                     <Image source={pendingTrip} style={styles.taskIcon} />
                                 </View>
-                                <Text style={styles.taskText}>Pending Trips</Text>
+                                <View style={styles.taskContent}>
+                                    <Text style={styles.taskText}>Pending Loads</Text>
+                                    <Text style={styles.taskCount}>{stats.pending}</Text>
+                                </View>
                             </TouchableOpacity>
                         </View>
                     </View>
@@ -321,31 +500,50 @@ const styles = StyleSheet.create({
     },
     horizontalScrollContent: {
         paddingRight: 20,
+        paddingVertical: 8,
+    },
+    wishGridContainer: {
+        paddingVertical: 8,
     },
     wishGrid: {
         flexDirection: "row",
         justifyContent: "space-between",
-        marginBottom: 12
+        marginBottom: 16,
+        paddingHorizontal: 4,
     },
     wishItem: {
-        width: (width - 60) / 4,
+        width: (width - 60) / 3.5,
+        minWidth: 90,
         aspectRatio: 1,
         borderRadius: 16,
         justifyContent: "center",
         alignItems: "center",
-        marginHorizontal: 2,
-        elevation: 2,
+        paddingVertical: 12,
+        paddingHorizontal: 8,
+        marginRight: 12,
+        elevation: 3,
         shadowColor: "#000",
-        shadowOffset: { width: 0, height: 1 },
-        shadowOpacity: 0.1,
-        shadowRadius: 2,
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.15,
+        shadowRadius: 4,
+    },
+    wishItemGrid: {
+        width: (width - 80) / 3,
+        minWidth: 100,
+        marginRight: 8,
+        marginLeft: 0,
     },
     wishText: {
         color: "#fff",
-        fontSize: 12,
+        fontSize: 11,
         marginTop: 8,
         fontWeight: "600",
         textAlign: "center",
+        paddingHorizontal: 4,
+    },
+    wishTextGrid: {
+        fontSize: 12,
+        marginTop: 10,
     },
     taskIcon: {
         width: 24,
@@ -355,6 +553,36 @@ const styles = StyleSheet.create({
     iconWrapper: {
         justifyContent: "center",
         alignItems: "center",
-        color: "white"
+        marginBottom: 4,
+    },
+    loadingContainer: {
+        padding: 40,
+        alignItems: "center",
+        justifyContent: "center",
+    },
+    loadingText: {
+        marginTop: 12,
+        fontSize: 16,
+        color: "#6B7280",
+    },
+    internalIdLabel: {
+        color: "#E1D5F7",
+        fontSize: 12,
+        marginBottom: 4,
+    },
+    avatarPlaceholder: {
+        backgroundColor: "rgba(255, 255, 255, 0.2)",
+        justifyContent: "center",
+        alignItems: "center",
+    },
+    taskContent: {
+        flex: 1,
+        marginLeft: 16,
+    },
+    taskCount: {
+        fontSize: 20,
+        fontWeight: "bold",
+        color: "#1F2937",
+        marginTop: 4,
     },
 });

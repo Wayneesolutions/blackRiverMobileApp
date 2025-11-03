@@ -1,6 +1,6 @@
 // src/services/ApiService.ts - CORRECTED VERSION
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { API_BASE_URL, API_ENDPOINTS, IS_DEV } from '../../config/env';
+import { API_BASE_URL, API_ENDPOINTS, IS_DEV, getAPIBaseURL } from '../../config/env';
 import { logger } from '../../utils/loggerHelper';
 
 interface ApiResponse<T = any> {
@@ -23,15 +23,17 @@ interface LoginResponse {
 }
 
 class ApiService {
-    private baseURL: string;
+    private baseURL: string | null = null;
     private token: string | null = null;
     private isInitialized: boolean = false;
+    private configInitialized: boolean = false;
     private requestCache = new Map();
 
     constructor() {
-        this.baseURL = API_BASE_URL;
         // Initialize immediately without async operations
         this.loadTokenSync();
+        // Try to get baseURL from config (might be undefined if config not loaded yet)
+        this.baseURL = API_BASE_URL || null;
     }
 
     // 🔧 FIXED: Synchronous token loading
@@ -46,42 +48,55 @@ class ApiService {
         });
     }
 
-    // 🔧 FIXED: Simplified initialization - only find working endpoint in dev
+    // 🔧 FIXED: Non-blocking initialization - don't block requests with health checks
     private async ensureInitialized() {
-        if (this.isInitialized) return;
+        if (this.isInitialized && this.configInitialized) return;
 
-        try {
-            // In development, try to find working endpoint
-            if (IS_DEV && API_ENDPOINTS && API_ENDPOINTS.length > 0) {
-                const workingEndpoint = await this.findWorkingEndpoint();
-                if (workingEndpoint) {
-                    this.baseURL = workingEndpoint;
-                    logger.info('Using working endpoint', { endpoint: this.baseURL });
+        // Wait for config to be initialized if baseURL is undefined
+        if (!this.baseURL || this.baseURL === 'undefined') {
+            try {
+                const baseURL = await getAPIBaseURL();
+                if (baseURL) {
+                    this.baseURL = baseURL;
+                    this.configInitialized = true;
+                    logger.info('Config loaded, baseURL set', { baseURL: this.baseURL });
+                } else {
+                    // Fallback if config still not ready
+                    this.baseURL = API_BASE_URL || 'http://localhost:3000/api/v1';
+                    logger.warn('Using fallback baseURL', { baseURL: this.baseURL });
                 }
+            } catch (error) {
+                logger.error('Failed to get API base URL', error);
+                this.baseURL = API_BASE_URL || 'http://localhost:3000/api/v1';
             }
-            
-            this.isInitialized = true;
-            logger.info('API Service initialized', { baseURL: this.baseURL });
-        } catch (error) {
-            logger.error('Failed to initialize API service', error);
-            // Continue with default endpoint
-            this.isInitialized = true;
+        } else {
+            this.configInitialized = true;
+        }
+
+        // Mark as initialized
+        this.isInitialized = true;
+        logger.info('API Service initialized', { baseURL: this.baseURL });
+
+        // Only do endpoint discovery in background if in dev mode and we have multiple endpoints
+        // Don't block requests for this
+        if (IS_DEV && API_ENDPOINTS && API_ENDPOINTS.length > 1) {
+            // Run endpoint discovery in background without blocking
+            this.findWorkingEndpointInBackground().catch(error => {
+                logger.warn('Background endpoint discovery failed', { error });
+            });
         }
     }
 
-    // 🔧 FIXED: Better endpoint detection with shorter timeout
-    private async findWorkingEndpoint(): Promise<string | null> {
-        const endpoints = [...(API_ENDPOINTS || []), this.baseURL];
-        const uniqueEndpoints = [...new Set(endpoints)];
-        
-        logger.info('Testing endpoints', { endpoints: uniqueEndpoints });
-
-        for (const endpoint of uniqueEndpoints) {
+    // 🔧 FIXED: Non-blocking endpoint detection - only test current endpoint first
+    private async findWorkingEndpointInBackground(): Promise<void> {
+        try {
+            // First, quickly test the current baseURL
+            const currentEndpoint = this.baseURL;
             try {
                 const controller = new AbortController();
-                const timeoutId = setTimeout(() => controller.abort(), 3000); // 3s timeout
+                const timeoutId = setTimeout(() => controller.abort(), 2000); // 2s timeout
 
-                const response = await fetch(`${endpoint}/health`, {
+                const response = await fetch(`${currentEndpoint}/health`, {
                     method: 'GET',
                     headers: { 'Content-Type': 'application/json' },
                     signal: controller.signal,
@@ -89,18 +104,47 @@ class ApiService {
 
                 clearTimeout(timeoutId);
 
-                // Accept any response that's not a network error
-                logger.info(`Endpoint test result: ${endpoint} - Status: ${response.status}`);
-                return endpoint;
-
-            } catch (error: any) {
-                logger.warn(`Endpoint failed: ${endpoint}`, { error: error.name });
-                continue;
+                if (response.ok || response.status < 500) {
+                    logger.info(`Current endpoint works: ${currentEndpoint}`);
+                    return; // Current endpoint works, no need to test others
+                }
+            } catch (error) {
+                logger.debug(`Current endpoint test failed: ${currentEndpoint}`);
             }
-        }
 
-        logger.warn('No working endpoint found');
-        return null;
+            // Only if current endpoint fails, try a few others (max 3 to avoid too many requests)
+            const endpointsToTry = (API_ENDPOINTS || [])
+                .filter(ep => ep !== currentEndpoint)
+                .slice(0, 3); // Only try first 3 alternatives
+
+            for (const endpoint of endpointsToTry) {
+                try {
+                    const controller = new AbortController();
+                    const timeoutId = setTimeout(() => controller.abort(), 2000); // 2s timeout
+
+                    const response = await fetch(`${endpoint}/health`, {
+                        method: 'GET',
+                        headers: { 'Content-Type': 'application/json' },
+                        signal: controller.signal,
+                    });
+
+                    clearTimeout(timeoutId);
+
+                    if (response.ok || response.status < 500) {
+                        this.baseURL = endpoint;
+                        logger.info(`Switched to working endpoint: ${endpoint}`);
+                        return; // Found working endpoint
+                    }
+                } catch (error: any) {
+                    logger.debug(`Endpoint test failed: ${endpoint}`);
+                    continue;
+                }
+            }
+
+            logger.warn('No alternative working endpoint found, using current');
+        } catch (error) {
+            logger.warn('Background endpoint discovery error', { error });
+        }
     }
 
     // Set authorization token
@@ -136,9 +180,18 @@ class ApiService {
         const requestId = Math.random().toString(36).substr(2, 9);
 
         // Prepare headers
+        // Don't set Content-Type for FormData - let fetch API set it with boundary
+        const body = options?.body;
+        let isFormData = false;
+        try {
+            isFormData = body != null && typeof FormData !== 'undefined' && body instanceof FormData;
+        } catch (e) {
+            // FormData might not be available or instanceof check failed
+            isFormData = false;
+        }
         const headers: Record<string, string> = {
-            'Content-Type': 'application/json',
-            ...options.headers as Record<string, string>,
+            ...(!isFormData && { 'Content-Type': 'application/json' }),
+            ...(options.headers as Record<string, string> || {}),
         };
 
         // Add auth token if required and available
@@ -154,13 +207,23 @@ class ApiService {
         // 🔧 FIXED: Create proper endpoint list for fallback
         const endpointsToTry: string[] = [];
         
+        // Ensure we have a valid baseURL
+        if (!this.baseURL || this.baseURL === 'undefined') {
+            logger.error('baseURL is undefined, cannot make request', { endpoint });
+            return {
+                success: false,
+                error: 'API configuration not initialized. Please restart the app.',
+                statusCode: 0
+            };
+        }
+        
         // Always try current baseURL first
         endpointsToTry.push(this.baseURL);
         
         // In development, add other endpoints as fallbacks
         if (IS_DEV && API_ENDPOINTS && API_ENDPOINTS.length > 0) {
             API_ENDPOINTS.forEach(ep => {
-                if (ep !== this.baseURL && !endpointsToTry.includes(ep)) {
+                if (ep && ep !== this.baseURL && !endpointsToTry.includes(ep)) {
                     endpointsToTry.push(ep);
                 }
             });
@@ -229,9 +292,22 @@ class ApiService {
                         logger.info('Switched to working endpoint', { endpoint: baseUrl });
                     }
 
+                    // Log response data for debugging
+                    logger.debug('Response data structure', { 
+                        hasData: !!responseData,
+                        dataKeys: responseData && typeof responseData === 'object' ? Object.keys(responseData) : null,
+                        dataType: typeof responseData
+                    });
+
+                    // Handle response format: backend returns {success: true/false, message: "..."}
+                    // For password change, we check responseData.success explicitly
+                    const backendSuccess = responseData?.success === true;
+                    const isSuccess = backendSuccess && response.status < 400;
+                    
                     return {
-                        success: true,
+                        success: isSuccess,
                         data: responseData,
+                        error: !backendSuccess ? (responseData?.message || responseData?.error || 'Request failed') : undefined,
                         statusCode: response.status,
                     };
                 }
@@ -239,28 +315,39 @@ class ApiService {
                 // Handle HTTP errors
                 let errorMessage = 'Request failed';
                 
-                if (responseData && typeof responseData === 'object' && responseData.message) {
-                    errorMessage = responseData.message;
+                // Check if backend returned an error message in responseData
+                if (responseData && typeof responseData === 'object') {
+                    if (responseData.message) {
+                        errorMessage = responseData.message;
+                    } else if (responseData.error) {
+                        errorMessage = responseData.error;
+                    } else if (responseData.success === false && responseData.message) {
+                        errorMessage = responseData.message;
+                    }
                 } else if (responseData && typeof responseData === 'string') {
                     errorMessage = responseData;
                 }
 
                 switch (response.status) {
+                    case 400:
+                        // Bad request - use backend message if available
+                        errorMessage = responseData?.message || responseData?.error || 'Invalid request. Please check your input.';
+                        break;
                     case 401:
-                        errorMessage = 'Authentication failed. Please login again.';
+                        errorMessage = responseData?.message || 'Authentication failed. Please login again.';
                         await this.removeAuthToken();
                         break;
                     case 403:
-                        errorMessage = 'Access denied. Insufficient permissions.';
+                        errorMessage = responseData?.message || 'Access denied. Insufficient permissions.';
                         break;
                     case 404:
-                        errorMessage = 'Service not found.';
+                        errorMessage = responseData?.message || 'Service not found.';
                         break;
                     case 422:
                         errorMessage = responseData?.message || 'Invalid data provided.';
                         break;
                     case 500:
-                        errorMessage = 'Server error. Please try again later.';
+                        errorMessage = responseData?.message || responseData?.error || 'Server error. Please try again later.';
                         break;
                 }
 
@@ -367,6 +454,301 @@ class ApiService {
             method: 'PUT',
             body: JSON.stringify(profileData)
         }, true);
+    }
+
+    // Driver Loads/Trips endpoints
+    async getActiveLoads(): Promise<ApiResponse<{ count: number; loads: any[] }>> {
+        return this.request('/driver/loads/active', { method: 'GET' }, true);
+    }
+
+    async getPendingLoads(): Promise<ApiResponse<{ count: number; loads: any[] }>> {
+        return this.request('/driver/loads/pending', { method: 'GET' }, true);
+    }
+
+    async getCompletedLoads(): Promise<ApiResponse<{ count: number; loads: any[] }>> {
+        return this.request('/driver/loads/completed', { method: 'GET' }, true);
+    }
+
+    async getStartedLoads(): Promise<ApiResponse<{ count: number; loads: any[] }>> {
+        return this.request('/driver/loads/started', { method: 'GET' }, true);
+    }
+
+    async updateLoadStatus(loadId: string, status: string): Promise<ApiResponse> {
+        return this.request('/driver/loads/status', {
+            method: 'PUT',
+            body: JSON.stringify({ loadId, status })
+        }, true);
+    }
+
+    async getNotifications(): Promise<ApiResponse> {
+        return this.request('/driver/notifications', { method: 'GET' }, true);
+    }
+
+    async changePassword(currentPassword: string, newPassword: string): Promise<ApiResponse> {
+        logger.info('Changing password - API call initiated', { 
+            hasCurrentPassword: !!currentPassword, 
+            hasNewPassword: !!newPassword,
+            endpoint: '/driver/change-password'
+        });
+        
+        try {
+            const response = await this.request('/driver/change-password', {
+                method: 'PUT',
+                body: JSON.stringify({ currentPassword, newPassword })
+            }, true);
+            
+            logger.debug('Change password response received', {
+                success: response.success,
+                error: response.error,
+                statusCode: response.statusCode,
+                hasData: !!response.data
+            });
+            
+            return response;
+        } catch (error: any) {
+            logger.error('Exception in changePassword API call', {
+                error: error.message,
+                name: error.name,
+                stack: error.stack
+            });
+            return {
+                success: false,
+                error: error.message || 'Failed to change password',
+                statusCode: 0
+            };
+        }
+    }
+
+    async submitFeedback(feedbackType: string, feedbackText: string): Promise<ApiResponse> {
+        return this.request('/driver/feedback', {
+            method: 'POST',
+            body: JSON.stringify({ 
+                type: feedbackType,
+                message: feedbackText 
+            })
+        }, true);
+    }
+
+    // ========== DOCUMENT METHODS ==========
+    async getDriverDocuments(): Promise<ApiResponse<{ data: any[]; count: number }>> {
+        try {
+            logger.info('Fetching driver documents');
+            
+            const response = await this.request<{ success: boolean; message: string; data: any[]; count: number }>('/driver/documents', {
+                method: 'GET'
+            }, true);
+
+            return response;
+        } catch (error: any) {
+            logger.error('Error fetching driver documents', error);
+            return {
+                success: false,
+                error: error.message || 'Failed to fetch documents',
+                statusCode: 0
+            };
+        }
+    }
+
+    async getDriverDocumentById(documentId: string): Promise<ApiResponse> {
+        try {
+            logger.info('Fetching driver document by ID', { documentId });
+            
+            const response = await this.request(`/driver/documents/${documentId}`, {
+                method: 'GET'
+            }, true);
+
+            return response;
+        } catch (error: any) {
+            logger.error('Error fetching driver document', error);
+            return {
+                success: false,
+                error: error.message || 'Failed to fetch document',
+                statusCode: 0
+            };
+        }
+    }
+
+    async uploadDriverDocument(
+        documentFile: any,
+        documentType: string,
+        documentNumber?: string,
+        issueDate?: string,
+        expiryDate?: string,
+        description?: string
+    ): Promise<ApiResponse> {
+        try {
+            logger.info('Uploading driver document', { documentType, hasFile: !!documentFile });
+
+            const formData = new FormData();
+            
+            // Handle file upload - React Native Web needs special handling
+            if (documentFile) {
+                // For React Native Web, we need to fetch the file and create a Blob
+                if (typeof window !== 'undefined' && documentFile.uri) {
+                    try {
+                        // For web platform, fetch the file as blob
+                        const response = await fetch(documentFile.uri);
+                        const blob = await response.blob();
+                        const file = new File(
+                            [blob],
+                            documentFile.name || 'document.pdf',
+                            { type: documentFile.type || blob.type || 'application/pdf' }
+                        );
+                        formData.append('documentFile', file);
+                        logger.info('File prepared for web upload', { name: file.name, type: file.type, size: file.size });
+                    } catch (blobError) {
+                        logger.warn('Failed to create blob from URI, trying direct append', blobError);
+                        // Fallback: try direct append (works for native)
+                        formData.append('documentFile', {
+                            uri: documentFile.uri,
+                            type: documentFile.type || 'application/pdf',
+                            name: documentFile.name || 'document.pdf',
+                        } as any);
+                    }
+                } else {
+                    // For native React Native, use the object format
+                    formData.append('documentFile', {
+                        uri: documentFile.uri,
+                        type: documentFile.type || 'application/pdf',
+                        name: documentFile.name || 'document.pdf',
+                    } as any);
+                }
+            } else {
+                logger.error('No document file provided');
+                return {
+                    success: false,
+                    error: 'Document file is required',
+                    statusCode: 400
+                };
+            }
+
+            formData.append('documentType', documentType);
+            if (documentNumber) formData.append('documentNumber', documentNumber);
+            if (issueDate) formData.append('issueDate', issueDate);
+            if (expiryDate) formData.append('expiryDate', expiryDate);
+            if (description) formData.append('description', description);
+
+            logger.debug('FormData prepared', {
+                hasDocumentFile: formData.has('documentFile'),
+                documentType,
+                hasDocumentNumber: !!documentNumber,
+                hasIssueDate: !!issueDate,
+                hasExpiryDate: !!expiryDate,
+            });
+
+            const response = await this.request('/driver/documents', {
+                method: 'POST',
+                body: formData,
+            }, true);
+
+            return response;
+        } catch (error: any) {
+            logger.error('Error uploading driver document', error);
+            return {
+                success: false,
+                error: error.message || 'Failed to upload document',
+                statusCode: 0
+            };
+        }
+    }
+
+    async updateDriverDocument(
+        documentId: string,
+        documentFile?: any,
+        documentType?: string,
+        documentNumber?: string,
+        issueDate?: string,
+        expiryDate?: string,
+        description?: string,
+        status?: string
+    ): Promise<ApiResponse> {
+        try {
+            logger.info('Updating driver document', { documentId, hasFile: !!documentFile });
+
+            const formData = new FormData();
+            
+            // Handle file upload - React Native Web needs special handling
+            if (documentFile) {
+                // For React Native Web, we need to fetch the file and create a Blob
+                if (typeof window !== 'undefined' && documentFile.uri) {
+                    try {
+                        // For web platform, fetch the file as blob
+                        const response = await fetch(documentFile.uri);
+                        const blob = await response.blob();
+                        const file = new File(
+                            [blob],
+                            documentFile.name || 'document.pdf',
+                            { type: documentFile.type || blob.type || 'application/pdf' }
+                        );
+                        formData.append('documentFile', file);
+                        logger.info('File prepared for web update', { name: file.name, type: file.type, size: file.size });
+                    } catch (blobError) {
+                        logger.warn('Failed to create blob from URI, trying direct append', blobError);
+                        // Fallback: try direct append (works for native)
+                        formData.append('documentFile', {
+                            uri: documentFile.uri,
+                            type: documentFile.type || 'application/pdf',
+                            name: documentFile.name || 'document.pdf',
+                        } as any);
+                    }
+                } else {
+                    // For native React Native, use the object format
+                    formData.append('documentFile', {
+                        uri: documentFile.uri,
+                        type: documentFile.type || 'application/pdf',
+                        name: documentFile.name || 'document.pdf',
+                    } as any);
+                }
+            }
+            
+            if (documentType) formData.append('documentType', documentType);
+            if (documentNumber) formData.append('documentNumber', documentNumber);
+            if (issueDate) formData.append('issueDate', issueDate);
+            if (expiryDate) formData.append('expiryDate', expiryDate);
+            if (description) formData.append('description', description);
+            if (status) formData.append('status', status);
+
+            logger.debug('FormData prepared for update', {
+                hasDocumentFile: formData.has('documentFile'),
+                documentType,
+                hasDocumentNumber: !!documentNumber,
+                hasIssueDate: !!issueDate,
+                hasExpiryDate: !!expiryDate,
+            });
+
+            const response = await this.request(`/driver/documents/${documentId}`, {
+                method: 'PUT',
+                body: formData,
+            }, true);
+
+            return response;
+        } catch (error: any) {
+            logger.error('Error updating driver document', error);
+            return {
+                success: false,
+                error: error.message || 'Failed to update document',
+                statusCode: 0
+            };
+        }
+    }
+
+    async deleteDriverDocument(documentId: string): Promise<ApiResponse> {
+        try {
+            logger.info('Deleting driver document', { documentId });
+            
+            const response = await this.request(`/driver/documents/${documentId}`, {
+                method: 'DELETE'
+            }, true);
+
+            return response;
+        } catch (error: any) {
+            logger.error('Error deleting driver document', error);
+            return {
+                success: false,
+                error: error.message || 'Failed to delete document',
+                statusCode: 0
+            };
+        }
     }
 
     // Utility methods

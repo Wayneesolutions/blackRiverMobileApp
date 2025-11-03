@@ -1,311 +1,244 @@
-import React from "react";
-import { View, Text, StyleSheet, ScrollView } from "react-native";
+import React, { useState, useEffect } from "react";
+import {
+  View,
+  Text,
+  StyleSheet,
+  ScrollView,
+  TouchableOpacity,
+  SafeAreaView,
+  ActivityIndicator,
+  RefreshControl,
+} from "react-native";
+import { apiService } from '../../services/api/apiService';
+import { logger } from '../../utils/loggerHelper';
 
-const CompleteTrips = () => {
-  // Enhanced data with fuel consumption and additional metrics
-  const completedTrips = [
-    {
-      id: 1,
-      route: "Boston, MA → Atlanta, GA",
-      cargo: "Medical Supplies",
-      carrier: "MedExpress Logistics",
-      driverName: "Sarah Wilson",
-      distanceCovered: 1087,
-      startDate: "2025-08-15",
-      completedDate: "2025-08-17",
-      deliveryTime: "2 days, 4 hours",
-      status: "Delivered On Time",
-      rating: 5,
-      fuelUsed: 181.2, // gallons
-      fuelCost: 652.32, // USD
-      avgMpg: 6.0,
-      truckType: "Class 8 Semi",
-      weight: 32000, // lbs
-      fuelEfficiencyRating: "Good"
-    },
-    {
-      id: 2,
-      route: "Phoenix, AZ → Portland, OR",
-      cargo: "Consumer Electronics",
-      carrier: "TechHaul Express",
-      driverName: "Mike Rodriguez",
-      distanceCovered: 1424,
-      startDate: "2025-08-10",
-      completedDate: "2025-08-13",
-      deliveryTime: "2 days, 18 hours",
-      status: "Delivered Early",
-      rating: 5,
-      fuelUsed: 228.6,
-      fuelCost: 823.10,
-      avgMpg: 6.2,
-      truckType: "Class 8 Semi",
-      weight: 28500,
-      fuelEfficiencyRating: "Excellent"
-    },
-    {
-      id: 3,
-      route: "Houston, TX → Nashville, TN",
-      cargo: "Automotive Parts",
-      carrier: "AutoCargo Solutions",
-      driverName: "Jennifer Lee",
-      distanceCovered: 928,
-      startDate: "2025-08-20",
-      completedDate: "2025-08-22",
-      deliveryTime: "1 day, 22 hours",
-      status: "Delivered On Time",
-      rating: 4,
-      fuelUsed: 161.4,
-      fuelCost: 581.04,
-      avgMpg: 5.75,
-      truckType: "Class 8 Semi",
-      weight: 35200,
-      fuelEfficiencyRating: "Average"
-    },
-    {
-      id: 4,
-      route: "San Francisco, CA → Las Vegas, NV",
-      cargo: "Food & Beverages",
-      carrier: "Fresh Cargo Co.",
-      driverName: "Robert Chen",
-      distanceCovered: 568,
-      startDate: "2025-08-05",
-      completedDate: "2025-08-06",
-      deliveryTime: "1 day, 3 hours",
-      status: "Delivered On Time",
-      rating: 5,
-      fuelUsed: 89.5,
-      fuelCost: 322.20,
-      avgMpg: 6.35,
-      truckType: "Class 6 Box Truck",
-      weight: 18600,
-      fuelEfficiencyRating: "Excellent"
-    },
-    {
-      id: 5,
-      route: "Minneapolis, MN → Kansas City, MO",
-      cargo: "Industrial Equipment",
-      carrier: "Heavy Haul Logistics",
-      driverName: "Thomas Brown",
-      distanceCovered: 465,
-      startDate: "2025-08-22",
-      completedDate: "2025-08-24",
-      deliveryTime: "2 days, 8 hours",
-      status: "Delivered Late",
-      rating: 3,
-      fuelUsed: 93.0,
-      fuelCost: 334.80,
-      avgMpg: 5.0,
-      truckType: "Heavy Haul",
-      weight: 42000,
-      fuelEfficiencyRating: "Poor"
-    },
-    {
-      id: 6,
-      route: "Orlando, FL → Charlotte, NC",
-      cargo: "Textiles",
-      carrier: "Southern Transport",
-      driverName: "Lisa Johnson",
-      distanceCovered: 523,
-      startDate: "2025-08-12",
-      completedDate: "2025-08-13",
-      deliveryTime: "1 day, 6 hours",
-      status: "Delivered Early",
-      rating: 5,
-      fuelUsed: 87.2,
-      fuelCost: 313.92,
-      avgMpg: 6.0,
-      truckType: "Class 8 Semi",
-      weight: 29800,
-      fuelEfficiencyRating: "Good"
-    }
-  ];
-
-
-  const getStatusColor = (status: any) => {
-    switch (status) {
-      case "Delivered Early":
-        return "#27ae60";
-      case "Delivered On Time":
-        return "#3498db";
-      case "Delivered Late":
-        return "#e74c3c";
-      default:
-        return "#95a5a6";
-    }
-  };
-
-  const getFuelEfficiencyColor = (rating: any) => {
-    switch (rating) {
-      case "Excellent":
-        return "#27ae60";
-      case "Good":
-        return "#f39c12";
-      case "Average":
-        return "#e67e22";
-      case "Poor":
-        return "#e74c3c";
-      default:
-        return "#95a5a6";
-    }
-  };
-
-  const formatDate = (dateString: any) => {
-    const date = new Date(dateString);
-    return date.toLocaleDateString("en-US", {
-      month: "short",
-      day: "numeric",
-      year: "numeric"
-    });
-  };
-
-
-
-  const renderTripCard = (trip: any) => (
-    <View key={trip.id} style={styles.tripCard}>
-      <View style={styles.cardHeader}>
-        <Text style={styles.routeText}>{trip.route}</Text>
-        <View style={[styles.statusBadge, { backgroundColor: getStatusColor(trip.status) }]}>
-          <Text style={styles.statusText}>{trip.status}</Text>
-        </View>
-      </View>
-
-      <View style={styles.cardContent}>
-        <View style={styles.infoRow}>
-          <Text style={styles.label}>Cargo:</Text>
-          <Text style={styles.value}>{trip.cargo}</Text>
-        </View>
-
-        <View style={styles.infoRow}>
-          <Text style={styles.label}>Carrier:</Text>
-          <Text style={styles.value}>{trip.carrier}</Text>
-        </View>
-
-        <View style={styles.infoRow}>
-          <Text style={styles.label}>Driver:</Text>
-          <Text style={styles.value}>{trip.driverName}</Text>
-        </View>
-
-        <View style={styles.infoRow}>
-          <Text style={styles.label}>Distance:</Text>
-          <Text style={styles.value}>{trip.distanceCovered} miles</Text>
-        </View>
-
-        <View style={styles.infoRow}>
-          <Text style={styles.label}>Vehicle Type:</Text>
-          <Text style={styles.value}>{trip.truckType}</Text>
-        </View>
-
-        <View style={styles.infoRow}>
-          <Text style={styles.label}>Cargo Weight:</Text>
-          <Text style={styles.value}>{trip.weight.toLocaleString()} lbs</Text>
-        </View>
-
-        <View style={styles.infoRow}>
-          <Text style={styles.label}>Delivery Time:</Text>
-          <Text style={styles.value}>{trip.deliveryTime}</Text>
-        </View>
-
-        {/* Fuel Information Section */}
-        <View style={styles.fuelSection}>
-          <Text style={styles.sectionTitle}>⛽ Fuel Consumption</Text>
-
-          <View style={styles.infoRow}>
-            <Text style={styles.label}>Fuel Used:</Text>
-            <Text style={styles.value}>{trip.fuelUsed} gallons</Text>
-          </View>
-
-          <View style={styles.infoRow}>
-            <Text style={styles.label}>Fuel Cost:</Text>
-            <Text style={styles.value}>${trip.fuelCost}</Text>
-          </View>
-
-          <View style={styles.infoRow}>
-            <Text style={styles.label}>Average MPG:</Text>
-            <Text style={styles.value}>{trip.avgMpg}</Text>
-          </View>
-
-          <View style={styles.infoRow}>
-            <Text style={styles.label}>Fuel Efficiency:</Text>
-            <View style={styles.efficiencyContainer}>
-              <View style={[styles.efficiencyBadge, { backgroundColor: getFuelEfficiencyColor(trip.fuelEfficiencyRating) }]}>
-                <Text style={styles.efficiencyText}>{trip.fuelEfficiencyRating}</Text>
-              </View>
-            </View>
-          </View>
-
-          <View style={styles.infoRow}>
-            <Text style={styles.label}>Cost per Mile:</Text>
-            <Text style={styles.value}>${(trip.fuelCost / trip.distanceCovered).toFixed(2)}</Text>
-          </View>
-        </View>
-
-        <View style={styles.dateSection}>
-          <View style={styles.dateRow}>
-            <Text style={styles.dateLabel}>Started:</Text>
-            <Text style={styles.dateValue}>{formatDate(trip.startDate)}</Text>
-          </View>
-          <View style={styles.dateRow}>
-            <Text style={styles.dateLabel}>Completed:</Text>
-            <Text style={styles.dateValue}>{formatDate(trip.completedDate)}</Text>
-          </View>
-        </View>
-
-
-      </View>
-    </View>
-  );
-
-  const getTotalStats = () => {
-    const totalTrips = completedTrips.length;
-    const totalMiles = completedTrips.reduce((sum, trip) => sum + trip.distanceCovered, 0);
-    const totalFuelUsed = completedTrips.reduce((sum, trip) => sum + trip.fuelUsed, 0);
-    const totalFuelCost = completedTrips.reduce((sum, trip) => sum + trip.fuelCost, 0);
-    const avgMpg = totalMiles / totalFuelUsed;
-    const onTimeDeliveries = completedTrips.filter(trip =>
-      trip.status === "Delivered On Time" || trip.status === "Delivered Early"
-    ).length;
-    const onTimePercentage = Math.round((onTimeDeliveries / totalTrips) * 100);
-
-    return {
-      totalTrips,
-      totalMiles,
-      totalFuelUsed: Math.round(totalFuelUsed * 10) / 10,
-      totalFuelCost: Math.round(totalFuelCost * 100) / 100,
-      avgMpg: Math.round(avgMpg * 10) / 10,
-      onTimePercentage
+interface Load {
+  _id: string;
+  internalId?: string;
+  orderType?: string;
+  status: string;
+  route?: {
+    selectPickup?: {
+      place?: string;
+      city?: string;
+      state?: string;
+      latitude?: number;
+      longitude?: number;
+    };
+    selectDropOff?: {
+      place?: string;
+      city?: string;
+      state?: string;
+      latitude?: number;
+      longitude?: number;
     };
   };
+  payloads?: Array<{
+    itemName?: string;
+    description?: string;
+    measurementAndWeight?: {
+      weight?: number;
+    };
+  }>;
+  customer?: {
+    name?: string;
+    email?: string;
+  };
+  createdAt?: string;
+  updatedAt?: string;
+  completedAt?: string;
+}
 
-  const stats = getTotalStats();
+const CompleteTrips = () => {
+  const [loads, setLoads] = useState<Load[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+
+  useEffect(() => {
+    fetchCompletedLoads();
+  }, []);
+
+  const fetchCompletedLoads = async () => {
+    try {
+      setLoading(true);
+      const response = await apiService.getCompletedLoads();
+      
+      if (response.success && response.data) {
+        const loadsData = response.data.loads || response.data || [];
+        setLoads(Array.isArray(loadsData) ? loadsData : []);
+        logger.info('Completed loads fetched', { count: loadsData.length });
+      } else {
+        logger.warn('Failed to fetch completed loads', { error: response.error });
+        setLoads([]);
+      }
+    } catch (error) {
+      logger.error('Error fetching completed loads', error);
+      setLoads([]);
+    } finally {
+      setLoading(false);
+      setRefreshing(false);
+    }
+  };
+
+  const onRefresh = () => {
+    setRefreshing(true);
+    fetchCompletedLoads();
+  };
+
+  const formatAddress = (location: any) => {
+    if (!location) return 'N/A';
+    if (location.place) return location.place;
+    if (location.city && location.state) {
+      return `${location.city}, ${location.state}`;
+    }
+    return location.city || location.state || 'Unknown Location';
+  };
+
+  const formatDate = (dateString?: string) => {
+    if (!dateString) return 'N/A';
+    try {
+      const date = new Date(dateString);
+      return date.toLocaleDateString('en-US', {
+        year: 'numeric',
+        month: 'short',
+        day: 'numeric',
+      });
+    } catch {
+      return dateString;
+    }
+  };
+
+  const getLoadWeight = (load: Load) => {
+    if (load.payloads && load.payloads.length > 0) {
+      const totalWeight = load.payloads.reduce((sum, payload) => {
+        return sum + (payload.measurementAndWeight?.weight || 0);
+      }, 0);
+      return totalWeight > 0 ? `${totalWeight.toLocaleString()} lbs` : 'N/A';
+    }
+    return 'N/A';
+  };
+
+  const getLoadItemName = (load: Load) => {
+    if (load.payloads && load.payloads.length > 0) {
+      return load.payloads[0].itemName || 'Cargo';
+    }
+    return 'Cargo';
+  };
 
   return (
-    <View style={styles.container}>
+    <SafeAreaView style={styles.container}>
       <View style={styles.header}>
-        <Text style={styles.headerTitle}>✅ Complete Trips</Text>
-        <Text style={styles.headerSubtitle}>Successfully completed this month</Text>
-      </View>
-
-      <View style={styles.statsSection}>
-        <View style={styles.statCard}>
-          <Text style={styles.statNumber}>{stats.totalTrips}</Text>
-          <Text style={styles.statLabel}>Total Trips</Text>
-        </View>
-        <View style={styles.statCard}>
-          <Text style={styles.statNumber}>{stats.totalMiles.toLocaleString()}</Text>
-          <Text style={styles.statLabel}>Miles Covered</Text>
-        </View>
-        <View style={styles.statCard}>
-          <Text style={styles.statNumber}>{stats.onTimePercentage}%</Text>
-          <Text style={styles.statLabel}>On Time</Text>
+        <View style={styles.headerContent}>
+          <Text style={styles.headerTitle}>Completed Loads</Text>
+          <Text style={styles.headerSubtitle}>View your delivery history</Text>
+          <View style={styles.statsContainer}>
+            <View style={styles.statItem}>
+              <Text style={styles.statNumber}>{loads.length}</Text>
+              <Text style={styles.statLabel}>Completed</Text>
+            </View>
+          </View>
         </View>
       </View>
 
+      {loading ? (
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="large" color="#8B5CF6" />
+          <Text style={styles.loadingText}>Loading completed loads...</Text>
+        </View>
+      ) : loads.length === 0 ? (
+        <View style={styles.emptyContainer}>
+          <Text style={styles.emptyIcon}>✅</Text>
+          <Text style={styles.emptyText}>No Completed Loads</Text>
+          <Text style={styles.emptySubtext}>You haven't completed any loads yet</Text>
+        </View>
+      ) : (
+        <ScrollView
+          style={styles.scrollView}
+          showsVerticalScrollIndicator={false}
+          contentContainerStyle={styles.scrollContent}
+          refreshControl={
+            <RefreshControl
+              refreshing={refreshing}
+              onRefresh={onRefresh}
+              colors={['#8B5CF6']}
+              tintColor="#8B5CF6"
+            />
+          }
+        >
+          {loads.map((load) => {
+            const pickup = load.route?.selectPickup;
+            const dropoff = load.route?.selectDropOff;
+            
+            return (
+              <View key={load._id} style={styles.loadCard}>
+                <View style={styles.cardHeader}>
+                  <View style={styles.headerInfo}>
+                    <Text style={styles.routeText}>
+                      {formatAddress(pickup)} → {formatAddress(dropoff)}
+                    </Text>
+                    {load.internalId && (
+                      <Text style={styles.loadIdText}>Load ID: {load.internalId}</Text>
+                    )}
+                  </View>
+                  <View style={styles.completedBadge}>
+                    <Text style={styles.completedText}>✓ Completed</Text>
+                  </View>
+                </View>
 
+                <View style={styles.detailsGrid}>
+                  <View style={styles.detailSection}>
+                    <View style={styles.detailItem}>
+                      <Text style={styles.detailIcon}>📦</Text>
+                      <View style={styles.detailContent}>
+                        <Text style={styles.detailTitle}>{getLoadItemName(load)}</Text>
+                        <Text style={styles.detailSubtext}>Weight: {getLoadWeight(load)}</Text>
+                      </View>
+                    </View>
 
-      <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
-        {completedTrips.map(renderTripCard)}
-      </ScrollView>
-    </View>
+                    {load.customer && (
+                      <View style={styles.detailItem}>
+                        <Text style={styles.detailIcon}>👤</Text>
+                        <View style={styles.detailContent}>
+                          <Text style={styles.detailTitle}>{load.customer.name || 'Customer'}</Text>
+                          {load.customer.email && (
+                            <Text style={styles.detailSubtext}>{load.customer.email}</Text>
+                          )}
+                        </View>
+                      </View>
+                    )}
+                  </View>
+
+                  <View style={styles.detailSection}>
+                    <View style={styles.detailItem}>
+                      <Text style={styles.detailIcon}>📍</Text>
+                      <View style={styles.detailContent}>
+                        <Text style={styles.detailTitle}>Pickup</Text>
+                        <Text style={styles.detailSubtext}>{formatAddress(pickup)}</Text>
+                      </View>
+                    </View>
+
+                    <View style={styles.detailItem}>
+                      <Text style={styles.detailIcon}>🎯</Text>
+                      <View style={styles.detailContent}>
+                        <Text style={styles.detailTitle}>Drop-off</Text>
+                        <Text style={styles.detailSubtext}>{formatAddress(dropoff)}</Text>
+                      </View>
+                    </View>
+                  </View>
+                </View>
+
+                {load.completedAt && (
+                  <View style={styles.dateSection}>
+                    <Text style={styles.dateLabel}>Completed on:</Text>
+                    <Text style={styles.dateText}>{formatDate(load.completedAt)}</Text>
+                  </View>
+                )}
+              </View>
+            );
+          })}
+        </ScrollView>
+      )}
+    </SafeAreaView>
   );
 };
 
@@ -314,207 +247,175 @@ export default CompleteTrips;
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#f5f5f5"
+    backgroundColor: "#f5f6fa"
   },
   header: {
     backgroundColor: "#8B5CF6",
-    paddingVertical: 20,
-    paddingHorizontal: 16,
+    paddingBottom: 20
+  },
+  headerContent: {
+    paddingHorizontal: 20,
     paddingTop: 20
   },
   headerTitle: {
-    fontSize: 24,
+    fontSize: 28,
     fontWeight: "bold",
     color: "#ffffff",
-    marginBottom: 4
-  },
-  headerSubtitle: {
-    fontSize: 14,
-    color: "#a8d5ba",
-    opacity: 0.9
-  },
-  statsSection: {
-    flexDirection: "row",
-    padding: 16,
-    gap: 12
-  },
-  fuelStatsSection: {
-    paddingHorizontal: 16,
-    paddingVertical: 12
-  },
-  fuelStatsTitle: {
-    fontSize: 16,
-    fontWeight: "600",
-    color: "#2c3e50",
     marginBottom: 8
   },
-  statsRow: {
-    flexDirection: "row",
-    gap: 12
+  headerSubtitle: {
+    fontSize: 16,
+    color: "#e8d8ff",
+    marginBottom: 16
   },
-  statCard: {
-    flex: 1,
-    backgroundColor: "#ffffff",
-    padding: 16,
-    borderRadius: 12,
-    alignItems: "center",
-    shadowColor: "#000",
-    shadowOffset: {
-      width: 0,
-      height: 2
-    },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3
+  statsContainer: {
+    flexDirection: "row",
+    gap: 24
+  },
+  statItem: {
+    alignItems: "center"
   },
   statNumber: {
-    fontSize: 22,
+    fontSize: 32,
     fontWeight: "bold",
-    color: "#27ae60",
-    marginBottom: 4
+    color: "#ffffff"
   },
   statLabel: {
-    fontSize: 12,
+    fontSize: 14,
+    color: "#e8d8ff"
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 40,
+  },
+  loadingText: {
+    marginTop: 12,
+    fontSize: 16,
+    color: "#6B7280",
+  },
+  emptyContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 40,
+  },
+  emptyIcon: {
+    fontSize: 64,
+    marginBottom: 16,
+  },
+  emptyText: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: "#2c3e50",
+    marginBottom: 8,
+  },
+  emptySubtext: {
+    fontSize: 14,
     color: "#7f8c8d",
-    textAlign: "center"
+    textAlign: 'center',
   },
   scrollView: {
-    flex: 1,
-    paddingHorizontal: 16
+    flex: 1
   },
-  tripCard: {
+  scrollContent: {
+    paddingHorizontal: 20,
+    paddingVertical: 16
+  },
+  loadCard: {
     backgroundColor: "#ffffff",
-    borderRadius: 12,
-    marginVertical: 8,
-    padding: 16,
+    borderRadius: 16,
+    marginBottom: 20,
+    padding: 20,
     shadowColor: "#000",
     shadowOffset: {
       width: 0,
-      height: 2
+      height: 4
     },
     shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3
+    shadowRadius: 8,
+    elevation: 5,
+    borderWidth: 1,
+    borderColor: "#f1f2f6"
   },
   cardHeader: {
     flexDirection: "row",
     justifyContent: "space-between",
-    alignItems: "center",
-    marginBottom: 12
+    alignItems: "flex-start",
+    marginBottom: 20
+  },
+  headerInfo: {
+    flex: 1,
+    marginRight: 12
   },
   routeText: {
-    fontSize: 16,
-    fontWeight: "600",
+    fontSize: 18,
+    fontWeight: "700",
     color: "#2c3e50",
-    flex: 1,
-    marginRight: 8
-  },
-  statusBadge: {
-    paddingHorizontal: 12,
-    paddingVertical: 4,
-    borderRadius: 20
-  },
-  statusText: {
-    fontSize: 12,
-    fontWeight: "600",
-    color: "#ffffff"
-  },
-  cardContent: {
-    gap: 8
-  },
-  infoRow: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    paddingVertical: 4
-  },
-  label: {
-    fontSize: 14,
-    fontWeight: "500",
-    color: "#7f8c8d",
-    flex: 1
-  },
-  value: {
-    fontSize: 14,
-    fontWeight: "600",
-    color: "#2c3e50",
-    flex: 2,
-    textAlign: "right"
-  },
-  fuelSection: {
-    marginTop: 16,
-    padding: 16,
-    backgroundColor: "#f8f9fa",
-    borderRadius: 12,
-    borderLeftWidth: 4,
-    borderLeftColor: "#e67e22"
-  },
-  sectionTitle: {
-    fontSize: 16,
-    fontWeight: "600",
-    color: "#2c3e50",
-    marginBottom: 12
-  },
-  efficiencyContainer: {
-    flex: 2,
-    alignItems: "flex-end"
-  },
-  efficiencyBadge: {
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 12
-  },
-  efficiencyText: {
-    fontSize: 12,
-    fontWeight: "600",
-    color: "#ffffff"
-  },
-  dateSection: {
-    marginTop: 12,
-    padding: 12,
-    backgroundColor: "#f8f9fa",
-    borderRadius: 8
-  },
-  dateRow: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    paddingVertical: 2
-  },
-  dateLabel: {
-    fontSize: 13,
-    fontWeight: "500",
-    color: "#34495e"
-  },
-  dateValue: {
-    fontSize: 13,
-    fontWeight: "600",
-    color: "#2c3e50"
-  },
-  ratingSection: {
-    marginTop: 12,
-    paddingTop: 12,
-    borderTopWidth: 1,
-    borderTopColor: "#ecf0f1"
-  },
-  ratingLabel: {
-    fontSize: 14,
-    fontWeight: "500",
-    color: "#34495e",
     marginBottom: 6
   },
-  ratingRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between"
-  },
-  stars: {
-    fontSize: 16,
-    color: "#f39c12"
-  },
-  ratingText: {
+  loadIdText: {
     fontSize: 12,
-    fontWeight: "500",
-    color: "#7f8c8d"
+    color: "#7f8c8d",
+    marginTop: 4,
+  },
+  completedBadge: {
+    backgroundColor: "#2ecc71",
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 20
+  },
+  completedText: {
+    fontSize: 12,
+    fontWeight: "700",
+    color: "#ffffff"
+  },
+  detailsGrid: {
+    flexDirection: "row",
+    marginBottom: 16
+  },
+  detailSection: {
+    flex: 1,
+    gap: 16
+  },
+  detailItem: {
+    flexDirection: "row",
+    alignItems: "flex-start"
+  },
+  detailIcon: {
+    fontSize: 20,
+    marginRight: 12,
+    marginTop: 2
+  },
+  detailContent: {
+    flex: 1
+  },
+  detailTitle: {
+    fontSize: 16,
+    fontWeight: "600",
+    color: "#2c3e50",
+    marginBottom: 2
+  },
+  detailSubtext: {
+    fontSize: 13,
+    color: "#7f8c8d",
+    lineHeight: 18
+  },
+  dateSection: {
+    borderTopWidth: 1,
+    borderTopColor: "#f1f2f6",
+    paddingTop: 12,
+    marginTop: 12
+  },
+  dateLabel: {
+    fontSize: 12,
+    color: "#7f8c8d",
+    marginBottom: 4
+  },
+  dateText: {
+    fontSize: 14,
+    fontWeight: "600",
+    color: "#2c3e50"
   }
 });

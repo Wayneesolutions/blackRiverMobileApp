@@ -9,9 +9,17 @@ import {
   Modal,
   TextInput,
   ActivityIndicator,
-  RefreshControl
+  RefreshControl,
+  SafeAreaView,
+  Image,
+  InteractionManager
 } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
+import { useNavigation } from '@react-navigation/native';
 import { profileService } from '../../services/ProfileService';
+import { apiService } from '../../services/api/apiService';
+import { authManager } from '../../types/AuthManager';
+import { logger } from '../../utils/loggerHelper';
 
 interface DriverProfile {
   id: string;
@@ -27,6 +35,7 @@ interface DriverProfile {
 
 
 const SettingsScreen = () => {
+  const navigation = useNavigation();
   const [isUpdating, setIsUpdating] = useState(false);
   const [showPasswordModal, setShowPasswordModal] = useState(false);
   const [showFeedbackModal, setShowFeedbackModal] = useState(false);
@@ -34,6 +43,8 @@ const SettingsScreen = () => {
   const [isLoadingProfile, setIsLoadingProfile] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [driverProfile, setDriverProfile] = useState<DriverProfile | null>(null);
+  const [isChangingPassword, setIsChangingPassword] = useState(false);
+  const [isSubmittingFeedback, setIsSubmittingFeedback] = useState(false);
 
 
   // Password form states
@@ -108,7 +119,14 @@ const SettingsScreen = () => {
     setShowPasswordModal(true);
   };
 
-  const handlePasswordSubmit = () => {
+  const handlePasswordSubmit = async () => {
+    console.log('🔐 handlePasswordSubmit called');
+    console.log('Form state:', { 
+      hasCurrentPassword: !!currentPassword, 
+      hasNewPassword: !!newPassword, 
+      hasConfirmPassword: !!confirmPassword 
+    });
+
     if (!currentPassword || !newPassword || !confirmPassword) {
       Alert.alert("Error", "Please fill all password fields");
       return;
@@ -124,39 +142,129 @@ const SettingsScreen = () => {
       return;
     }
 
-    // Simulate password change
-    Alert.alert(
-      "Success",
-      "Password changed successfully!\nYou will be logged out for security.",
-      [{ text: "OK", onPress: () => setShowPasswordModal(false) }]
-    );
+    try {
+      setIsChangingPassword(true);
+      logger.info('Changing password', { 
+        hasCurrentPassword: !!currentPassword,
+        hasNewPassword: !!newPassword,
+        newPasswordLength: newPassword.length
+      });
+      
+      console.log('📞 Calling apiService.changePassword');
+      const response = await apiService.changePassword(currentPassword, newPassword);
+      console.log('✅ API response received:', { 
+        success: response.success, 
+        error: response.error,
+        statusCode: response.statusCode 
+      });
 
-    // Reset form
-    setCurrentPassword('');
-    setNewPassword('');
-    setConfirmPassword('');
+      if (response.success) {
+        logger.userAction('Password Changed', {}, 'SettingsScreen');
+        
+        // Reset loading state first
+        setIsChangingPassword(false);
+        
+        // Close modal and reset form immediately
+        setShowPasswordModal(false);
+        setCurrentPassword('');
+        setNewPassword('');
+        setConfirmPassword('');
+        
+        // Show success alert after interactions complete (ensuring modal has closed)
+        InteractionManager.runAfterInteractions(() => {
+          Alert.alert(
+            "Success",
+            "Password changed successfully!\nYou will be logged out for security.",
+            [
+              { 
+                text: "OK", 
+                onPress: async () => {
+                  // Logout user after alert is dismissed
+                  await handleLogout();
+                }
+              }
+            ]
+          );
+        });
+      } else {
+        const errorMsg = response.error || "Failed to change password. Please try again.";
+        logger.error('Password change failed', { error: errorMsg, statusCode: response.statusCode });
+        setIsChangingPassword(false);
+        Alert.alert("Error", errorMsg);
+      }
+    } catch (error: any) {
+      console.error('❌ Exception in handlePasswordSubmit:', error);
+      logger.error('Error changing password', error);
+      setIsChangingPassword(false);
+      Alert.alert(
+        "Error", 
+        error?.message || "An unexpected error occurred. Please try again."
+      );
+    }
   };
 
   const handleSendFeedback = () => {
     setShowFeedbackModal(true);
   };
 
-  const handleFeedbackSubmit = () => {
+  const handleFeedbackSubmit = async () => {
     if (!feedbackText.trim()) {
       Alert.alert("Error", "Please enter your feedback");
       return;
     }
 
-    // Simulate feedback submission
-    Alert.alert(
-      "Feedback Sent",
-      `Thank you for your ${feedbackType.toLowerCase()} feedback!\n\nTicket ID: #FB${Date.now().toString().slice(-6)}\n\nWe'll review it within 24-48 hours.`,
-      [{ text: "OK", onPress: () => setShowFeedbackModal(false) }]
-    );
+    try {
+      setIsSubmittingFeedback(true);
+      logger.info('Submitting feedback', { type: feedbackType });
+      
+      const response = await apiService.submitFeedback(feedbackType, feedbackText);
 
-    // Reset form
-    setFeedbackText('');
-    setFeedbackType('General');
+      if (response.success) {
+        const ticketId = response.data?.ticketId || `#FB${Date.now().toString().slice(-6)}`;
+        Alert.alert(
+          "Feedback Sent",
+          `Thank you for your ${feedbackType.toLowerCase()} feedback!\n\nTicket ID: ${ticketId}\n\nWe'll review it within 24-48 hours.`,
+          [{ text: "OK", onPress: () => setShowFeedbackModal(false) }]
+        );
+
+        // Reset form
+        setFeedbackText('');
+        setFeedbackType('General');
+      } else {
+        Alert.alert("Error", response.error || "Failed to submit feedback. Please try again.");
+      }
+    } catch (error: any) {
+      logger.error('Error submitting feedback', error);
+      Alert.alert("Error", "An unexpected error occurred. Please try again.");
+    } finally {
+      setIsSubmittingFeedback(false);
+    }
+  };
+
+  const handleLogout = async () => {
+    Alert.alert(
+      "Logout",
+      "Are you sure you want to logout?",
+      [
+        { text: "Cancel", style: "cancel" },
+        {
+          text: "Logout",
+          style: "destructive",
+          onPress: async () => {
+            try {
+              await apiService.logout();
+              await authManager.logout();
+              // Navigation will be handled by AppNavigator based on auth state
+              logger.userAction('Logout', {}, 'SettingsScreen');
+            } catch (error: any) {
+              logger.error('Error during logout', error);
+              // Still logout locally even if API call fails
+              await authManager.logout();
+            }
+          }
+        }
+      ]
+    );
   };
 
   const renderPasswordModal = () => (
@@ -164,48 +272,86 @@ const SettingsScreen = () => {
       visible={showPasswordModal}
       animationType="slide"
       transparent={true}
+      onRequestClose={() => {
+        if (!isChangingPassword) {
+          setShowPasswordModal(false);
+        }
+      }}
     >
       <View style={styles.modalOverlay}>
         <View style={styles.modalContent}>
-          <Text style={styles.modalTitle}>Change Password</Text>
+          <View style={styles.modalHeader}>
+            <Text style={styles.modalTitle}>Change Password</Text>
+            {!isChangingPassword && (
+              <TouchableOpacity
+                onPress={() => setShowPasswordModal(false)}
+                style={styles.modalCloseButton}
+              >
+                <Ionicons name="close" size={24} color="#666" />
+              </TouchableOpacity>
+            )}
+          </View>
 
           <TextInput
             style={styles.input}
             placeholder="Current Password"
+            placeholderTextColor="#999"
             secureTextEntry
             value={currentPassword}
             onChangeText={setCurrentPassword}
+            editable={!isChangingPassword}
+            autoCapitalize="none"
           />
 
           <TextInput
             style={styles.input}
             placeholder="New Password"
+            placeholderTextColor="#999"
             secureTextEntry
             value={newPassword}
             onChangeText={setNewPassword}
+            editable={!isChangingPassword}
+            autoCapitalize="none"
           />
 
           <TextInput
             style={styles.input}
             placeholder="Confirm New Password"
+            placeholderTextColor="#999"
             secureTextEntry
             value={confirmPassword}
             onChangeText={setConfirmPassword}
+            editable={!isChangingPassword}
+            autoCapitalize="none"
+            onSubmitEditing={handlePasswordSubmit}
           />
 
           <View style={styles.modalButtons}>
             <TouchableOpacity
               style={[styles.modalBtn, styles.cancelBtn]}
-              onPress={() => setShowPasswordModal(false)}
+              onPress={() => {
+                if (!isChangingPassword) {
+                  setShowPasswordModal(false);
+                  setCurrentPassword('');
+                  setNewPassword('');
+                  setConfirmPassword('');
+                }
+              }}
+              disabled={isChangingPassword}
             >
               <Text style={styles.cancelBtnText}>Cancel</Text>
             </TouchableOpacity>
 
             <TouchableOpacity
-              style={[styles.modalBtn, styles.submitBtn]}
+              style={[styles.modalBtn, styles.submitBtn, isChangingPassword && styles.disabledBtn]}
               onPress={handlePasswordSubmit}
+              disabled={isChangingPassword}
             >
-              <Text style={styles.submitBtnText}>Change Password</Text>
+              {isChangingPassword ? (
+                <ActivityIndicator size="small" color="#fff" />
+              ) : (
+                <Text style={styles.submitBtnText}>Change Password</Text>
+              )}
             </TouchableOpacity>
           </View>
         </View>
@@ -263,10 +409,15 @@ const SettingsScreen = () => {
             </TouchableOpacity>
 
             <TouchableOpacity
-              style={[styles.modalBtn, styles.submitBtn]}
+              style={[styles.modalBtn, styles.submitBtn, isSubmittingFeedback && styles.disabledBtn]}
               onPress={handleFeedbackSubmit}
+              disabled={isSubmittingFeedback}
             >
-              <Text style={styles.submitBtnText}>Send Feedback</Text>
+              {isSubmittingFeedback ? (
+                <ActivityIndicator size="small" color="#fff" />
+              ) : (
+                <Text style={styles.submitBtnText}>Send Feedback</Text>
+              )}
             </TouchableOpacity>
           </View>
         </View>
@@ -331,53 +482,110 @@ const SettingsScreen = () => {
   };
 
   return (
-    <ScrollView
-      style={styles.container}
-      refreshControl={
-        <RefreshControl
-          refreshing={isRefreshing}
-          onRefresh={handleRefresh}
-          colors={['#007AFF']}
-          tintColor="#007AFF"
-        />
-      }
-    >
-      {/* Action Buttons */}
-      <TouchableOpacity
-        style={[styles.actionBtn, isUpdating && styles.disabledBtn]}
-        onPress={handleCheckUpdates}
-        disabled={isUpdating}
+    <SafeAreaView style={styles.safeArea}>
+      <ScrollView
+        style={styles.container}
+        refreshControl={
+          <RefreshControl
+            refreshing={isRefreshing}
+            onRefresh={handleRefresh}
+            colors={['#8B5CF6']}
+            tintColor="#8B5CF6"
+          />
+        }
       >
-        <View style={styles.actionContent}>
-          <View style={styles.actionTextContainer}>
-            <Text style={styles.actionTitle}>Check for updates</Text>
-            <Text style={styles.actionSubtitle}>
-              {updateStatus || "Refresh and synchronize data"}
-            </Text>
-          </View>
-          {isUpdating && <ActivityIndicator size="small" color="#007AFF" />}
+        {/* Header */}
+        <View style={styles.header}>
+          <Text style={styles.headerTitle}>Settings</Text>
         </View>
-      </TouchableOpacity>
 
-      <TouchableOpacity style={styles.actionBtn} onPress={handleChangePassword}>
-        <Text style={styles.actionTitle}>Change Password</Text>
-        <Text style={styles.actionSubtitle}>Change your Password</Text>
-      </TouchableOpacity>
+        {/* Action Buttons */}
+        <View style={styles.actionsSection}>
+          <TouchableOpacity
+            style={[styles.actionBtn, isUpdating && styles.disabledBtn]}
+            onPress={handleCheckUpdates}
+            disabled={isUpdating}
+            activeOpacity={0.7}
+          >
+            <View style={styles.actionContent}>
+              <View style={styles.actionIconContainer}>
+                <Ionicons name="refresh" size={24} color="#8B5CF6" />
+              </View>
+              <View style={styles.actionTextContainer}>
+                <Text style={styles.actionTitle}>Check for Updates</Text>
+                <Text style={styles.actionSubtitle}>
+                  {updateStatus || "Refresh and synchronize data"}
+                </Text>
+              </View>
+              {isUpdating ? (
+                <ActivityIndicator size="small" color="#8B5CF6" />
+              ) : (
+                <Ionicons name="chevron-forward" size={20} color="#999" />
+              )}
+            </View>
+          </TouchableOpacity>
 
-      <TouchableOpacity style={styles.actionBtn} onPress={handleSendFeedback}>
-        <Text style={styles.actionTitle}>Send feedback</Text>
-        <Text style={styles.actionSubtitle}>
-          Provide a brief Description of your feedback, problem or Feature Request
-        </Text>
-      </TouchableOpacity>
+          <TouchableOpacity 
+            style={styles.actionBtn} 
+            onPress={handleChangePassword}
+            activeOpacity={0.7}
+          >
+            <View style={styles.actionContent}>
+              <View style={styles.actionIconContainer}>
+                <Ionicons name="lock-closed" size={24} color="#8B5CF6" />
+              </View>
+              <View style={styles.actionTextContainer}>
+                <Text style={styles.actionTitle}>Change Password</Text>
+                <Text style={styles.actionSubtitle}>Update your account password</Text>
+              </View>
+              <Ionicons name="chevron-forward" size={20} color="#999" />
+            </View>
+          </TouchableOpacity>
 
-      {/* Driver Info */}
-      <Text style={styles.sectionTitle}>Driver Information</Text>
-      {renderDriverInfo()}
+          <TouchableOpacity 
+            style={styles.actionBtn} 
+            onPress={handleSendFeedback}
+            activeOpacity={0.7}
+          >
+            <View style={styles.actionContent}>
+              <View style={styles.actionIconContainer}>
+                <Ionicons name="chatbubble-ellipses" size={24} color="#8B5CF6" />
+              </View>
+              <View style={styles.actionTextContainer}>
+                <Text style={styles.actionTitle}>Send Feedback</Text>
+                <Text style={styles.actionSubtitle}>
+                  Share your feedback or report issues
+                </Text>
+              </View>
+              <Ionicons name="chevron-forward" size={20} color="#999" />
+            </View>
+          </TouchableOpacity>
 
-      {/* Company Info */}
-      <Text style={styles.sectionTitle}>Company Information</Text>
-      <View style={styles.card}>
+          <TouchableOpacity 
+            style={[styles.actionBtn, styles.logoutBtn]} 
+            onPress={handleLogout}
+            activeOpacity={0.7}
+          >
+            <View style={styles.actionContent}>
+              <View style={styles.actionIconContainer}>
+                <Ionicons name="log-out" size={24} color="#EF4444" />
+              </View>
+              <View style={styles.actionTextContainer}>
+                <Text style={[styles.actionTitle, styles.logoutText]}>Logout</Text>
+                <Text style={styles.actionSubtitle}>Sign out of your account</Text>
+              </View>
+              <Ionicons name="chevron-forward" size={20} color="#999" />
+            </View>
+          </TouchableOpacity>
+        </View>
+
+        {/* Driver Info */}
+        <Text style={styles.sectionTitle}>Driver Information</Text>
+        {renderDriverInfo()}
+
+        {/* Company Info */}
+        <Text style={styles.sectionTitle}>Company Information</Text>
+        <View style={styles.card}>
         <View style={styles.row}>
           <Text style={styles.label}>Company Name</Text>
           <Text style={styles.value}>Zendo Demo</Text>
@@ -411,48 +619,115 @@ const SettingsScreen = () => {
 
 
 
-      {renderPasswordModal()}
-      {renderFeedbackModal()}
-    </ScrollView>
+        {renderPasswordModal()}
+        {renderFeedbackModal()}
+      </ScrollView>
+    </SafeAreaView>
   );
 };
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#fff', padding: 20 },
+  safeArea: {
+    flex: 1,
+    backgroundColor: '#f5f5f5',
+  },
+  container: { 
+    flex: 1, 
+    backgroundColor: '#f5f5f5',
+  },
+  header: {
+    backgroundColor: '#fff',
+    paddingHorizontal: 20,
+    paddingVertical: 20,
+    borderBottomWidth: 1,
+    borderBottomColor: '#e5e5e5',
+  },
+  headerTitle: {
+    fontSize: 28,
+    fontWeight: 'bold',
+    color: '#1F2937',
+  },
+  actionsSection: {
+    backgroundColor: '#fff',
+    marginTop: 20,
+    marginHorizontal: 20,
+    borderRadius: 16,
+    overflow: 'hidden',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 2,
+    elevation: 2,
+  },
   actionBtn: {
     backgroundColor: '#fff',
-    paddingVertical: 12,
-    paddingHorizontal: 15,
+    paddingVertical: 16,
+    paddingHorizontal: 20,
     borderBottomWidth: 1,
-    borderBottomColor: '#eee',
+    borderBottomColor: '#f3f4f6',
   },
   disabledBtn: {
-    opacity: 0.7,
+    opacity: 0.6,
+  },
+  logoutBtn: {
+    borderBottomWidth: 0,
   },
   actionContent: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
   },
+  actionIconContainer: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: '#F3F4F6',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 12,
+  },
   actionTextContainer: {
     flex: 1,
   },
-  actionTitle: { fontSize: 15, fontWeight: '600', color: '#000' },
-  actionSubtitle: { fontSize: 12, color: '#777', marginTop: 2 },
-  sectionTitle: {
-    fontSize: 16,
-    fontWeight: '700',
-    color: '#000',
-    marginTop: 15,
-    marginBottom: 8,
+  actionTitle: { 
+    fontSize: 16, 
+    fontWeight: '600', 
+    color: '#1F2937',
+    marginBottom: 4,
   },
-  card: { backgroundColor: '#fff', marginBottom: 15 },
+  actionSubtitle: { 
+    fontSize: 13, 
+    color: '#6B7280',
+  },
+  logoutText: {
+    color: '#EF4444',
+  },
+  sectionTitle: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: '#1F2937',
+    marginTop: 24,
+    marginBottom: 12,
+    marginHorizontal: 20,
+  },
+  card: { 
+    backgroundColor: '#fff', 
+    marginHorizontal: 20,
+    marginBottom: 20,
+    borderRadius: 16,
+    padding: 16,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 2,
+    elevation: 2,
+  },
   row: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    paddingVertical: 6,
-    borderBottomWidth: 0.5,
-    borderBottomColor: '#eee',
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: '#f3f4f6',
   },
   label: { fontSize: 14, color: '#555', fontWeight: '500', flex: 1 },
   value: {
@@ -471,20 +746,24 @@ const styles = StyleSheet.create({
   // Loading states
   loadingContainer: {
     backgroundColor: '#fff',
-    padding: 20,
+    padding: 40,
     alignItems: 'center',
-    marginBottom: 15,
+    marginHorizontal: 20,
+    marginBottom: 20,
+    borderRadius: 16,
   },
   loadingText: {
     marginTop: 10,
-    color: '#666',
+    color: '#6B7280',
     fontSize: 14,
   },
   errorContainer: {
     backgroundColor: '#fff',
-    padding: 20,
+    padding: 40,
     alignItems: 'center',
-    marginBottom: 15,
+    marginHorizontal: 20,
+    marginBottom: 20,
+    borderRadius: 16,
   },
   errorText: {
     color: '#dc3545',
@@ -492,10 +771,10 @@ const styles = StyleSheet.create({
     marginBottom: 10,
   },
   retryBtn: {
-    backgroundColor: '#007AFF',
+    backgroundColor: '#8B5CF6',
     paddingHorizontal: 16,
     paddingVertical: 8,
-    borderRadius: 6,
+    borderRadius: 8,
   },
   retryBtnText: {
     color: 'white',
@@ -517,21 +796,31 @@ const styles = StyleSheet.create({
     width: '90%',
     maxWidth: 400,
   },
-  modalTitle: {
-    fontSize: 18,
-    fontWeight: '600',
-    textAlign: 'center',
+  modalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
     marginBottom: 20,
-    color: '#000',
+  },
+  modalCloseButton: {
+    padding: 4,
+  },
+  modalTitle: {
+    fontSize: 20,
+    fontWeight: '600',
+    color: '#1F2937',
+    flex: 1,
   },
   input: {
     borderWidth: 1,
-    borderColor: '#ddd',
-    borderRadius: 8,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    marginBottom: 15,
+    borderColor: '#e5e5e5',
+    borderRadius: 12,
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+    marginBottom: 16,
     fontSize: 16,
+    backgroundColor: '#fff',
+    color: '#1F2937',
   },
   textArea: {
     borderWidth: 1,
@@ -558,7 +847,7 @@ const styles = StyleSheet.create({
     marginBottom: 8,
   },
   selectedType: {
-    backgroundColor: '#007AFF',
+    backgroundColor: '#8B5CF6',
   },
   typeBtnText: {
     fontSize: 12,
@@ -582,7 +871,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#f0f0f0',
   },
   submitBtn: {
-    backgroundColor: '#007AFF',
+    backgroundColor: '#8B5CF6',
   },
   cancelBtnText: {
     textAlign: 'center',

@@ -6,6 +6,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { View, Text, StyleSheet, ActivityIndicator } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { NavigationProp } from '@react-navigation/native';
+import { authManager } from '../types/AuthManager';
 
 // Import screens
 import DashboardScreen from '../screens/dashboard/DashboardScreen';
@@ -244,19 +245,31 @@ export default function AppNavigator() {
 
     const checkInitialAuthState = async (): Promise<void> => {
         try {
+            // Check both AuthService and authManager for consistency
             const authStatus = await AuthService.checkAuthStatus();
+            const authManagerState = authManager.getAuthState();
+            const authManagerUser = authManager.getCurrentUser();
+
+            // If authManager has auth data but AuthService doesn't, sync them
+            const isAuthenticated = authStatus.isAuthenticated || authManagerState.isAuthenticated;
+            const userData = authStatus.userData || authManagerUser;
+
+            if (authManagerState.isAuthenticated && !authStatus.isAuthenticated && authManagerUser) {
+                // Sync AuthService with authManager
+                await AuthService.setAuthenticated(authManagerUser);
+            }
 
             setAuthState({
-                isAuthenticated: authStatus.isAuthenticated,
+                isAuthenticated,
                 isLoading: false,
-                userData: authStatus.userData
+                userData
             });
 
             // Optional: Log for debugging
             if (__DEV__) {
                 console.log('Auth Status:', {
-                    isAuthenticated: authStatus.isAuthenticated,
-                    hasUserData: !!authStatus.userData,
+                    isAuthenticated,
+                    hasUserData: !!userData,
                     lastLogin: authStatus.loginTime?.toLocaleString()
                 });
             }
@@ -272,7 +285,19 @@ export default function AppNavigator() {
 
     // Handle successful authentication
     const handleAuthSuccess = async (userData: any = null): Promise<void> => {
+        // Sync both AuthService and ensure authManager is also updated
         await AuthService.setAuthenticated(userData);
+        
+        // Update authManager if it's not already updated (should be updated by LoginScreen, but ensure sync)
+        if (userData && !authManager.isAuthenticated()) {
+            await authManager.login({
+                id: userData.id,
+                name: userData.name,
+                email: userData.email,
+                token: userData.token,
+            });
+        }
+        
         setAuthState({
             isAuthenticated: true,
             isLoading: false,
@@ -283,6 +308,8 @@ export default function AppNavigator() {
     // Handle logout
     const handleLogout = async (): Promise<void> => {
         await AuthService.clearAuth();
+        // Also logout from authManager
+        await authManager.logout();
         setAuthState({
             isAuthenticated: false,
             isLoading: false,

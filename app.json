@@ -7,7 +7,7 @@
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
     "splash": {
-      "image": "./assets/splash.png",
+      "image": "./assets/splash-icon.png",
       "resizeMode": "contain",
       "backgroundColor": "#ffffff"
     },
@@ -20,8 +20,7 @@
       "web"
     ],
     "plugins": [
-      "expo-font",
-      "expo-dev-client"
+      "expo-font"
     ],
     "android": {
       "package": "com.blackriverlogistics.app",
@@ -32,11 +31,19 @@
     },
     "ios": {
       "bundleIdentifier": "com.blackriverlogistics.app",
-      "supportsTablet": true
+      "supportsTablet": true,
+      "infoPlist": {
+        "NSLocationWhenInUseUsageDescription": "This app needs access to your location to show your current position on the map.",
+        "NSLocationAlwaysUsageDescription": "This app needs access to your location for live tracking of your trips.",
+        "NSPhotoLibraryUsageDescription": "This app needs access to your photos to upload document images.",
+        "NSCameraUsageDescription": "This app needs access to your camera to take photos of documents."
+      }
     },
     "web": {
       "favicon": "./assets/favicon.png",
-      "bundler": "metro"
+      "bundler": "metro",
+      "title": "Black River Logistics - Driver App",
+      "description": "Driver Mobile App for Black River Logistics"
     },
     "extra": {
       "eas": {

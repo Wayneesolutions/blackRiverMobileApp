@@ -174,6 +174,19 @@ const TrailerFinder = () => {
   };
 
   /**
+   * Get last drop location from currentLocation or lastDropLocation
+   */
+  const getLastDropLocation = (trailer: Trailer): string => {
+    if (trailer.currentLocation?.address) {
+      return trailer.currentLocation.address;
+    }
+    if (trailer.lastDropLocation) {
+      return trailer.lastDropLocation;
+    }
+    return 'Location not available';
+  };
+
+  /**
    * Format date for display
    */
   const formatDate = (dateString: string): string => {
@@ -210,11 +223,16 @@ const TrailerFinder = () => {
 
       <View style={styles.trailerDetails}>
         <Text style={styles.trailerSubText}>
-          Type: {trailer.type} • {trailer.ownerShip}
+          Type: {trailer.type || 'N/A'} • {trailer.ownerShip || 'N/A'}
         </Text>
         <Text style={styles.trailerSubText}>
-          Last Drop: {trailer.lastDropLocation}
+          Location: {getLastDropLocation(trailer)}
         </Text>
+        {trailer.capacity && (
+          <Text style={styles.trailerSubText}>
+            Capacity: {trailer.capacity}
+          </Text>
+        )}
       </View>
     </TouchableOpacity>
   );
@@ -271,33 +289,133 @@ const TrailerFinder = () => {
               <Text style={styles.detailLabel}>Status Information</Text>
               <View style={styles.detailRow}>
                 <Text style={styles.detailKey}>Operation Status:</Text>
-                <Text style={[styles.detailValue, { color: selectedTrailer.operationStatus.toLowerCase() === 'active' ? '#10B981' : '#EF4444' }]}>
-                  {selectedTrailer.operationStatus}
+                <Text style={[styles.detailValue, { 
+                  color: selectedTrailer.operationStatus?.toLowerCase() === 'available' || 
+                         selectedTrailer.operationStatus?.toLowerCase() === 'active' 
+                         ? '#10B981' : '#EF4444' 
+                }]}>
+                  {selectedTrailer.operationStatus || 'N/A'}
                 </Text>
               </View>
-              <View style={styles.detailRow}>
-                <Text style={styles.detailKey}>Load Status:</Text>
-                <Text style={styles.detailValue}>{selectedTrailer.loadStatus}</Text>
-              </View>
-              <View style={styles.detailRow}>
-                <Text style={styles.detailKey}>Compliance:</Text>
-                <Text style={[styles.detailValue, { color: selectedTrailer.compilance.toLowerCase() === 'valid' ? '#10B981' : '#EF4444' }]}>
-                  {selectedTrailer.compilance}
-                </Text>
-              </View>
+              {selectedTrailer.status && (
+                <View style={styles.detailRow}>
+                  <Text style={styles.detailKey}>Status:</Text>
+                  <Text style={styles.detailValue}>{selectedTrailer.status}</Text>
+                </View>
+              )}
+              {selectedTrailer.loadStatus && (
+                <View style={styles.detailRow}>
+                  <Text style={styles.detailKey}>Load Status:</Text>
+                  <Text style={styles.detailValue}>{selectedTrailer.loadStatus}</Text>
+                </View>
+              )}
+              {selectedTrailer.compilance && (
+                <View style={styles.detailRow}>
+                  <Text style={styles.detailKey}>Compliance:</Text>
+                  <Text style={[styles.detailValue, { 
+                    color: selectedTrailer.compilance.toLowerCase() === 'valid' ? '#10B981' : '#EF4444' 
+                  }]}>
+                    {selectedTrailer.compilance}
+                  </Text>
+                </View>
+              )}
             </View>
 
             <View style={styles.detailSection}>
-              <Text style={styles.detailLabel}>Trip Information</Text>
-              <View style={styles.detailRow}>
-                <Text style={styles.detailKey}>Last Dispatch:</Text>
-                <Text style={styles.detailValue}>{formatDate(selectedTrailer.lastDispatch)}</Text>
-              </View>
-              <View style={styles.detailRow}>
-                <Text style={styles.detailKey}>Last Drop Location:</Text>
-                <Text style={styles.detailValue}>{selectedTrailer.lastDropLocation}</Text>
-              </View>
+              <Text style={styles.detailLabel}>Location Information</Text>
+              {selectedTrailer.currentLocation?.address && (
+                <View style={styles.detailRow}>
+                  <Text style={styles.detailKey}>Current Location:</Text>
+                  <Text style={styles.detailValue}>{selectedTrailer.currentLocation.address}</Text>
+                </View>
+              )}
+              {selectedTrailer.lastDropLocation && (
+                <View style={styles.detailRow}>
+                  <Text style={styles.detailKey}>Last Drop Location:</Text>
+                  <Text style={styles.detailValue}>{selectedTrailer.lastDropLocation}</Text>
+                </View>
+              )}
+              {selectedTrailer.capacity && (
+                <View style={styles.detailRow}>
+                  <Text style={styles.detailKey}>Capacity:</Text>
+                  <Text style={styles.detailValue}>{selectedTrailer.capacity}</Text>
+                </View>
+              )}
+              {selectedTrailer.isAttached !== undefined && (
+                <View style={styles.detailRow}>
+                  <Text style={styles.detailKey}>Is Attached:</Text>
+                  <Text style={[styles.detailValue, { 
+                    color: selectedTrailer.isAttached ? '#10B981' : '#666' 
+                  }]}>
+                    {selectedTrailer.isAttached ? 'Yes' : 'No'}
+                  </Text>
+                </View>
+              )}
             </View>
+
+            {selectedTrailer.lastDispatch && (
+              <View style={styles.detailSection}>
+                <Text style={styles.detailLabel}>Trip Information</Text>
+                <View style={styles.detailRow}>
+                  <Text style={styles.detailKey}>Last Dispatch:</Text>
+                  <Text style={styles.detailValue}>{formatDate(selectedTrailer.lastDispatch)}</Text>
+                </View>
+              </View>
+            )}
+
+            {selectedTrailer.sensors && (
+              <View style={styles.detailSection}>
+                <Text style={styles.detailLabel}>Sensors</Text>
+                {selectedTrailer.sensors.doorStatus && (
+                  <View style={styles.detailRow}>
+                    <Text style={styles.detailKey}>Door Status:</Text>
+                    <Text style={styles.detailValue}>{selectedTrailer.sensors.doorStatus}</Text>
+                  </View>
+                )}
+                {selectedTrailer.sensors.shockDetection !== undefined && (
+                  <View style={styles.detailRow}>
+                    <Text style={styles.detailKey}>Shock Detection:</Text>
+                    <Text style={styles.detailValue}>
+                      {selectedTrailer.sensors.shockDetection ? 'Detected' : 'None'}
+                    </Text>
+                  </View>
+                )}
+                {selectedTrailer.sensors.tilting !== undefined && (
+                  <View style={styles.detailRow}>
+                    <Text style={styles.detailKey}>Tilting:</Text>
+                    <Text style={styles.detailValue}>
+                      {selectedTrailer.sensors.tilting ? 'Yes' : 'No'}
+                    </Text>
+                  </View>
+                )}
+              </View>
+            )}
+
+            {selectedTrailer.maintenance && (
+              <View style={styles.detailSection}>
+                <Text style={styles.detailLabel}>Maintenance</Text>
+                {selectedTrailer.maintenance.tyreCondition && (
+                  <View style={styles.detailRow}>
+                    <Text style={styles.detailKey}>Tyre Condition:</Text>
+                    <Text style={styles.detailValue}>{selectedTrailer.maintenance.tyreCondition}</Text>
+                  </View>
+                )}
+                {selectedTrailer.maintenance.brakeCondition && (
+                  <View style={styles.detailRow}>
+                    <Text style={styles.detailKey}>Brake Condition:</Text>
+                    <Text style={styles.detailValue}>{selectedTrailer.maintenance.brakeCondition}</Text>
+                  </View>
+                )}
+                {selectedTrailer.maintenance.issues && selectedTrailer.maintenance.issues.length > 0 && (
+                  <View style={styles.detailRow}>
+                    <Text style={styles.detailKey}>Issues:</Text>
+                    <Text style={styles.detailValue}>
+                      {selectedTrailer.maintenance.issues.join(', ') || 'None'}
+                    </Text>
+                  </View>
+                )}
+              </View>
+            )}
 
             {selectedTrailer.note && (
               <View style={styles.detailSection}>

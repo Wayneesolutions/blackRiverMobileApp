@@ -1,7 +1,16 @@
 // src/config/env.ts
 import Constants from 'expo-constants';
 import { Platform } from 'react-native';
-import * as Network from 'expo-network';
+// Conditionally import expo-network (not available in Expo Go)
+let Network: any = null;
+try {
+  Network = require('expo-network');
+} catch (e) {
+  // expo-network not available (e.g., in Expo Go)
+  console.warn('expo-network not available, using fallback IP detection');
+}
+import { API_BASE_URL as ENV_API_BASE_URL, SOCKET_URL as ENV_SOCKET_URL, 
+    NODE_ENV as ENV_NODE_ENV, DB_NAME as ENV_DB_NAME } from '@env';
 
 type ManifestWithReleaseChannel = typeof Constants.manifest & {
     releaseChannel?: string;
@@ -17,18 +26,23 @@ interface Config {
 
 const getCurrentIP = async (): Promise<string | null> => {
     try {
-        const networkState = await Network.getNetworkStateAsync();
+        // Only use expo-network if available (requires custom build)
+        if (Network) {
+            const networkState = await Network.getNetworkStateAsync();
 
-        if (!networkState.isConnected) {
-            console.log('❌ Not connected to network');
-            return null;
-        }
+            if (!networkState.isConnected) {
+                console.log('❌ Not connected to network');
+                return null;
+            }
 
-        const ipAddress = await Network.getIpAddressAsync();
+            const ipAddress = await Network.getIpAddressAsync();
 
-        if (ipAddress && ipAddress !== '127.0.0.1') {
-            console.log(`🌐 Current IP detected: ${ipAddress}`);
-            return ipAddress;
+            if (ipAddress && ipAddress !== '127.0.0.1') {
+                console.log(`🌐 Current IP detected: ${ipAddress}`);
+                return ipAddress;
+            }
+        } else {
+            console.log('ℹ️ expo-network not available, using fallback IP detection');
         }
 
         return null;
@@ -145,51 +159,110 @@ const getEnvVars = async (env = manifest?.releaseChannel): Promise<Config> => {
     return config;
 };
 
-// Global variables
-let config: Config;
-let API_BASE_URL: string;
-let SOCKET_URL: string;
-let NODE_ENV: string;
-let DB_NAME: string;
-let IS_DEV: boolean;
-let IS_PROD: boolean;
-let API_ENDPOINTS: string[];
+// Global variables - Load from .env file with fallbacks
+// These will be updated by initConfig() but provide immediate values from .env
+let config: Config | null = null;
+
+// Get values from .env file, with platform-specific fallbacks
+const getDefaultBaseURL = (): string => {
+  // Use .env value if available
+  if (ENV_API_BASE_URL && ENV_API_BASE_URL !== 'undefined') {
+    return ENV_API_BASE_URL;
+  }
+  // Platform-specific fallbacks
+  return Platform.OS === 'android' 
+    ? 'http://10.0.2.2:3000/api/v1'  // Android emulator default
+    : 'http://localhost:3000/api/v1'; // iOS simulator / web default
+};
+
+const getDefaultSocketURL = (): string => {
+  if (ENV_SOCKET_URL && ENV_SOCKET_URL !== 'undefined') {
+    return ENV_SOCKET_URL;
+  }
+  return Platform.OS === 'android'
+    ? 'http://10.0.2.2:3000'
+    : 'http://localhost:3000';
+};
+
+let API_BASE_URL: string = getDefaultBaseURL();
+let SOCKET_URL: string = getDefaultSocketURL();
+let NODE_ENV: string = (ENV_NODE_ENV && ENV_NODE_ENV !== 'undefined') ? ENV_NODE_ENV : 'development';
+let DB_NAME: string = (ENV_DB_NAME && ENV_DB_NAME !== 'undefined') ? ENV_DB_NAME : 'blackriver';
+let IS_DEV: boolean = NODE_ENV === 'development';
+let IS_PROD: boolean = NODE_ENV === 'production';
+let API_ENDPOINTS: string[] = [API_BASE_URL];
 
 
 const initConfig = async () => {
-    console.log('🚀 Initializing config with IP detection...');
+    try {
+        console.log('🚀 Initializing config with IP detection...');
 
-    config = await getEnvVars();
+        config = await getEnvVars();
 
-    API_BASE_URL = config.API_BASE_URL;
-    SOCKET_URL = config.SOCKET_URL;
-    NODE_ENV = config.NODE_ENV;
-    DB_NAME = config.DB_NAME;
-    IS_DEV = NODE_ENV === 'development';
-    IS_PROD = NODE_ENV === 'production';
+        // Priority: .env file > auto-detected > default
+        // Only override if auto-detection found a better URL, otherwise keep .env value
+        if (config.API_BASE_URL && config.API_BASE_URL !== getDefaultBaseURL()) {
+            // Only update if detected URL is different (and likely better)
+            API_BASE_URL = config.API_BASE_URL;
+        }
+        // Keep using .env SOCKET_URL unless auto-detected is different
+        if (config.SOCKET_URL && config.SOCKET_URL !== getDefaultSocketURL()) {
+            SOCKET_URL = config.SOCKET_URL;
+        }
+        // Use .env NODE_ENV if provided, otherwise use config
+        if (ENV_NODE_ENV && ENV_NODE_ENV !== 'undefined') {
+            NODE_ENV = ENV_NODE_ENV;
+        } else {
+            NODE_ENV = config.NODE_ENV;
+        }
+        // Use .env DB_NAME if provided, otherwise use config
+        if (ENV_DB_NAME && ENV_DB_NAME !== 'undefined') {
+            DB_NAME = ENV_DB_NAME;
+        } else {
+            DB_NAME = config.DB_NAME;
+        }
+        IS_DEV = NODE_ENV === 'development';
+        IS_PROD = NODE_ENV === 'production';
 
-    if (IS_DEV) {
-        API_ENDPOINTS = await getAPIEndpoints();
-    } else {
-        API_ENDPOINTS = [API_BASE_URL];
-    }
+        if (IS_DEV) {
+            API_ENDPOINTS = await getAPIEndpoints();
+            // Ensure baseURL is in endpoints list
+            if (!API_ENDPOINTS.includes(API_BASE_URL)) {
+                API_ENDPOINTS.unshift(API_BASE_URL);
+            }
+        } else {
+            API_ENDPOINTS = [API_BASE_URL];
+        }
 
-    if (IS_DEV) {
-        const currentIP = await getCurrentIP();
-        console.log('🚀 Environment Config:', {
-            'Detected IP': currentIP,
+        if (IS_DEV) {
+            const currentIP = await getCurrentIP();
+            console.log('🚀 Environment Config:', {
+                'Detected IP': currentIP,
+                API_BASE_URL,
+                SOCKET_URL,
+                NODE_ENV,
+                DB_NAME,
+                Platform: Platform.OS,
+                'Available Endpoints': API_ENDPOINTS.slice(0, 5),
+                'Total Endpoints': API_ENDPOINTS.length
+            });
+        }
+    } catch (error) {
+        console.error('❌ Failed to initialize config:', error);
+        // Keep default values if initialization fails
+        console.log('⚠️ Using default configuration:', {
             API_BASE_URL,
             SOCKET_URL,
             NODE_ENV,
-            DB_NAME,
-            Platform: Platform.OS,
-            'Available Endpoints': API_ENDPOINTS.slice(0, 5),
-            'Total Endpoints': API_ENDPOINTS.length
+            Platform: Platform.OS
         });
     }
 };
 
-initConfig().catch(console.error);
+// Start initialization immediately
+initConfig().catch(error => {
+    console.error('❌ Config initialization error:', error);
+});
 
 export const testConnection = async (url?: string): Promise<boolean> => {
     const testUrl = url || API_BASE_URL || 'http://localhost:3000/api/v1';
@@ -286,6 +359,15 @@ export const refreshConfig = async (): Promise<void> => {
 export const getConfig = async (): Promise<Config> => {
     if (!config) {
         await initConfig();
+    }
+    // Ensure config is not null - provide default if still null
+    if (!config) {
+        return {
+            API_BASE_URL: getDefaultBaseURL(),
+            SOCKET_URL: getDefaultSocketURL(),
+            NODE_ENV: NODE_ENV,
+            DB_NAME: DB_NAME,
+        };
     }
     return config;
 };

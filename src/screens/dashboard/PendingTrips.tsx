@@ -1,300 +1,280 @@
-import React, { useState } from "react";
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity } from "react-native";
+import React, { useState, useEffect } from "react";
+import {
+  View,
+  Text,
+  StyleSheet,
+  ScrollView,
+  TouchableOpacity,
+  SafeAreaView,
+  ActivityIndicator,
+  RefreshControl,
+  Alert,
+} from "react-native";
+import { apiService } from '../../services/api/apiService';
+import { logger } from '../../utils/loggerHelper';
+
+interface Load {
+  _id: string;
+  internalId?: string;
+  orderType?: string;
+  status: string;
+  route?: {
+    selectPickup?: {
+      place?: string;
+      city?: string;
+      state?: string;
+      latitude?: number;
+      longitude?: number;
+    };
+    selectDropOff?: {
+      place?: string;
+      city?: string;
+      state?: string;
+      latitude?: number;
+      longitude?: number;
+    };
+  };
+  payloads?: Array<{
+    itemName?: string;
+    description?: string;
+    measurementAndWeight?: {
+      weight?: number;
+    };
+  }>;
+  customer?: {
+    name?: string;
+    email?: string;
+  };
+  notes?: string;
+}
 
 const PendingTrips = () => {
-  // Sample data for pending trips
-  const pendingTrips = [
-    {
-      id: 1,
-      pickupLocation: "Dallas, TX",
-      destination: "Phoenix, AZ",
-      cargoType: "Electronics",
-      carrier: "TechTransport LLC",
-      driverName: "Alex Thompson",
-      assignedDate: "2025-08-27",
-      scheduledPickup: "2025-08-28",
-      estimatedDistance: 887,
-      priority: "High",
-      status: "Not Started",
-      cargoWeight: "15,000 lbs",
-      specialInstructions: "Handle with care - fragile items"
-    },
-    {
-      id: 2,
-      pickupLocation: "Miami, FL",
-      destination: "Jacksonville, FL",
-      cargoType: "Medical Supplies",
-      carrier: "HealthCargo Express",
-      driverName: "Emma Rodriguez",
-      assignedDate: "2025-08-27",
-      scheduledPickup: "2025-08-27",
-      estimatedDistance: 345,
-      priority: "Urgent",
-      status: "Awaiting Pickup",
-      cargoWeight: "8,500 lbs",
-      specialInstructions: "Temperature controlled - keep refrigerated"
-    },
-    {
-      id: 3,
-      pickupLocation: "Portland, OR",
-      destination: "San Francisco, CA",
-      cargoType: "Food Products",
-      carrier: "Fresh Foods Transport",
-      driverName: "Carlos Martinez",
-      assignedDate: "2025-08-26",
-      scheduledPickup: "2025-08-27",
-      estimatedDistance: 635,
-      priority: "Medium",
-      status: "Awaiting Pickup",
-      cargoWeight: "22,000 lbs",
-      specialInstructions: "Perishable goods - expedited delivery required"
-    },
-    {
-      id: 4,
-      pickupLocation: "Chicago, IL",
-      destination: "Detroit, MI",
-      cargoType: "Automotive Parts",
-      carrier: "AutoMove Logistics",
-      driverName: "Jessica Kim",
-      assignedDate: "2025-08-27",
-      scheduledPickup: "2025-08-28",
-      estimatedDistance: 283,
-      priority: "Medium",
-      status: "Not Started",
-      cargoWeight: "18,500 lbs",
-      specialInstructions: "Standard delivery - no special requirements"
-    },
-    {
-      id: 5,
-      pickupLocation: "Houston, TX",
-      destination: "New Orleans, LA",
-      cargoType: "Industrial Equipment",
-      carrier: "Heavy Haul Pro",
-      driverName: "Michael Davis",
-      assignedDate: "2025-08-26",
-      scheduledPickup: "2025-08-27",
-      estimatedDistance: 348,
-      priority: "High",
-      status: "Awaiting Pickup",
-      cargoWeight: "35,000 lbs",
-      specialInstructions: "Oversized load - special permits required"
-    }
-  ];
-  const [trips, setTrips] = useState(pendingTrips);
+  const [loads, setLoads] = useState<Load[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
 
-  const handleStartTrip = (tripId: any) => {
-    // Remove trip from pending and add to active
-    const tripToStart = trips.find(trip => trip.id === tripId);
-    if (tripToStart) {
-      // Here you would typically call a parent component function or API
-      // For now, we'll just remove it from the local state
-      setTrips(prevTrips => prevTrips.filter(trip => trip.id !== tripId));
+  useEffect(() => {
+    fetchPendingLoads();
+  }, []);
 
-      // In a real app, you'd call something like:
-      // onTripStarted(tripToStart);
+  const fetchPendingLoads = async () => {
+    try {
+      setLoading(true);
+      const response = await apiService.getPendingLoads();
+      
+      if (response.success && response.data) {
+        const loadsData = response.data.loads || response.data || [];
+        setLoads(Array.isArray(loadsData) ? loadsData : []);
+        logger.info('Pending loads fetched', { count: loadsData.length });
+      } else {
+        logger.warn('Failed to fetch pending loads', { error: response.error });
+        setLoads([]);
+      }
+    } catch (error) {
+      logger.error('Error fetching pending loads', error);
+      setLoads([]);
+    } finally {
+      setLoading(false);
+      setRefreshing(false);
     }
   };
 
-  const getPriorityColor = (priority: any) => {
-    switch (priority) {
-      case "Urgent":
-        return "#e74c3c";
-      case "High":
-        return "#f39c12";
-      case "Medium":
-        return "#3498db";
-      case "Low":
-        return "#95a5a6";
-      default:
-        return "#95a5a6";
+  const onRefresh = () => {
+    setRefreshing(true);
+    fetchPendingLoads();
+  };
+
+  const handleStartLoad = async (loadId: string) => {
+    Alert.alert(
+      'Start Load',
+      'Are you sure you want to start this load?',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Start',
+          style: 'default',
+          onPress: async () => {
+            try {
+              const response = await apiService.updateLoadStatus(loadId, 'in-delivery');
+              if (response.success) {
+                Alert.alert('Success', 'Load started successfully');
+                fetchPendingLoads(); // Refresh the list
+              } else {
+                Alert.alert('Error', response.error || 'Failed to start load');
+              }
+            } catch (error) {
+              logger.error('Error starting load', error);
+              Alert.alert('Error', 'Failed to start load. Please try again.');
+            }
+          },
+        },
+      ]
+    );
+  };
+
+  const formatAddress = (location: any) => {
+    if (!location) return 'N/A';
+    if (location.place) return location.place;
+    if (location.city && location.state) {
+      return `${location.city}, ${location.state}`;
+    }
+    return location.city || location.state || 'Unknown Location';
+  };
+
+  const getLoadWeight = (load: Load) => {
+    if (load.payloads && load.payloads.length > 0) {
+      const totalWeight = load.payloads.reduce((sum, payload) => {
+        return sum + (payload.measurementAndWeight?.weight || 0);
+      }, 0);
+      return totalWeight > 0 ? `${totalWeight.toLocaleString()} lbs` : 'N/A';
+    }
+    return 'N/A';
+  };
+
+  const getLoadItemName = (load: Load) => {
+    if (load.payloads && load.payloads.length > 0) {
+      return load.payloads[0].itemName || 'Cargo';
+    }
+    return 'Cargo';
+  };
+
+  const getStatusDisplay = (status: string) => {
+    switch (status?.toLowerCase()) {
+      case 'planned': return 'Planned';
+      case 'dispatched': return 'Dispatched';
+      default: return status || 'Pending';
     }
   };
 
-  const getStatusColor = (status: any) => {
-    switch (status) {
-      case "Awaiting Pickup":
-        return "#f39c12";
-      case "Not Started":
-        return "#95a5a6";
-      case "Ready to Start":
-        return "#27ae60";
-      default:
-        return "#95a5a6";
+  const getStatusColor = (status: string) => {
+    switch (status?.toLowerCase()) {
+      case "dispatched": return "#3498db";
+      case "planned": return "#f39c12";
+      default: return "#95a5a6";
     }
   };
-
-  const formatDate = (dateString: any) => {
-    const date = new Date(dateString);
-    const today = new Date();
-    const tomorrow = new Date(today);
-    tomorrow.setDate(today.getDate() + 1);
-
-    if (date.toDateString() === today.toDateString()) {
-      return "Today";
-    } else if (date.toDateString() === tomorrow.toDateString()) {
-      return "Tomorrow";
-    } else {
-      return date.toLocaleDateString("en-US", {
-        month: "short",
-        day: "numeric",
-        year: "numeric"
-      });
-    }
-  };
-
-  const renderTripCard = (trip: any) => (
-    <TouchableOpacity key={trip.id} style={styles.tripCard} activeOpacity={0.7}>
-      {/* Priority Badge at Top Right */}
-      <View style={[styles.priorityBadge, { backgroundColor: getPriorityColor(trip.priority) }]}>
-        <Text style={styles.priorityText}>{trip.priority} Priority</Text>
-      </View>
-
-      {/* Route Header */}
-      <View style={styles.routeHeader}>
-        <View style={styles.routeContainer}>
-          <Text style={styles.routeLabel}>ROUTE</Text>
-          <View style={styles.routeDetails}>
-            <View style={styles.locationContainer}>
-              <Text style={styles.pickupText}>{trip.pickupLocation}</Text>
-            </View>
-            <View style={styles.arrowContainer}>
-              <Text style={styles.arrowText}>→</Text>
-            </View>
-            <View style={styles.locationContainer}>
-              <Text style={styles.destinationText}>{trip.destination}</Text>
-            </View>
-          </View>
-        </View>
-        <View style={styles.distanceContainer}>
-          <Text style={styles.distanceValue}>{trip.estimatedDistance}</Text>
-          <Text style={styles.distanceLabel}>miles</Text>
-        </View>
-      </View>
-
-      {/* Inline Action Button + Status Badge */}
-      <View style={{ flexDirection: "row", alignItems: "center", marginTop: 2 }}>
-        <TouchableOpacity
-          style={[styles.startTripButton, { flex: 0.65, marginRight: 10 }]}
-          onPress={() => handleStartTrip(trip.id)}
-        >
-          <Text style={styles.startTripButtonText}>Start Trip</Text>
-        </TouchableOpacity>
-
-        <View
-          style={[
-            styles.statusBadge,
-            {
-              flex: 0.35,
-              backgroundColor: getStatusColor(trip.status),
-              alignItems: "center",
-              justifyContent: "center", // vertical + horizontal centering
-              alignSelf: "stretch",     // makes badge take full row height
-              paddingVertical: 0,       // remove extra vertical padding
-            },
-          ]}
-        >
-          <Text style={styles.statusText}>{trip.status}</Text>
-        </View>
-      </View>
-
-
-
-      {/* Trip Details Grid */}
-      <View style={styles.detailsGrid}>
-        {/* Cargo Information */}
-        <View style={styles.detailSection}>
-          <Text style={styles.sectionTitle}>📦 CARGO</Text>
-          <View style={styles.detailRow}>
-            <Text style={styles.detailLabel}>Type:</Text>
-            <Text style={styles.detailValue}>{trip.cargoType}</Text>
-          </View>
-          <View style={styles.detailRow}>
-            <Text style={styles.detailLabel}>Weight:</Text>
-            <Text style={styles.detailValue}>{trip.cargoWeight}</Text>
-          </View>
-        </View>
-
-        {/* Carrier Information */}
-        <View style={styles.detailSection}>
-          <Text style={styles.sectionTitle}>🚛 CARRIER</Text>
-          <View style={styles.detailRow}>
-            <Text style={styles.detailLabel}>Company:</Text>
-            <Text style={styles.detailValue}>{trip.carrier}</Text>
-          </View>
-          <View style={styles.detailRow}>
-            <Text style={styles.detailLabel}>Driver:</Text>
-            <Text style={styles.detailValue}>{trip.driverName}</Text>
-          </View>
-        </View>
-      </View>
-
-      {/* Schedule Section */}
-      <View style={styles.scheduleSection}>
-        <Text style={styles.sectionTitle}>📅 SCHEDULE</Text>
-        <View style={styles.scheduleGrid}>
-          <View style={styles.scheduleItem}>
-            <Text style={styles.scheduleLabel}>Assigned</Text>
-            <Text style={styles.scheduleValue}>{formatDate(trip.assignedDate)}</Text>
-          </View>
-          <View style={styles.scheduleItem}>
-            <Text style={styles.scheduleLabel}>Pickup</Text>
-            <Text style={[styles.scheduleValue, styles.pickupDate]}>
-              {formatDate(trip.scheduledPickup)}
-            </Text>
-          </View>
-        </View>
-      </View>
-
-      {/* Special Instructions */}
-      {trip.specialInstructions && (
-        <View style={styles.instructionsSection}>
-          <Text style={styles.instructionsTitle}>⚠️ SPECIAL INSTRUCTIONS</Text>
-          <Text style={styles.instructionsText}>{trip.specialInstructions}</Text>
-        </View>
-      )}
-    </TouchableOpacity>
-  );
-
-  const getTripStats = () => {
-    const totalTrips = pendingTrips.length;
-    const awaitingPickup = pendingTrips.filter(trip => trip.status === "Awaiting Pickup").length;
-    const notStarted = pendingTrips.filter(trip => trip.status === "Not Started").length;
-    const urgentTrips = pendingTrips.filter(trip => trip.priority === "Urgent" || trip.priority === "High").length;
-
-    return { totalTrips, awaitingPickup, notStarted, urgentTrips };
-  };
-
-  const stats = getTripStats();
 
   return (
-    <View style={styles.container}>
-      {/* Header */}
+    <SafeAreaView style={styles.container}>
       <View style={styles.header}>
-        <Text style={styles.headerTitle}>🕒 Pending Trips</Text>
-        <Text style={styles.headerSubtitle}>Trips assigned but not yet started</Text>
-      </View>
-
-      {/* Statistics Cards */}
-      <View style={styles.statsSection}>
-        <View style={styles.statCard}>
-          <Text style={styles.statNumber}>{stats.totalTrips}</Text>
-          <Text style={styles.statLabel}>Total Pending</Text>
-        </View>
-        <View style={styles.statCard}>
-          <Text style={styles.statNumber}>{stats.awaitingPickup}</Text>
-          <Text style={styles.statLabel}>Awaiting Pickup</Text>
-        </View>
-        <View style={styles.statCard}>
-          <Text style={styles.statNumber}>{stats.urgentTrips}</Text>
-          <Text style={styles.statLabel}>High Priority</Text>
+        <View style={styles.headerContent}>
+          <Text style={styles.headerTitle}>Pending Loads</Text>
+          <Text style={styles.headerSubtitle}>Loads waiting to be started</Text>
+          <View style={styles.statsContainer}>
+            <View style={styles.statItem}>
+              <Text style={styles.statNumber}>{loads.length}</Text>
+              <Text style={styles.statLabel}>Pending</Text>
+            </View>
+          </View>
         </View>
       </View>
 
-      {/* Trip Cards */}
-      <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
-        {pendingTrips.map(renderTripCard)}
-      </ScrollView>
-    </View>
+      {loading ? (
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="large" color="#8B5CF6" />
+          <Text style={styles.loadingText}>Loading pending loads...</Text>
+        </View>
+      ) : loads.length === 0 ? (
+        <View style={styles.emptyContainer}>
+          <Text style={styles.emptyIcon}>📋</Text>
+          <Text style={styles.emptyText}>No Pending Loads</Text>
+          <Text style={styles.emptySubtext}>You don't have any pending loads at the moment</Text>
+        </View>
+      ) : (
+        <ScrollView
+          style={styles.scrollView}
+          showsVerticalScrollIndicator={false}
+          contentContainerStyle={styles.scrollContent}
+          refreshControl={
+            <RefreshControl
+              refreshing={refreshing}
+              onRefresh={onRefresh}
+              colors={['#8B5CF6']}
+              tintColor="#8B5CF6"
+            />
+          }
+        >
+          {loads.map((load) => {
+            const pickup = load.route?.selectPickup;
+            const dropoff = load.route?.selectDropOff;
+            
+            return (
+              <View key={load._id} style={styles.loadCard}>
+                <View style={styles.cardHeader}>
+                  <View style={styles.headerInfo}>
+                    <Text style={styles.routeText}>
+                      {formatAddress(pickup)} → {formatAddress(dropoff)}
+                    </Text>
+                    {load.internalId && (
+                      <Text style={styles.loadIdText}>Load ID: {load.internalId}</Text>
+                    )}
+                  </View>
+                  <View style={[styles.statusBadge, { backgroundColor: getStatusColor(load.status) }]}>
+                    <Text style={styles.statusText}>{getStatusDisplay(load.status)}</Text>
+                  </View>
+                </View>
+
+                <View style={styles.detailsGrid}>
+                  <View style={styles.detailSection}>
+                    <View style={styles.detailItem}>
+                      <Text style={styles.detailIcon}>📦</Text>
+                      <View style={styles.detailContent}>
+                        <Text style={styles.detailTitle}>{getLoadItemName(load)}</Text>
+                        <Text style={styles.detailSubtext}>Weight: {getLoadWeight(load)}</Text>
+                      </View>
+                    </View>
+
+                    {load.customer && (
+                      <View style={styles.detailItem}>
+                        <Text style={styles.detailIcon}>👤</Text>
+                        <View style={styles.detailContent}>
+                          <Text style={styles.detailTitle}>{load.customer.name || 'Customer'}</Text>
+                          {load.customer.email && (
+                            <Text style={styles.detailSubtext}>{load.customer.email}</Text>
+                          )}
+                        </View>
+                      </View>
+                    )}
+                  </View>
+
+                  <View style={styles.detailSection}>
+                    <View style={styles.detailItem}>
+                      <Text style={styles.detailIcon}>📍</Text>
+                      <View style={styles.detailContent}>
+                        <Text style={styles.detailTitle}>Pickup</Text>
+                        <Text style={styles.detailSubtext}>{formatAddress(pickup)}</Text>
+                      </View>
+                    </View>
+
+                    <View style={styles.detailItem}>
+                      <Text style={styles.detailIcon}>🎯</Text>
+                      <View style={styles.detailContent}>
+                        <Text style={styles.detailTitle}>Drop-off</Text>
+                        <Text style={styles.detailSubtext}>{formatAddress(dropoff)}</Text>
+                      </View>
+                    </View>
+                  </View>
+                </View>
+
+                {load.notes && (
+                  <View style={styles.notesSection}>
+                    <Text style={styles.notesLabel}>Notes:</Text>
+                    <Text style={styles.notesText}>{load.notes}</Text>
+                  </View>
+                )}
+
+                <TouchableOpacity
+                  style={styles.startButton}
+                  onPress={() => handleStartLoad(load._id)}
+                >
+                  <Text style={styles.startButtonText}>Start Load</Text>
+                </TouchableOpacity>
+              </View>
+            );
+          })}
+        </ScrollView>
+      )}
+    </SafeAreaView>
   );
 };
 
@@ -303,283 +283,186 @@ export default PendingTrips;
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#f8f9fa"
+    backgroundColor: "#f5f6fa"
   },
   header: {
     backgroundColor: "#8B5CF6",
-    paddingVertical: 24,
+    paddingBottom: 20
+  },
+  headerContent: {
     paddingHorizontal: 20,
-    paddingTop: 40
+    paddingTop: 20
   },
   headerTitle: {
     fontSize: 28,
     fontWeight: "bold",
     color: "#ffffff",
-    marginBottom: 6
+    marginBottom: 8
   },
   headerSubtitle: {
     fontSize: 16,
-    color: "#e9d8fd",
-    opacity: 0.9
+    color: "#e8d8ff",
+    marginBottom: 16
   },
-  statsSection: {
+  statsContainer: {
     flexDirection: "row",
-    paddingHorizontal: 16,
-    paddingVertical: 20,
-    gap: 12
+    gap: 24
   },
-  statCard: {
-    flex: 1,
-    backgroundColor: "#ffffff",
-    padding: 20,
-    borderRadius: 16,
-    alignItems: "center",
-    shadowColor: "#000",
-    shadowOffset: {
-      width: 0,
-      height: 4
-    },
-    shadowOpacity: 0.12,
-    shadowRadius: 6,
-    elevation: 4
+  statItem: {
+    alignItems: "center"
   },
   statNumber: {
-    fontSize: 28,
+    fontSize: 32,
     fontWeight: "bold",
-    color: "#f39c12",
-    marginBottom: 6
+    color: "#ffffff"
   },
   statLabel: {
-    fontSize: 13,
-    color: "#6c757d",
-    textAlign: "center",
-    fontWeight: "500"
+    fontSize: 14,
+    color: "#e8d8ff"
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 40,
+  },
+  loadingText: {
+    marginTop: 12,
+    fontSize: 16,
+    color: "#6B7280",
+  },
+  emptyContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 40,
+  },
+  emptyIcon: {
+    fontSize: 64,
+    marginBottom: 16,
+  },
+  emptyText: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: "#2c3e50",
+    marginBottom: 8,
+  },
+  emptySubtext: {
+    fontSize: 14,
+    color: "#7f8c8d",
+    textAlign: 'center',
   },
   scrollView: {
-    flex: 1,
-    paddingHorizontal: 16
+    flex: 1
   },
-  tripCard: {
+  scrollContent: {
+    paddingHorizontal: 20,
+    paddingVertical: 16
+  },
+  loadCard: {
     backgroundColor: "#ffffff",
     borderRadius: 16,
-    marginVertical: 10,
+    marginBottom: 20,
     padding: 20,
     shadowColor: "#000",
     shadowOffset: {
       width: 0,
       height: 4
     },
-    shadowOpacity: 0.12,
-    shadowRadius: 6,
-    elevation: 4,
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    elevation: 5,
     borderWidth: 1,
-    borderColor: "#f0f0f0",
-    position: "relative"
+    borderColor: "#f1f2f6"
   },
-  priorityBadge: {
-    position: "absolute",
-    top: 16,
-    right: 16,
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 20,
-    zIndex: 1
-  },
-  priorityText: {
-    fontSize: 12,
-    fontWeight: "700",
-    color: "#ffffff"
-  },
-  routeHeader: {
+  cardHeader: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "flex-start",
-    marginBottom: 20,
-    marginTop: 16
-  },
-  routeContainer: {
-    flex: 1,
-    marginRight: 16
-  },
-  routeLabel: {
-    fontSize: 12,
-    fontWeight: "700",
-    color: "#6c757d",
-    marginBottom: 8,
-    letterSpacing: 0.5
-  },
-  routeDetails: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "flex-start",
-    flexWrap: "wrap"
-  },
-  locationContainer: {
-    backgroundColor: "#f8f9fa",
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderRadius: 8,
-    maxWidth: "40%"
-  },
-  pickupText: {
-    fontSize: 14,
-    fontWeight: "600",
-    color: "#2c3e50",
-    textAlign: "center"
-  },
-  arrowContainer: {
-    paddingHorizontal: 8,
-    paddingVertical: 4
-  },
-  arrowText: {
-    fontSize: 18,
-    color: "#8B5CF6",
-    fontWeight: "bold"
-  },
-  destinationText: {
-    fontSize: 14,
-    fontWeight: "600",
-    color: "#2c3e50",
-    textAlign: "center"
-  },
-  distanceContainer: {
-    alignItems: "center",
-    backgroundColor: "#f8f9fa",
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    borderRadius: 12,
-    marginTop: 20
-  },
-  actionButtonContainer: {
-    marginTop: 2,
-    marginBottom: 8
-  },
-  startTripButton: {
-    backgroundColor: "#27ae60",
-    paddingVertical: 14,
-    paddingHorizontal: 20,
-    borderRadius: 12,
-    marginBottom: 16,
-    alignItems: "center",
-    shadowColor: "#27ae60",
-    shadowOffset: {
-      width: 0,
-      height: 4
-    },
-    shadowOpacity: 0.3,
-    shadowRadius: 6,
-    elevation: 4
-  },
-  startTripButtonText: {
-    color: "#ffffff",
-    fontSize: 16,
-    fontWeight: "700"
-  },
-  distanceValue: {
-    fontSize: 20,
-    fontWeight: "bold",
-    color: "#8B5CF6"
-  },
-  distanceLabel: {
-    fontSize: 12,
-    color: "#6c757d",
-    marginTop: 2
-  },
-  statusBadge: {
-    alignSelf: "flex-start",
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderRadius: 25,
     marginBottom: 20
   },
+  headerInfo: {
+    flex: 1,
+    marginRight: 12
+  },
+  routeText: {
+    fontSize: 18,
+    fontWeight: "700",
+    color: "#2c3e50",
+    marginBottom: 6
+  },
+  loadIdText: {
+    fontSize: 12,
+    color: "#7f8c8d",
+    marginTop: 4,
+  },
+  statusBadge: {
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 20
+  },
   statusText: {
-    fontSize: 13,
+    fontSize: 12,
     fontWeight: "700",
     color: "#ffffff"
   },
   detailsGrid: {
     flexDirection: "row",
-    gap: 16,
-    marginBottom: 20
+    marginBottom: 16
   },
   detailSection: {
     flex: 1,
-    backgroundColor: "#f8f9fa",
-    padding: 16,
-    borderRadius: 12
+    gap: 16
   },
-  sectionTitle: {
-    fontSize: 12,
-    fontWeight: "700",
-    color: "#6c757d",
-    marginBottom: 12,
-    letterSpacing: 0.5
-  },
-  detailRow: {
+  detailItem: {
     flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    paddingVertical: 6
+    alignItems: "flex-start"
   },
-  detailLabel: {
-    fontSize: 14,
-    fontWeight: "500",
-    color: "#6c757d"
+  detailIcon: {
+    fontSize: 20,
+    marginRight: 12,
+    marginTop: 2
   },
-  detailValue: {
-    fontSize: 14,
+  detailContent: {
+    flex: 1
+  },
+  detailTitle: {
+    fontSize: 16,
     fontWeight: "600",
     color: "#2c3e50",
-    textAlign: "right",
-    flex: 1,
-    marginLeft: 8
+    marginBottom: 2
   },
-  scheduleSection: {
-    backgroundColor: "#e3f2fd",
-    padding: 16,
-    borderRadius: 12,
+  detailSubtext: {
+    fontSize: 13,
+    color: "#7f8c8d",
+    lineHeight: 18
+  },
+  notesSection: {
+    backgroundColor: "#f8f9fa",
+    borderRadius: 8,
+    padding: 12,
     marginBottom: 16
   },
-  scheduleGrid: {
-    flexDirection: "row",
-    justifyContent: "space-between"
-  },
-  scheduleItem: {
-    flex: 1,
-    alignItems: "center"
-  },
-  scheduleLabel: {
-    fontSize: 13,
+  notesLabel: {
+    fontSize: 14,
     fontWeight: "600",
-    color: "#1976d2",
+    color: "#34495e",
     marginBottom: 4
   },
-  scheduleValue: {
-    fontSize: 15,
-    fontWeight: "700",
-    color: "#0d47a1"
+  notesText: {
+    fontSize: 13,
+    color: "#7f8c8d",
+    lineHeight: 18
   },
-  pickupDate: {
-    color: "#f57c00"
+  startButton: {
+    backgroundColor: "#3498db",
+    paddingVertical: 14,
+    borderRadius: 10,
+    alignItems: "center"
   },
-  instructionsSection: {
-    backgroundColor: "#fff3e0",
-    padding: 16,
-    borderRadius: 12,
-    borderLeftWidth: 4,
-    borderLeftColor: "#ff9800"
-  },
-  instructionsTitle: {
-    fontSize: 12,
-    fontWeight: "700",
-    color: "#e65100",
-    marginBottom: 8,
-    letterSpacing: 0.5
-  },
-  instructionsText: {
-    fontSize: 14,
-    color: "#ef6c00",
-    lineHeight: 20,
-    fontWeight: "500"
+  startButtonText: {
+    color: "#ffffff",
+    fontSize: 16,
+    fontWeight: "700"
   }
 });

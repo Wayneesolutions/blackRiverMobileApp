@@ -8,12 +8,39 @@ export interface Trailer {
     plateNumber: string;
     type: string;
     ownerShip: string;
-    lastDispatch: string;
-    lastDropLocation: string;
-    note: string;
     operationStatus: string;
-    loadStatus: string;
-    compilance: string;
+    internalId: string;
+    speed?: number;
+    status?: string;
+    capacity?: string;
+    isAttached?: boolean;
+    company?: string;
+    route?: any[];
+    currentLocation?: {
+        address?: string;
+        longitude?: string;
+        latitude?: string;
+        updatedAt?: string;
+    };
+    cargoDetails?: {
+        weight?: number;
+        isRefrigerated?: boolean;
+    };
+    sensors?: {
+        doorStatus?: string;
+        shockDetection?: boolean;
+        tilting?: boolean;
+    };
+    maintenance?: {
+        tyreCondition?: string;
+        brakeCondition?: string;
+        issues?: string[];
+    };
+    lastDispatch?: string;
+    lastDropLocation?: string;
+    note?: string;
+    loadStatus?: string;
+    compilance?: string;
     createdAt: string;
     updatedAt: string;
     __v: number;
@@ -22,7 +49,13 @@ export interface Trailer {
 interface TrailerListResponse {
     success: boolean;
     message: string;
-    dataa: Trailer[];
+    data: Trailer[];
+    pagination?: {
+        current: number;
+        pages: number;
+        total: number;
+        limit: number;
+    };
 }
 
 interface SingleTrailerResponse {
@@ -61,9 +94,9 @@ class TrailerService {
 
             const response = await apiService.get<TrailerListResponse>('/driver/trailer');
 
-            if (response.success && response.data?.dataa) {
+            if (response.success && response.data?.data) {
                 // Cache the results
-                this.trailerCache = response.data.dataa;
+                this.trailerCache = Array.isArray(response.data.data) ? response.data.data : [];
                 this.lastFetchTime = now;
 
                 logger.info('Trailers fetched successfully', {
@@ -193,40 +226,50 @@ class TrailerService {
     /**
      * Get trailer status display text
      */
-    getStatusText(loadStatus: string, operationStatus: string): string {
-        if (operationStatus.toLowerCase() === 'active') {
-            switch (loadStatus.toLowerCase()) {
-                case 'empty':
-                    return 'Available';
-                case 'loaded':
-                    return 'Ready to Load';
-                case 'in-transit':
-                    return 'In Transit';
-                default:
-                    return 'Available';
-            }
-        } else {
-            return 'On Service';
+    getStatusText(loadStatus?: string, operationStatus?: string): string {
+        if (!operationStatus) {
+            return 'Unknown';
+        }
+
+        const opStatus = operationStatus.toLowerCase();
+        
+        switch (opStatus) {
+            case 'available':
+                return 'Available';
+            case 'in_transit':
+            case 'in-transit':
+                return 'In Transit';
+            case 'maintenance':
+                return 'In Maintenance';
+            case 'out_of_service':
+                return 'Out of Service';
+            default:
+                return operationStatus.charAt(0).toUpperCase() + operationStatus.slice(1);
         }
     }
 
     /**
      * Get trailer status color
      */
-    getStatusColor(loadStatus: string, operationStatus: string): string {
-        if (operationStatus.toLowerCase() === 'active') {
-            switch (loadStatus.toLowerCase()) {
-                case 'empty':
-                    return '#666'; // Gray
-                case 'loaded':
-                    return '#10B981'; // Green
-                case 'in-transit':
-                    return '#F59E0B'; // Yellow/Orange
-                default:
-                    return '#666';
-            }
-        } else {
-            return '#EF4444'; // Red for service
+    getStatusColor(loadStatus?: string, operationStatus?: string): string {
+        if (!operationStatus) {
+            return '#666';
+        }
+
+        const opStatus = operationStatus.toLowerCase();
+        
+        switch (opStatus) {
+            case 'available':
+                return '#10B981'; // Green
+            case 'in_transit':
+            case 'in-transit':
+                return '#F59E0B'; // Yellow/Orange
+            case 'maintenance':
+                return '#EF4444'; // Red
+            case 'out_of_service':
+                return '#6B7280'; // Gray
+            default:
+                return '#666';
         }
     }
 
