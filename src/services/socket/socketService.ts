@@ -1,4 +1,5 @@
 import { io, Socket } from 'socket.io-client';
+import { Platform } from 'react-native';
 import { logger } from '../../utils/loggerHelper';
 import { getConfig } from '../../config/env';
 
@@ -38,37 +39,56 @@ class SocketService {
 
     try {
       const config = await getConfig();
+      // Use .env SOCKET_URL if available, otherwise use config value
       const socketUrl = config.SOCKET_URL || 'http://localhost:3000';
+      
+      // Log which SOCKET_URL is being used for debugging
+      console.log(`🔌 Using SOCKET_URL from: ${config.SOCKET_URL ? 'config' : 'default'}`);
       
       logger.info('Initializing socket connection', { 
         socketUrl,
-        platform: typeof window !== 'undefined' ? 'web' : 'native'
+        platform: Platform.OS
       });
+      
+      console.log(`🔌 Connecting to Socket.IO at: ${socketUrl}`);
+      console.log(`🔌 Platform: ${Platform.OS}`);
 
-      // Log the URL being used for debugging
-      console.log('🔌 Connecting to Socket.IO at:', socketUrl);
-      console.log('🔍 Platform:', typeof window !== 'undefined' ? 'web' : 'native');
-      console.log('🔍 User agent:', typeof navigator !== 'undefined' ? navigator.userAgent : 'N/A');
-
-      // Test if we can reach the server first (for web)
-      if (typeof window !== 'undefined') {
+      // Test if we can reach the server first (for React Native)
+      if (Platform.OS !== 'web') {
         try {
           const testUrl = socketUrl.replace(/\/$/, ''); // Remove trailing slash
-          console.log('🧪 Testing server connection at:', testUrl);
+          console.log(`🧪 Testing server connection at: ${testUrl}/api/v1/config`);
           
-          // Try to fetch a simple endpoint to verify server is reachable
-          const healthCheck = await fetch(`${testUrl}/api/v1/health`, {
+          const controller = new AbortController();
+          const timeoutId = setTimeout(() => controller.abort(), 5000);
+          
+          const response = await fetch(`${testUrl}/api/v1/config`, {
             method: 'GET',
-            signal: AbortSignal.timeout(3000),
-          }).catch(() => null);
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            signal: controller.signal,
+          });
           
-          if (healthCheck && healthCheck.ok) {
-            console.log('✅ Server is reachable via HTTP');
+          clearTimeout(timeoutId);
+          
+          if (response.ok) {
+            console.log(`✅ Server is reachable via HTTP`);
           } else {
-            console.warn('⚠️ Server health check failed, but continuing with socket connection...');
+            console.warn(`⚠️ Server responded with status: ${response.status}`);
           }
-        } catch (testError) {
-          console.warn('⚠️ Could not test server connection:', testError);
+        } catch (testError: any) {
+          const errorMsg = testError?.message || 'Unknown error';
+          console.error(`❌ Cannot reach server at ${socketUrl}:`, errorMsg);
+          console.error(`   This is likely a network connectivity issue.`);
+          console.error(`   Troubleshooting steps:`);
+          console.error(`   1. Verify backend server is running on ${socketUrl}`);
+          console.error(`   2. Check if mobile device and server are on SAME Wi-Fi network`);
+          console.error(`   3. Test in browser: Open http://192.168.31.161:3000/api/v1/health on your phone's browser`);
+          console.error(`   4. Windows Firewall: Allow port 3000 for incoming connections`);
+          console.error(`   5. Android: Check if network_security_config.xml allows cleartext traffic`);
+          console.error(`   6. Try ping: ping 192.168.31.161 from mobile device`);
+          // Don't throw - let socket.io try anyway
         }
       }
 
@@ -80,9 +100,7 @@ class SocketService {
         const timeoutId = setTimeout(() => {
           if (!resolved) {
             resolved = true;
-            console.error(`❌ Socket connection timeout after ${timeout}ms to ${socketUrl}`);
-            console.error('💡 Make sure your backend server is running and Socket.IO is configured');
-            console.error(`💡 Trying to connect to: ${socketUrl}`);
+            console.error('❌ Socket: Connection timeout');
             
             // Disconnect the socket if it exists
             if (this.socket) {
@@ -100,41 +118,28 @@ class SocketService {
         }, timeout);
 
         // Configure Socket.IO based on platform
+        // For React Native, try polling first (more reliable), then upgrade to websocket
         const socketOptions: any = {
-          transports: typeof window !== 'undefined' ? ['polling', 'websocket'] : ['websocket', 'polling'],
+          transports: ['polling', 'websocket'], // Always use polling first for better compatibility
           reconnection: false, // Disable auto-reconnect - we'll handle it manually
           reconnectionAttempts: 0,
           reconnectionDelay: 1000,
           reconnectionDelayMax: 5000,
           autoConnect: true,
-          timeout: Math.min(timeout - 1000, 5000), // Cap at 5 seconds for faster failure
+          timeout: 10000, // 10 seconds timeout
           forceNew: false,
           withCredentials: false,
+          upgrade: true,
+          rememberUpgrade: false,
+          // Add path for socket.io
+          path: '/socket.io/',
+          // Add query parameters for better debugging
+          query: {
+            platform: Platform.OS,
+          },
         };
 
-        // For web, try polling first (more reliable)
-        if (typeof window !== 'undefined') {
-          socketOptions.transports = ['polling', 'websocket'];
-          socketOptions.upgrade = true;
-          socketOptions.rememberUpgrade = false; // Don't remember upgrade if it fails
-          
-          // On web, if using localhost, try 127.0.0.1 as fallback
-          if (socketUrl.includes('localhost') && socketUrl.includes('3000')) {
-            console.log('💡 Note: If connection fails, try using 127.0.0.1:3000 instead of localhost:3000');
-          }
-        }
-
-        console.log('🔌 Creating Socket.IO client with options:', {
-          url: socketUrl,
-          transports: socketOptions.transports,
-          timeout: socketOptions.timeout,
-        });
-
         this.socket = io(socketUrl, socketOptions);
-
-        console.log('🔌 Socket.IO client created, waiting for connection...');
-        console.log('🔌 Socket ID (initial):', this.socket.id);
-        console.log('🔌 Socket connected (initial):', this.socket.connected);
 
         // Set up event handlers with connection promise
         const connectHandler = () => {
@@ -144,7 +149,7 @@ class SocketService {
             this.isConnected = true;
             this.reconnectAttempts = 0;
             logger.info('Socket connected', { socketId: this.socket?.id });
-            console.log('✅ Socket.IO connected successfully!', { socketId: this.socket?.id });
+            console.log('✅ Socket: Connected');
             resolve();
           }
         };
@@ -160,8 +165,7 @@ class SocketService {
             description: error?.description
           });
           
-          console.error('❌ Socket connection error:', errorMsg);
-          console.error('   Details:', error);
+          console.error('❌ Socket: Connection failed -', errorMsg);
           
           // If we've had too many errors, reject immediately
           if (this.reconnectAttempts >= 3) {
@@ -216,12 +220,14 @@ class SocketService {
         this.isConnected = true;
         this.reconnectAttempts = 0;
         logger.info('Socket connected', { socketId: this.socket?.id });
+        console.log('✅ Socket: Connected');
       });
     }
 
     this.socket.on('disconnect', (reason) => {
       this.isConnected = false;
       logger.warn('Socket disconnected', { reason });
+      console.warn('⚠️ Socket: Disconnected');
     });
 
     this.socket.on('connect_error', (error) => {
@@ -248,11 +254,15 @@ class SocketService {
 
   joinVehicle(vehicleId: string): void {
     if (!this.socket || !this.isConnected) {
-      logger.warn('Cannot join vehicle - socket not connected');
+      logger.warn('Cannot join vehicle - socket not connected', { 
+        hasSocket: !!this.socket,
+        isConnected: this.isConnected 
+      });
+      console.warn('⚠️ Socket not connected - cannot join vehicle room');
       return;
     }
 
-    logger.info('Joining vehicle room', { vehicleId });
+    logger.info('Joining vehicle room', { vehicleId, socketId: this.socket.id });
     this.socket.emit('joinVehicle', vehicleId);
   }
 
@@ -268,13 +278,21 @@ class SocketService {
   onVehicleLocation(callback: (vehicle: VehicleLocation) => void): void {
     if (!this.socket) {
       logger.warn('Cannot listen for vehicle location - socket not initialized');
+      console.warn('⚠️ Socket not initialized - cannot listen for vehicle location');
       return;
     }
+
+    // Remove any existing listener to avoid duplicates
+    this.socket.off('vehicleLocation');
 
     this.socket.on('vehicleLocation', (vehicle: VehicleLocation) => {
       logger.debug('Received vehicle location update', { 
         vehicleId: vehicle._id,
-        internalId: vehicle.internalId 
+        internalId: vehicle.internalId,
+        plateNumber: vehicle.plateNumber,
+        latitude: vehicle.currentLocation?.latitude,
+        longitude: vehicle.currentLocation?.longitude,
+        speed: vehicle.speed
       });
       callback(vehicle);
     });

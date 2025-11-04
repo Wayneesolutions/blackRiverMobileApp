@@ -12,6 +12,14 @@ try {
 import { API_BASE_URL as ENV_API_BASE_URL, SOCKET_URL as ENV_SOCKET_URL, 
     NODE_ENV as ENV_NODE_ENV, DB_NAME as ENV_DB_NAME } from '@env';
 
+// Debug: Log imported .env values
+console.log('📦 .env values imported:', {
+    ENV_API_BASE_URL,
+    ENV_SOCKET_URL,
+    ENV_NODE_ENV,
+    ENV_DB_NAME
+});
+
 type ManifestWithReleaseChannel = typeof Constants.manifest & {
     releaseChannel?: string;
 };
@@ -54,7 +62,20 @@ const getCurrentIP = async (): Promise<string | null> => {
 
 
 const getFallbackIPs = () => {
+    // If .env has values, don't use fallback IPs - force use of .env
+    if (ENV_API_BASE_URL && ENV_API_BASE_URL !== 'undefined') {
+        // Extract IP from .env URL if possible
+        const envUrl = ENV_API_BASE_URL;
+        const match = envUrl.match(/http:\/\/([^:]+)/);
+        if (match && match[1]) {
+            return [match[1]]; // Only return the .env IP
+        }
+    }
+    
     const possibleIPs = [
+        // Add common server IPs first (prioritize these)
+        '192.168.31.247', // Current server IP
+        '192.168.31.161', // Alternative server IP
         '192.168.1.17',
         '192.168.1.16',
         '192.168.0.16',
@@ -72,12 +93,23 @@ const getFallbackIPs = () => {
 
 
 const getLocalIP = async (): Promise<string> => {
+    // PRIORITY 1: Use .env value if available
+    if (ENV_API_BASE_URL && ENV_API_BASE_URL !== 'undefined') {
+        const envUrl = ENV_API_BASE_URL;
+        const match = envUrl.match(/http:\/\/([^:]+)/);
+        if (match && match[1]) {
+            console.log(`✅ Using .env IP: ${match[1]}`);
+            return match[1];
+        }
+    }
+    
+    // PRIORITY 2: Try auto-detection
     const currentIP = await getCurrentIP();
-
     if (currentIP) {
         return currentIP;
     }
 
+    // PRIORITY 3: Use fallback IPs
     const fallbackIPs = getFallbackIPs();
     console.log('🔄 Using fallback IPs, auto-detection failed');
 
@@ -195,19 +227,43 @@ let API_ENDPOINTS: string[] = [API_BASE_URL];
 
 const initConfig = async () => {
     try {
-        console.log('🚀 Initializing config with IP detection...');
+        // Check if .env values exist - if so, skip auto-detection entirely
+        const hasEnvValues = (ENV_API_BASE_URL && ENV_API_BASE_URL !== 'undefined') || 
+                           (ENV_SOCKET_URL && ENV_SOCKET_URL !== 'undefined');
+        
+        if (hasEnvValues) {
+            console.log('✅ .env file detected - skipping auto-detection');
+            // Use .env values directly, no auto-detection needed
+            if (ENV_API_BASE_URL && ENV_API_BASE_URL !== 'undefined') {
+                API_BASE_URL = ENV_API_BASE_URL;
+                console.log(`✅ Using .env API_BASE_URL: ${API_BASE_URL}`);
+            }
+            
+            if (ENV_SOCKET_URL && ENV_SOCKET_URL !== 'undefined') {
+                SOCKET_URL = ENV_SOCKET_URL;
+                console.log(`✅ Using .env SOCKET_URL: ${SOCKET_URL}`);
+            }
+            
+            // Still get config for other values (NODE_ENV, DB_NAME)
+            config = await getEnvVars();
+        } else {
+            console.log('🚀 No .env values found - using auto-detection...');
+            config = await getEnvVars();
 
-        config = await getEnvVars();
-
-        // Priority: .env file > auto-detected > default
-        // Only override if auto-detection found a better URL, otherwise keep .env value
-        if (config.API_BASE_URL && config.API_BASE_URL !== getDefaultBaseURL()) {
-            // Only update if detected URL is different (and likely better)
-            API_BASE_URL = config.API_BASE_URL;
-        }
-        // Keep using .env SOCKET_URL unless auto-detected is different
-        if (config.SOCKET_URL && config.SOCKET_URL !== getDefaultSocketURL()) {
-            SOCKET_URL = config.SOCKET_URL;
+            // Use auto-detected values
+            if (config.API_BASE_URL && config.API_BASE_URL !== getDefaultBaseURL()) {
+                console.log(`⚠️ Using auto-detected API_BASE_URL: ${config.API_BASE_URL}`);
+                API_BASE_URL = config.API_BASE_URL;
+            } else {
+                console.log(`⚠️ Using default API_BASE_URL: ${getDefaultBaseURL()}`);
+            }
+            
+            if (config.SOCKET_URL && config.SOCKET_URL !== getDefaultSocketURL()) {
+                console.log(`⚠️ Using auto-detected SOCKET_URL: ${config.SOCKET_URL}`);
+                SOCKET_URL = config.SOCKET_URL;
+            } else {
+                console.log(`⚠️ Using default SOCKET_URL: ${getDefaultSocketURL()}`);
+            }
         }
         // Use .env NODE_ENV if provided, otherwise use config
         if (ENV_NODE_ENV && ENV_NODE_ENV !== 'undefined') {
@@ -225,10 +281,23 @@ const initConfig = async () => {
         IS_PROD = NODE_ENV === 'production';
 
         if (IS_DEV) {
-            API_ENDPOINTS = await getAPIEndpoints();
-            // Ensure baseURL is in endpoints list
-            if (!API_ENDPOINTS.includes(API_BASE_URL)) {
-                API_ENDPOINTS.unshift(API_BASE_URL);
+            // If .env values exist, prioritize them in endpoints list
+            if (hasEnvValues) {
+                // Use .env URL as primary, add fallbacks
+                API_ENDPOINTS = [API_BASE_URL];
+                const fallbackEndpoints = await getAPIEndpoints();
+                // Add fallbacks but don't override .env URL
+                for (const endpoint of fallbackEndpoints) {
+                    if (endpoint !== API_BASE_URL && !API_ENDPOINTS.includes(endpoint)) {
+                        API_ENDPOINTS.push(endpoint);
+                    }
+                }
+            } else {
+                API_ENDPOINTS = await getAPIEndpoints();
+                // Ensure baseURL is in endpoints list
+                if (!API_ENDPOINTS.includes(API_BASE_URL)) {
+                    API_ENDPOINTS.unshift(API_BASE_URL);
+                }
             }
         } else {
             API_ENDPOINTS = [API_BASE_URL];
@@ -314,8 +383,8 @@ export const findWorkingEndpoint = async (): Promise<string | null> => {
         if (await testConnection(currentEndpoint)) {
             console.log(`✅ Current IP endpoint works: ${currentEndpoint}`);
 
-
-            if (config) {
+            // Don't override .env values - only update if no .env values exist
+            if (config && !(ENV_API_BASE_URL && ENV_API_BASE_URL !== 'undefined')) {
                 config.API_BASE_URL = currentEndpoint;
                 config.SOCKET_URL = currentEndpoint.replace('/api/v1', '');
             }
@@ -333,8 +402,8 @@ export const findWorkingEndpoint = async (): Promise<string | null> => {
         if (await testConnection(endpoint)) {
             console.log(`✅ Found working endpoint: ${endpoint}`);
 
-
-            if (config) {
+            // Don't override .env values - only update if no .env values exist
+            if (config && !(ENV_API_BASE_URL && ENV_API_BASE_URL !== 'undefined')) {
                 config.API_BASE_URL = endpoint;
                 config.SOCKET_URL = endpoint.replace('/api/v1', '');
             }
@@ -360,16 +429,15 @@ export const getConfig = async (): Promise<Config> => {
     if (!config) {
         await initConfig();
     }
-    // Ensure config is not null - provide default if still null
-    if (!config) {
-        return {
-            API_BASE_URL: getDefaultBaseURL(),
-            SOCKET_URL: getDefaultSocketURL(),
-            NODE_ENV: NODE_ENV,
-            DB_NAME: DB_NAME,
-        };
-    }
-    return config;
+    
+    // Always return current values from global variables (which respect .env)
+    // This ensures .env values take priority over cached config object
+    return {
+        API_BASE_URL: API_BASE_URL,  // Use global variable (respects .env)
+        SOCKET_URL: SOCKET_URL,      // Use global variable (respects .env)
+        NODE_ENV: NODE_ENV,
+        DB_NAME: DB_NAME,
+    };
 };
 
 export const getAPIBaseURL = async (): Promise<string> => {

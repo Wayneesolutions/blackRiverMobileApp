@@ -11,9 +11,14 @@ import {
   RefreshControl,
   Alert,
 } from "react-native";
+import { useNavigation } from '@react-navigation/native';
+import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import { RootStackParamList } from '../../navigation/AppNavigator';
 import { apiService } from '../../services/api/apiService';
 import { logger } from '../../utils/loggerHelper';
 import MapViewWithLiveTracking from '../../components/MapViewWithLiveTracking';
+
+type NavigationProp = NativeStackNavigationProp<RootStackParamList>;
 
 const { width } = Dimensions.get('window');
 
@@ -23,6 +28,7 @@ interface Load {
   orderType?: string;
   status: string;
   route?: {
+    multipleDropOffs?: boolean;
     selectPickup?: {
       place?: string;
       city?: string;
@@ -37,6 +43,17 @@ interface Load {
       latitude?: number;
       longitude?: number;
     };
+    wayPoints?: Array<{
+      address?: {
+        place?: string;
+        city?: string;
+        state?: string;
+        latitude?: number | string;
+        longitude?: number | string;
+      };
+      dropOff?: boolean;
+      pickup?: boolean;
+    }>;
   };
   payloads?: Array<{
     itemName?: string;
@@ -103,6 +120,36 @@ const ActiveTrips = () => {
     fetchActiveLoads();
   };
 
+  const navigation = useNavigation<NavigationProp>();
+
+  const handleMarkDelivered = async (loadId: string) => {
+    Alert.alert(
+      'Mark as Delivered',
+      'Have you successfully delivered the goods to the destination?',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Mark Delivered',
+          style: 'default',
+          onPress: async () => {
+            try {
+              const response = await apiService.updateLoadStatus(loadId, 'delivered');
+              if (response.success) {
+                Alert.alert('Success', 'Load marked as delivered');
+                fetchActiveLoads(); // Refresh the list
+              } else {
+                Alert.alert('Error', response.error || 'Failed to mark load as delivered');
+              }
+            } catch (error) {
+              logger.error('Error marking load as delivered', error);
+              Alert.alert('Error', 'Failed to mark load as delivered. Please try again.');
+            }
+          },
+        },
+      ]
+    );
+  };
+
   const handleCompleteLoad = async (loadId: string) => {
     Alert.alert(
       'Complete Load',
@@ -116,7 +163,19 @@ const ActiveTrips = () => {
             try {
               const response = await apiService.updateLoadStatus(loadId, 'completed');
               if (response.success) {
-                Alert.alert('Success', 'Load marked as completed');
+                Alert.alert(
+                  'Success',
+                  'Load marked as completed',
+                  [
+                    {
+                      text: 'OK',
+                      onPress: () => {
+                        // Navigate to Dashboard after completion
+                        navigation.navigate('MainTabs', { screen: 'Dashboard' });
+                      },
+                    },
+                  ]
+                );
                 fetchActiveLoads(); // Refresh the list
               } else {
                 Alert.alert('Error', response.error || 'Failed to update load status');
@@ -134,6 +193,7 @@ const ActiveTrips = () => {
   const getStatusColor = (status: string) => {
     switch (status?.toLowerCase()) {
       case "in-delivery": return "#27ae60";
+      case "delivered": return "#f39c12";
       case "completed": return "#2ecc71";
       case "dispatched": return "#3498db";
       case "planned": return "#95a5a6";
@@ -171,13 +231,28 @@ const ActiveTrips = () => {
   const LoadCard: React.FC<LoadCardProps> = ({ load }) => {
     const pickup = load.route?.selectPickup;
     const dropoff = load.route?.selectDropOff;
+    const multipleDropOffs = load.route?.multipleDropOffs || false;
+    const wayPoints = load.route?.wayPoints || [];
+    
+    // Format route text based on multipleDropOffs
+    const formatRouteText = () => {
+      const pickupText = formatAddress(pickup);
+      
+      if (multipleDropOffs && wayPoints.length > 0) {
+        const waypointCount = wayPoints.length;
+        const dropoffCount = wayPoints.filter(wp => wp.dropOff === true).length;
+        return `${pickupText} → ${waypointCount} stop${waypointCount > 1 ? 's' : ''} (${dropoffCount} drop${dropoffCount > 1 ? 's' : ''})`;
+      } else {
+        return `${pickupText} → ${formatAddress(dropoff)}`;
+      }
+    };
     
     return (
       <View style={styles.tripCard}>
         <View style={styles.cardHeader}>
           <View style={styles.headerInfo}>
             <Text style={styles.routeText}>
-              {formatAddress(pickup)} → {formatAddress(dropoff)}
+              {formatRouteText()}
             </Text>
             {load.internalId && (
               <Text style={styles.loadIdText}>Load ID: {load.internalId}</Text>
@@ -244,7 +319,12 @@ const ActiveTrips = () => {
           <TouchableOpacity
             style={styles.primaryButton}
             onPress={() => {
-              if (load.route?.selectPickup?.latitude && load.route?.selectDropOff?.latitude) {
+              // Check if we can show map (pickup exists, and either dropoff or waypoints exist)
+              const canShowMap = load.route?.selectPickup?.latitude && 
+                ((!multipleDropOffs && load.route?.selectDropOff?.latitude) || 
+                 (multipleDropOffs && wayPoints.length > 0 && wayPoints.some(wp => wp.address?.latitude)));
+              
+              if (canShowMap) {
                 setSelectedLoadForMap(load);
                 setMapModalVisible(true);
               } else {
@@ -255,12 +335,31 @@ const ActiveTrips = () => {
             <Text style={styles.primaryButtonText}>View Map</Text>
           </TouchableOpacity>
 
-          <TouchableOpacity
-            style={styles.completeButton}
-            onPress={() => handleCompleteLoad(load._id)}
-          >
-            <Text style={styles.completeButtonText}>Complete Load</Text>
-          </TouchableOpacity>
+          {load.status === 'in-delivery' && (
+            <>
+              <TouchableOpacity
+                style={styles.deliveredButton}
+                onPress={() => handleMarkDelivered(load._id)}
+              >
+                <Text style={styles.deliveredButtonText}>Mark Delivered</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={styles.completeButton}
+                onPress={() => handleCompleteLoad(load._id)}
+              >
+                <Text style={styles.completeButtonText}>Complete</Text>
+              </TouchableOpacity>
+            </>
+          )}
+
+          {load.status === 'delivered' && (
+            <TouchableOpacity
+              style={[styles.completeButton, { flex: 2 }]}
+              onPress={() => handleCompleteLoad(load._id)}
+            >
+              <Text style={styles.completeButtonText}>Complete Load</Text>
+            </TouchableOpacity>
+          )}
         </View>
       </View>
     );
@@ -522,34 +621,57 @@ const styles = StyleSheet.create({
   },
   buttonContainer: {
     flexDirection: "row",
-    gap: 12,
-    alignItems: "center"
+    gap: 8,
+    alignItems: "stretch",
+    justifyContent: "space-between",
   },
   primaryButton: {
-    flex: 1,
     backgroundColor: "#3498db",
-    paddingVertical: 12,
-    paddingHorizontal: 16,
+    paddingVertical: 14,
+    paddingHorizontal: 12,
     borderRadius: 10,
-    alignItems: "center"
+    alignItems: "center",
+    justifyContent: "center",
+    flex: 1,
+    minWidth: 0,
   },
   primaryButtonText: {
     color: "#ffffff",
-    fontSize: 14,
-    fontWeight: "700"
+    fontSize: 12,
+    fontWeight: "700",
+    textAlign: "center",
+  },
+  deliveredButton: {
+    backgroundColor: "#f39c12",
+    paddingVertical: 14,
+    paddingHorizontal: 12,
+    borderRadius: 10,
+    alignItems: "center",
+    justifyContent: "center",
+    flex: 1,
+    minWidth: 0,
+  },
+  deliveredButtonText: {
+    color: "#ffffff",
+    fontSize: 12,
+    fontWeight: "700",
+    textAlign: "center",
   },
   completeButton: {
     backgroundColor: "#27ae60",
-    paddingVertical: 12,
-    paddingHorizontal: 16,
+    paddingVertical: 14,
+    paddingHorizontal: 12,
     borderRadius: 10,
     alignItems: "center",
-    minWidth: 100
+    justifyContent: "center",
+    flex: 1,
+    minWidth: 0,
   },
   completeButtonText: {
     color: "#ffffff",
-    fontSize: 14,
-    fontWeight: "700"
+    fontSize: 12,
+    fontWeight: "700",
+    textAlign: "center",
   },
   secondaryButton: {
     backgroundColor: "#f1f2f6",

@@ -5,8 +5,17 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { Platform } from 'react-native';
 import Constants from 'expo-constants';
 import AppNavigator from './src/navigation/AppNavigator';
+import ErrorBoundary from './src/components/ErrorBoundary';
+import Logger from './src/utils/Logger';
 
 export default function App() {
+  // Log app initialization
+  useEffect(() => {
+    Logger.info('App initialized', {
+      platform: Platform.OS,
+      timestamp: new Date().toISOString(),
+    }, 'App');
+  }, []);
   // Set document title for web platform
   useEffect(() => {
     if (Platform.OS === 'web' && typeof document !== 'undefined') {
@@ -45,17 +54,19 @@ export default function App() {
   }, []);
 
   return (
-    <SafeAreaProvider>
-      <NavigationContainer
-        documentTitle={{
-          formatter: (options, route) => {
-            return options?.title ?? route?.name ?? 'Black River Logistics - Driver App';
-          },
-        }}
-      >
-        <StatusBar style="dark" />
-        <AppNavigator />
-      </NavigationContainer>
-    </SafeAreaProvider>
+    <ErrorBoundary>
+      <SafeAreaProvider>
+        <NavigationContainer
+          documentTitle={{
+            formatter: (options, route) => {
+              return options?.title ?? route?.name ?? 'Black River Logistics - Driver App';
+            },
+          }}
+        >
+          <StatusBar style="dark" />
+          <AppNavigator />
+        </NavigationContainer>
+      </SafeAreaProvider>
+    </ErrorBoundary>
   );
 }

@@ -220,8 +220,17 @@ class ApiService {
         // Always try current baseURL first
         endpointsToTry.push(this.baseURL);
         
-        // In development, add other endpoints as fallbacks
-        if (IS_DEV && API_ENDPOINTS && API_ENDPOINTS.length > 0) {
+        // In development, ONLY add fallback endpoints if baseURL is a default/localhost URL
+        // If baseURL is a specific IP (like from .env), don't try other endpoints
+        const isDefaultURL = !this.baseURL || 
+            this.baseURL === 'http://localhost:3000/api/v1' || 
+            this.baseURL === 'http://10.0.2.2:3000/api/v1' ||
+            this.baseURL.includes('localhost') ||
+            this.baseURL.includes('127.0.0.1');
+        
+        // Only try fallback endpoints if using default/localhost URL
+        // If .env is set with a specific IP, we should ONLY use that
+        if (IS_DEV && isDefaultURL && API_ENDPOINTS && API_ENDPOINTS.length > 0) {
             API_ENDPOINTS.forEach(ep => {
                 if (ep && ep !== this.baseURL && !endpointsToTry.includes(ep)) {
                     endpointsToTry.push(ep);

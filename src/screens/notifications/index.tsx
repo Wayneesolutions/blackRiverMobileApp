@@ -1,4 +1,4 @@
-// src/screens/notifications/index.js
+// src/screens/notifications/index.tsx
 import React, { useState, useEffect } from 'react';
 import {
     View,
@@ -7,112 +7,137 @@ import {
     FlatList,
     TouchableOpacity,
     RefreshControl,
-    Alert
+    Alert,
+    ActivityIndicator
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useNavigation } from '@react-navigation/native';
+import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { RootStackParamList } from '../../navigation/AppNavigator';
+import apiService from '../../services/api/apiService';
+import { logger } from '../../utils/loggerHelper';
 
 type NavigationProp = NativeStackNavigationProp<RootStackParamList>;
 
-// Mock notification data
-const mockNotifications = [
-    {
-        id: '1',
-        type: 'task_assigned',
-        title: 'New Trip Assigned',
-        message: 'Trip #TR001 from Los Angeles to San Francisco has been assigned to you.',
-        timestamp: '2 hours ago',
-        isRead: false,
-        priority: 'high',
-        icon: 'car-outline',
-        color: '#906AD1'
-    },
-    {
-        id: '2',
-        type: 'maintenance',
-        title: 'Vehicle Maintenance Due',
-        message: 'Vehicle #VH-2024 requires scheduled maintenance within 500 miles.',
-        timestamp: '4 hours ago',
-        isRead: false,
-        priority: 'medium',
-        icon: 'build-outline',
-        color: '#F59E0B'
-    },
-    {
-        id: '3',
-        type: 'fuel',
-        title: 'Low Fuel Alert',
-        message: 'Vehicle #VH-2024 fuel level is below 25%. Consider refueling soon.',
-        timestamp: '6 hours ago',
-        isRead: true,
-        priority: 'high',
-        icon: 'flame-outline',
-        color: '#EF4444'
-    },
-    {
-        id: '4',
-        type: 'document',
-        title: 'Document Expiring',
-        message: 'Your commercial driving license expires in 30 days.',
-        timestamp: '1 day ago',
-        isRead: true,
-        priority: 'medium',
-        icon: 'document-text-outline',
-        color: '#10B981'
-    },
-    {
-        id: '5',
-        type: 'system',
-        title: 'System Update',
-        message: 'FleetGo app has been updated with new features and improvements.',
-        timestamp: '2 days ago',
-        isRead: true,
-        priority: 'low',
-        icon: 'information-circle-outline',
-        color: '#6366F1'
-    },
-    {
-        id: '6',
-        type: 'hos',
-        title: 'HOS Violation Warning',
-        message: 'You are approaching your daily driving limit. 2 hours remaining.',
-        timestamp: '3 days ago',
-        isRead: true,
-        priority: 'high',
-        icon: 'time-outline',
-        color: '#EF4444'
-    }
-];
+interface Notification {
+    _id: string;
+    id?: string;
+    action: string;
+    changeSummary: string;
+    createdAt: string;
+    isRead?: boolean;
+    type?: string;
+    priority?: 'high' | 'medium' | 'low';
+    icon?: string;
+    color?: string;
+}
 
 export default function NotificationsScreen({ }) {
     const navigation = useNavigation<NavigationProp>();
-    const [notifications, setNotifications] = useState(mockNotifications);
+    const [notifications, setNotifications] = useState<Notification[]>([]);
     const [refreshing, setRefreshing] = useState(false);
+    const [loading, setLoading] = useState(true);
     const [filter, setFilter] = useState('all'); // all, unread, high
+
+    // Fetch notifications from API
+    const fetchNotifications = async () => {
+        try {
+            setLoading(true);
+            const response = await apiService.getNotifications();
+            console.log('📦 Notifications API Response:', JSON.stringify(response, null, 2));
+            
+            // Handle nested response structure: response.data.data.notifications
+            const notificationsData = response.data?.data?.notifications || response.data?.notifications || [];
+            
+            if (response.success && notificationsData.length >= 0) {
+                // Transform API response to match our notification format
+                const formattedNotifications = notificationsData.map((notif: any) => {
+                    // Determine notification type and styling based on action
+                    let type = 'system';
+                    let icon = 'information-circle-outline';
+                    let color = '#6366F1';
+                    let priority: 'high' | 'medium' | 'low' = 'medium';
+
+                    if (notif.action?.toLowerCase().includes('completed')) {
+                        type = 'task_completed';
+                        icon = 'checkmark-circle-outline';
+                        color = '#10B981';
+                        priority = 'high';
+                    } else if (notif.action?.toLowerCase().includes('delivered')) {
+                        type = 'task_delivered';
+                        icon = 'location-outline';
+                        color = '#F59E0B';
+                        priority = 'high';
+                    } else if (notif.action?.toLowerCase().includes('started')) {
+                        type = 'task_assigned';
+                        icon = 'play-circle-outline';
+                        color = '#906AD1';
+                        priority = 'high';
+                    }
+
+                    return {
+                        _id: notif._id,
+                        id: notif._id,
+                        action: notif.action || 'Notification',
+                        changeSummary: notif.changeSummary || '',
+                        createdAt: notif.createdAt || new Date().toISOString(),
+                        isRead: false, // ActivityLog doesn't have read status, so we'll consider all as unread initially
+                        type,
+                        icon,
+                        color,
+                        priority
+                    };
+                });
+                console.log('✅ Formatted notifications:', formattedNotifications.length);
+                setNotifications(formattedNotifications);
+            } else {
+                logger.warn('Failed to fetch notifications', { response });
+                console.log('⚠️ No notifications found or invalid response structure');
+                setNotifications([]);
+            }
+        } catch (error) {
+            logger.error('Error fetching notifications', error);
+            Alert.alert('Error', 'Failed to load notifications. Please try again.');
+            setNotifications([]);
+        } finally {
+            setLoading(false);
+            setRefreshing(false);
+        }
+    };
+
+    // Fetch notifications when screen comes into focus
+    useFocusEffect(
+        React.useCallback(() => {
+            fetchNotifications();
+        }, [])
+    );
 
     const unreadCount = notifications.filter(n => !n.isRead).length;
 
     // Refresh notifications
     const onRefresh = async () => {
         setRefreshing(true);
-        // Simulate API call
-        setTimeout(() => {
-            setRefreshing(false);
-        }, 1000);
+        await fetchNotifications();
     };
 
     // Mark notification as read
-    const markAsRead = (id: any) => {
-        setNotifications(prev =>
-            prev.map(notification =>
-                notification.id === id
-                    ? { ...notification, isRead: true }
-                    : notification
-            )
-        );
+    const markAsRead = (id: string) => {
+        const notification = notifications.find(n => n._id === id || n.id === id);
+        
+        // Only mark as read if it's not already read
+        if (notification && !notification.isRead) {
+            setNotifications(prev =>
+                prev.map(notif =>
+                    notif._id === id || notif.id === id
+                        ? { ...notif, isRead: true }
+                        : notif
+                )
+            );
+            
+            // Optional: Show brief feedback (you can remove this if you don't want it)
+            // The visual change (removing unread indicator) already provides feedback
+        }
     };
 
     // Mark all as read
@@ -135,7 +160,7 @@ export default function NotificationsScreen({ }) {
     };
 
     // Delete notification
-    const deleteNotification = (id: any) => {
+    const deleteNotification = (id: string) => {
         Alert.alert(
             'Delete Notification',
             'Are you sure you want to delete this notification?',
@@ -145,11 +170,27 @@ export default function NotificationsScreen({ }) {
                     text: 'Delete',
                     style: 'destructive',
                     onPress: () => {
-                        setNotifications(prev => prev.filter(n => n.id !== id));
+                        setNotifications(prev => prev.filter(n => n._id !== id && n.id !== id));
                     }
                 }
             ]
         );
+    };
+
+    // Format timestamp
+    const formatTimestamp = (dateString: string) => {
+        const date = new Date(dateString);
+        const now = new Date();
+        const diffMs = now.getTime() - date.getTime();
+        const diffMins = Math.floor(diffMs / 60000);
+        const diffHours = Math.floor(diffMs / 3600000);
+        const diffDays = Math.floor(diffMs / 86400000);
+
+        if (diffMins < 1) return 'Just now';
+        if (diffMins < 60) return `${diffMins} ${diffMins === 1 ? 'minute' : 'minutes'} ago`;
+        if (diffHours < 24) return `${diffHours} ${diffHours === 1 ? 'hour' : 'hours'} ago`;
+        if (diffDays < 7) return `${diffDays} ${diffDays === 1 ? 'day' : 'days'} ago`;
+        return date.toLocaleDateString();
     };
 
     // Filter notifications
@@ -165,29 +206,33 @@ export default function NotificationsScreen({ }) {
     };
 
     // Render notification item
-    const renderNotificationItem = ({ item }: { item: any }) => (
+    const renderNotificationItem = ({ item }: { item: Notification }) => (
         <TouchableOpacity
             style={[
                 styles.notificationItem,
-                !item.isRead && styles.unreadNotification
+                !item.isRead && styles.unreadNotification,
+                item.isRead && styles.readNotification
             ]}
-            onPress={() => markAsRead(item.id)}
-            onLongPress={() => deleteNotification(item.id)}
+            activeOpacity={0.7}
+            onPress={() => {
+                markAsRead(item._id || item.id || '');
+            }}
+            onLongPress={() => deleteNotification(item._id || item.id || '')}
         >
             <View style={styles.notificationContent}>
                 <View style={styles.notificationHeader}>
-                    <View style={[styles.iconContainer, { backgroundColor: item.color + '20' }]}>
-                        <Ionicons name={item.icon} size={20} color={item.color} />
+                    <View style={[styles.iconContainer, { backgroundColor: (item.color || '#6366F1') + '20' }]}>
+                        <Ionicons name={item.icon as any || 'information-circle-outline'} size={20} color={item.color || '#6366F1'} />
                     </View>
                     <View style={styles.notificationText}>
                         <View style={styles.titleRow}>
                             <Text style={[styles.notificationTitle, !item.isRead && styles.unreadTitle]}>
-                                {item.title}
+                                {item.action}
                             </Text>
                             {!item.isRead && <View style={styles.unreadDot} />}
                         </View>
-                        <Text style={styles.notificationMessage}>{item.message}</Text>
-                        <Text style={styles.timestamp}>{item.timestamp}</Text>
+                        <Text style={styles.notificationMessage}>{item.changeSummary}</Text>
+                        <Text style={styles.timestamp}>{formatTimestamp(item.createdAt)}</Text>
                     </View>
                 </View>
                 {item.priority === 'high' && (
@@ -201,12 +246,23 @@ export default function NotificationsScreen({ }) {
 
     const filteredNotifications = getFilteredNotifications();
 
+    if (loading && notifications.length === 0) {
+        return (
+            <SafeAreaView style={styles.container}>
+                <View style={styles.loadingContainer}>
+                    <ActivityIndicator size="large" color="#906AD1" />
+                    <Text style={styles.loadingText}>Loading notifications...</Text>
+                </View>
+            </SafeAreaView>
+        );
+    }
+
     return (
         <SafeAreaView style={styles.container}>
             <FlatList
                 data={filteredNotifications}
                 renderItem={renderNotificationItem}
-                keyExtractor={(item) => item.id}
+                keyExtractor={(item) => item._id || item.id || item.action}
                 refreshControl={
                     <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
                 }
@@ -345,6 +401,11 @@ const styles = StyleSheet.create({
     unreadNotification: {
         borderLeftWidth: 4,
         borderLeftColor: '#906AD1',
+        backgroundColor: '#F9FAFB',
+    },
+    readNotification: {
+        backgroundColor: '#FFFFFF',
+        opacity: 0.9,
     },
     notificationContent: {
         flex: 1,
@@ -426,5 +487,15 @@ const styles = StyleSheet.create({
         textAlign: 'center',
         marginTop: 8,
         paddingHorizontal: 40,
+    },
+    loadingContainer: {
+        flex: 1,
+        justifyContent: 'center',
+        alignItems: 'center',
+    },
+    loadingText: {
+        marginTop: 16,
+        fontSize: 16,
+        color: '#6B7280',
     },
 });

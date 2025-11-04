@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from "react";
+import { useFocusEffect } from '@react-navigation/native';
 import {
     View,
     Text,
@@ -73,10 +74,17 @@ export default function DashboardScreen() {
         { id: 9, name: "Fuel", icon: <FontAwesome5 name="gas-pump" size={28} color="#fff" />, color: "#04AA30", route: "Fuel" },
     ];
 
-    // Fetch driver profile and statistics
+    // Fetch driver profile and statistics on mount
     useEffect(() => {
         fetchDashboardData();
     }, []);
+
+    // Refresh dashboard data when screen comes into focus
+    useFocusEffect(
+        React.useCallback(() => {
+            fetchDashboardData();
+        }, [])
+    );
 
     const fetchDashboardData = async () => {
         try {

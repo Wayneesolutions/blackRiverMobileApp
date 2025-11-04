@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import {
   View,
   Text,
@@ -20,6 +20,7 @@ import { apiService } from '../services/api/apiService';
 // Conditionally import react-native-maps only on native platforms
 let MapView: any = null;
 let Marker: any = null;
+let Callout: any = null;
 let Polyline: any = null;
 let PROVIDER_GOOGLE: any = null;
 
@@ -29,6 +30,7 @@ try {
   if (mapsModule && mapsModule.default) {
     MapView = mapsModule.default;
     Marker = mapsModule.Marker;
+    Callout = mapsModule.Callout;
     Polyline = mapsModule.Polyline;
     PROVIDER_GOOGLE = mapsModule.PROVIDER_GOOGLE;
   }
@@ -41,6 +43,37 @@ try {
 
 const { width, height } = Dimensions.get('window');
 
+// Helper function to safely convert latitude/longitude to numbers
+const parseCoordinate = (value: string | number | undefined | null): number | null => {
+  if (value === undefined || value === null) return null;
+  if (typeof value === 'number') {
+    return isNaN(value) ? null : value;
+  }
+  if (typeof value === 'string') {
+    const parsed = parseFloat(value);
+    return isNaN(parsed) ? null : parsed;
+  }
+  return null;
+};
+
+// Calculate distance between two coordinates using Haversine formula (in kilometers)
+const calculateDistance = (lat1: number, lon1: number, lat2: number, lon2: number): number => {
+  if (lat1 === null || lon1 === null || lat2 === null || lon2 === null) return 0;
+  if (isNaN(lat1) || isNaN(lon1) || isNaN(lat2) || isNaN(lon2)) return 0;
+  
+  const R = 6371; // Earth's radius in kilometers
+  const dLat = ((lat2 - lat1) * Math.PI) / 180;
+  const dLon = ((lon2 - lon1) * Math.PI) / 180;
+  const a =
+    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+    Math.cos((lat1 * Math.PI) / 180) *
+      Math.cos((lat2 * Math.PI) / 180) *
+      Math.sin(dLon / 2) *
+      Math.sin(dLon / 2);
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+  return R * c;
+};
+
 interface MapViewWithLiveTrackingProps {
   visible: boolean;
   onClose: () => void;
@@ -48,20 +81,32 @@ interface MapViewWithLiveTrackingProps {
     _id: string;
     internalId?: string;
     route?: {
+      multipleDropOffs?: boolean;
       selectPickup?: {
         place?: string;
         city?: string;
         state?: string;
-        latitude?: number;
-        longitude?: number;
+        latitude?: number | string;
+        longitude?: number | string;
       };
       selectDropOff?: {
         place?: string;
         city?: string;
         state?: string;
-        latitude?: number;
-        longitude?: number;
+        latitude?: number | string;
+        longitude?: number | string;
       };
+      wayPoints?: Array<{
+        address?: {
+          place?: string;
+          city?: string;
+          state?: string;
+          latitude?: number | string;
+          longitude?: number | string;
+        };
+        dropOff?: boolean;
+        pickup?: boolean;
+      }>;
     };
     vehicle?: {
       _id: string;
@@ -79,11 +124,14 @@ const MapViewWithLiveTracking: React.FC<MapViewWithLiveTrackingProps> = ({
   const [vehicleLocation, setVehicleLocation] = useState<VehicleLocation | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [showDistanceInfo, setShowDistanceInfo] = useState(true);
   const mapRef = useRef<any>(null);
 
   const pickup = load.route?.selectPickup;
   const dropoff = load.route?.selectDropOff;
   const vehicleId = load.vehicle?.internalId;
+  const multipleDropOffs = load.route?.multipleDropOffs || false;
+  const wayPoints = load.route?.wayPoints || [];
 
   useEffect(() => {
     if (!visible) {
@@ -102,7 +150,7 @@ const MapViewWithLiveTracking: React.FC<MapViewWithLiveTrackingProps> = ({
         setError(null);
 
         // On web platform, skip socket connection entirely - we only use Google Maps
-        if (typeof window !== 'undefined') {
+        if (Platform.OS === 'web') {
           logger.info('Web platform detected - skipping socket connection, using Google Maps only');
           setLoading(false);
           // Don't set error - map will show route with Google Maps
@@ -156,35 +204,54 @@ const MapViewWithLiveTracking: React.FC<MapViewWithLiveTrackingProps> = ({
           logger.info('Joining vehicle for live tracking', { vehicleId });
           
           let locationReceived = false;
+          let isFirstLocationUpdate = true;
           const timeoutId = setTimeout(() => {
             if (!locationReceived) {
               setLoading(false);
               setError('No location data received. The vehicle may be offline.');
+              console.warn('⚠️ Socket: No location data received within 10 seconds');
             }
           }, 10000);
           
-          // Set up vehicle location listener
+          // IMPORTANT: Set up listener BEFORE joining the vehicle room
+          // This ensures we catch the initial location update
           socketService.onVehicleLocation((vehicle: VehicleLocation) => {
-            locationReceived = true;
+            if (!locationReceived) {
+              console.log('✅ Socket: Vehicle location updates working');
+              locationReceived = true;
+            }
             setVehicleLocation(vehicle);
             setLoading(false);
+            clearTimeout(timeoutId);
             
-            // Update map camera to show vehicle
-            if (vehicle.currentLocation?.latitude && vehicle.currentLocation?.longitude && mapRef.current) {
-              const lat = parseFloat(String(vehicle.currentLocation.latitude));
-              const lng = parseFloat(String(vehicle.currentLocation.longitude));
-              
-              if (!isNaN(lat) && !isNaN(lng)) {
+            logger.debug('Vehicle location update received', {
+              vehicleId: vehicle._id,
+              internalId: vehicle.internalId,
+              plateNumber: vehicle.plateNumber,
+              latitude: vehicle.currentLocation?.latitude,
+              longitude: vehicle.currentLocation?.longitude,
+              speed: vehicle.speed,
+            }, 'MapViewWithLiveTracking');
+            
+            // Update map camera to show vehicle (only on first update to avoid constant movement)
+            const vehicleLat = parseCoordinate(vehicle.currentLocation?.latitude);
+            const vehicleLng = parseCoordinate(vehicle.currentLocation?.longitude);
+            if (vehicleLat !== null && vehicleLng !== null && mapRef.current) {
+              if (isFirstLocationUpdate) {
+                // Animate to vehicle location on first update
                 mapRef.current.animateToRegion({
-                  latitude: lat,
-                  longitude: lng,
+                  latitude: vehicleLat,
+                  longitude: vehicleLng,
                   latitudeDelta: 0.05,
                   longitudeDelta: 0.05,
                 }, 1000);
+                isFirstLocationUpdate = false;
               }
+              // Subsequent updates will just move the marker, camera stays stable
             }
           });
           
+          // Now join the vehicle room - this will trigger the backend to start sending updates
           socketService.joinVehicle(vehicleId);
           
           // Clear timeout on cleanup
@@ -223,28 +290,44 @@ const MapViewWithLiveTracking: React.FC<MapViewWithLiveTrackingProps> = ({
     const coordinates: Array<{ latitude: number; longitude: number }> = [];
 
     // Add pickup location
-    if (pickup?.latitude && pickup?.longitude) {
+    const pickupLat = parseCoordinate(pickup?.latitude);
+    const pickupLng = parseCoordinate(pickup?.longitude);
+    if (pickupLat !== null && pickupLng !== null) {
       coordinates.push({
-        latitude: pickup.latitude,
-        longitude: pickup.longitude,
+        latitude: pickupLat,
+        longitude: pickupLng,
       });
     }
 
-    // Add dropoff location
-    if (dropoff?.latitude && dropoff?.longitude) {
-      coordinates.push({
-        latitude: dropoff.latitude,
-        longitude: dropoff.longitude,
+    // Add waypoints if multipleDropOffs is true
+    if (multipleDropOffs && wayPoints.length > 0) {
+      wayPoints.forEach((waypoint) => {
+        const waypointLat = parseCoordinate(waypoint.address?.latitude);
+        const waypointLng = parseCoordinate(waypoint.address?.longitude);
+        if (waypointLat !== null && waypointLng !== null) {
+          coordinates.push({
+            latitude: waypointLat,
+            longitude: waypointLng,
+          });
+        }
       });
+    } else {
+      // Add dropoff location only if not multiple drops
+      const dropoffLat = parseCoordinate(dropoff?.latitude);
+      const dropoffLng = parseCoordinate(dropoff?.longitude);
+      if (dropoffLat !== null && dropoffLng !== null) {
+        coordinates.push({
+          latitude: dropoffLat,
+          longitude: dropoffLng,
+        });
+      }
     }
 
     // Add vehicle location if available
-    if (vehicleLocation?.currentLocation?.latitude && vehicleLocation?.currentLocation?.longitude) {
-      const lat = parseFloat(String(vehicleLocation.currentLocation.latitude));
-      const lng = parseFloat(String(vehicleLocation.currentLocation.longitude));
-      if (!isNaN(lat) && !isNaN(lng)) {
-        coordinates.push({ latitude: lat, longitude: lng });
-      }
+    const vehicleLat = parseCoordinate(vehicleLocation?.currentLocation?.latitude);
+    const vehicleLng = parseCoordinate(vehicleLocation?.currentLocation?.longitude);
+    if (vehicleLat !== null && vehicleLng !== null) {
+      coordinates.push({ latitude: vehicleLat, longitude: vehicleLng });
     }
 
     if (coordinates.length === 0) {
@@ -276,29 +359,196 @@ const MapViewWithLiveTracking: React.FC<MapViewWithLiveTrackingProps> = ({
     };
   };
 
+  // Parse coordinates first
+  const pickupLat = parseCoordinate(pickup?.latitude);
+  const pickupLng = parseCoordinate(pickup?.longitude);
+  const dropoffLat = parseCoordinate(dropoff?.latitude);
+  const dropoffLng = parseCoordinate(dropoff?.longitude);
+
+  // Build route coordinates based on multipleDropOffs flag
   const routeCoordinates: Array<{ latitude: number; longitude: number }> = [];
 
-  if (pickup?.latitude && pickup?.longitude) {
+  // Always start with pickup
+  if (pickupLat !== null && pickupLng !== null) {
     routeCoordinates.push({
-      latitude: pickup.latitude,
-      longitude: pickup.longitude,
+      latitude: pickupLat,
+      longitude: pickupLng,
     });
   }
 
-  if (dropoff?.latitude && dropoff?.longitude) {
-    routeCoordinates.push({
-      latitude: dropoff.latitude,
-      longitude: dropoff.longitude,
+  // If multiple drops, add waypoints; otherwise add single dropoff
+  if (multipleDropOffs && wayPoints.length > 0) {
+    wayPoints.forEach((waypoint) => {
+      const waypointLat = parseCoordinate(waypoint.address?.latitude);
+      const waypointLng = parseCoordinate(waypoint.address?.longitude);
+      if (waypointLat !== null && waypointLng !== null) {
+        routeCoordinates.push({
+          latitude: waypointLat,
+          longitude: waypointLng,
+        });
+      }
     });
+  } else {
+    // Single dropoff
+    if (dropoffLat !== null && dropoffLng !== null) {
+      routeCoordinates.push({
+        latitude: dropoffLat,
+        longitude: dropoffLng,
+      });
+    }
   }
 
-  const vehicleCoordinates = vehicleLocation?.currentLocation?.latitude && 
-    vehicleLocation?.currentLocation?.longitude
+  const vehicleLat = parseCoordinate(vehicleLocation?.currentLocation?.latitude);
+  const vehicleLng = parseCoordinate(vehicleLocation?.currentLocation?.longitude);
+  const vehicleCoordinates = vehicleLat !== null && vehicleLng !== null
     ? {
-        latitude: parseFloat(String(vehicleLocation.currentLocation.latitude)),
-        longitude: parseFloat(String(vehicleLocation.currentLocation.longitude)),
+        latitude: vehicleLat,
+        longitude: vehicleLng,
       }
     : null;
+
+  // Prepare valid waypoints for rendering (filter out invalid coordinates)
+  // Use useMemo to ensure stable array reference
+  const validWaypoints = useMemo(() => {
+    if (!multipleDropOffs || !wayPoints || wayPoints.length === 0) {
+      return [];
+    }
+
+    return wayPoints
+      .map((waypoint, originalIndex) => {
+        const waypointLat = parseCoordinate(waypoint.address?.latitude);
+        const waypointLng = parseCoordinate(waypoint.address?.longitude);
+        
+        if (waypointLat === null || waypointLng === null) {
+          return null;
+        }
+
+        return {
+          waypoint,
+          waypointLat,
+          waypointLng,
+          originalIndex,
+          isDropoff: waypoint.dropOff === true,
+          isPickup: waypoint.pickup === true,
+        };
+      })
+      .filter((item): item is NonNullable<typeof item> => item !== null);
+  }, [multipleDropOffs, wayPoints]);
+
+  // Calculate distance metrics
+  const distanceMetrics = useMemo(() => {
+    let totalDistance = 0;
+    let distanceTraveled = 0;
+    let distanceRemaining = 0;
+
+    // Calculate total route distance
+    if (multipleDropOffs && validWaypoints.length > 0) {
+      // Multiple drops: Calculate distance from pickup through all waypoints
+      if (pickupLat !== null && pickupLng !== null && validWaypoints.length > 0) {
+        // Distance from pickup to first waypoint
+        const firstWaypoint = validWaypoints[0];
+        totalDistance += calculateDistance(
+          pickupLat,
+          pickupLng,
+          firstWaypoint.waypointLat,
+          firstWaypoint.waypointLng
+        );
+
+        // Distance between waypoints
+        for (let i = 0; i < validWaypoints.length - 1; i++) {
+          totalDistance += calculateDistance(
+            validWaypoints[i].waypointLat,
+            validWaypoints[i].waypointLng,
+            validWaypoints[i + 1].waypointLat,
+            validWaypoints[i + 1].waypointLng
+          );
+        }
+      }
+    } else {
+      // Single drop: Calculate distance from pickup to dropoff
+      if (pickupLat !== null && pickupLng !== null && dropoffLat !== null && dropoffLng !== null) {
+        totalDistance = calculateDistance(pickupLat, pickupLng, dropoffLat, dropoffLng);
+      }
+    }
+
+    // Calculate distance traveled (from pickup to current vehicle position)
+    if (vehicleCoordinates && pickupLat !== null && pickupLng !== null) {
+      distanceTraveled = calculateDistance(
+        pickupLat,
+        pickupLng,
+        vehicleCoordinates.latitude,
+        vehicleCoordinates.longitude
+      );
+    }
+
+    // Calculate distance remaining (from vehicle to next destination)
+    if (vehicleCoordinates) {
+      if (multipleDropOffs && validWaypoints.length > 0) {
+        // For multiple drops, calculate distance from vehicle to nearest waypoint
+        // and then add remaining waypoints distance
+        let nearestWaypointIndex = 0;
+        let nearestDistance = Infinity;
+        
+        // Find the nearest waypoint to the vehicle
+        validWaypoints.forEach((waypoint, index) => {
+          const dist = calculateDistance(
+            vehicleCoordinates.latitude,
+            vehicleCoordinates.longitude,
+            waypoint.waypointLat,
+            waypoint.waypointLng
+          );
+          if (dist < nearestDistance) {
+            nearestDistance = dist;
+            nearestWaypointIndex = index;
+          }
+        });
+        
+        // Calculate distance from vehicle to nearest waypoint
+        const nearestWaypoint = validWaypoints[nearestWaypointIndex];
+        distanceRemaining = calculateDistance(
+          vehicleCoordinates.latitude,
+          vehicleCoordinates.longitude,
+          nearestWaypoint.waypointLat,
+          nearestWaypoint.waypointLng
+        );
+        
+        // Add distance from nearest waypoint through remaining waypoints
+        for (let i = nearestWaypointIndex; i < validWaypoints.length - 1; i++) {
+          distanceRemaining += calculateDistance(
+            validWaypoints[i].waypointLat,
+            validWaypoints[i].waypointLng,
+            validWaypoints[i + 1].waypointLat,
+            validWaypoints[i + 1].waypointLng
+          );
+        }
+      } else if (dropoffLat !== null && dropoffLng !== null) {
+        // Single drop: Distance from vehicle to dropoff
+        distanceRemaining = calculateDistance(
+          vehicleCoordinates.latitude,
+          vehicleCoordinates.longitude,
+          dropoffLat,
+          dropoffLng
+        );
+      }
+    } else {
+      // If no vehicle location, remaining = total
+      distanceRemaining = totalDistance;
+    }
+
+    return {
+      total: totalDistance,
+      traveled: distanceTraveled,
+      remaining: distanceRemaining,
+    };
+  }, [
+    multipleDropOffs,
+    pickupLat,
+    pickupLng,
+    dropoffLat,
+    dropoffLng,
+    validWaypoints,
+    vehicleCoordinates,
+  ]);
 
   return (
     <Modal
@@ -323,6 +573,74 @@ const MapViewWithLiveTracking: React.FC<MapViewWithLiveTrackingProps> = ({
 
         {/* Map Container */}
         <View style={styles.mapContainer}>
+          {/* Distance Toggle Button */}
+          {(distanceMetrics.total > 0 || distanceMetrics.traveled > 0 || distanceMetrics.remaining > 0) && (
+            <TouchableOpacity
+              style={styles.distanceToggleButton}
+              onPress={() => setShowDistanceInfo(!showDistanceInfo)}
+              activeOpacity={0.7}
+            >
+              <Ionicons 
+                name={showDistanceInfo ? "eye-off" : "eye"} 
+                size={20} 
+                color="#fff" 
+              />
+            </TouchableOpacity>
+          )}
+
+          {/* Distance Info Overlay - Floating on Map */}
+          {showDistanceInfo && (distanceMetrics.total > 0 || distanceMetrics.traveled > 0 || distanceMetrics.remaining > 0) && (
+            <View style={styles.mapDistanceOverlay}>
+              <View style={styles.mapDistanceCard}>
+                <View style={styles.mapDistanceHeader}>
+                  <Text style={styles.mapDistanceTitle}>Distance Information</Text>
+                  <TouchableOpacity
+                    onPress={() => setShowDistanceInfo(false)}
+                    style={styles.mapDistanceCloseButton}
+                  >
+                    <Ionicons name="close" size={18} color="#6b7280" />
+                  </TouchableOpacity>
+                </View>
+                <View style={styles.mapDistanceRow}>
+                  <View style={styles.mapDistanceItem}>
+                    <Ionicons name="map-outline" size={20} color="#8B5CF6" />
+                    <Text style={styles.mapDistanceLabel}>Total</Text>
+                    <Text style={styles.mapDistanceValue}>
+                      {distanceMetrics.total > 0 ? `${distanceMetrics.total.toFixed(1)} km` : 'N/A'}
+                    </Text>
+                  </View>
+                  {vehicleCoordinates && (
+                    <>
+                      <View style={styles.mapDistanceDivider} />
+                      <View style={styles.mapDistanceItem}>
+                        <Ionicons name="checkmark-circle" size={20} color="#10B981" />
+                        <Text style={styles.mapDistanceLabel}>Traveled</Text>
+                        <Text style={styles.mapDistanceValue}>
+                          {distanceMetrics.traveled > 0 ? `${distanceMetrics.traveled.toFixed(1)} km` : '0.0 km'}
+                        </Text>
+                      </View>
+                      <View style={styles.mapDistanceDivider} />
+                      <View style={styles.mapDistanceItem}>
+                        <Ionicons name="navigate-circle" size={20} color="#F59E0B" />
+                        <Text style={styles.mapDistanceLabel}>Remaining</Text>
+                        <Text style={styles.mapDistanceValue}>
+                          {distanceMetrics.remaining > 0 ? `${distanceMetrics.remaining.toFixed(1)} km` : '0.0 km'}
+                        </Text>
+                      </View>
+                    </>
+                  )}
+                </View>
+                {multipleDropOffs && validWaypoints.length > 0 && (
+                  <View style={styles.mapDistanceWaypointContainer}>
+                    <Text style={styles.mapDistanceWaypointInfo}>
+                      {validWaypoints.length} stop{validWaypoints.length !== 1 ? 's' : ''}
+                    </Text>
+                  </View>
+                )}
+              </View>
+            </View>
+          )}
+
           {loading && (
             <View style={styles.loadingOverlay}>
               <ActivityIndicator size="large" color="#8B5CF6" />
@@ -348,8 +666,8 @@ const MapViewWithLiveTracking: React.FC<MapViewWithLiveTrackingProps> = ({
               vehicleCoordinates={vehicleCoordinates}
               onOpenGoogleMaps={() => {
                 // Open Google Maps with route if coordinates are available
-                const coords = vehicleCoordinates || pickup;
-                if (coords) {
+                const coords = vehicleCoordinates || (pickupLat !== null && pickupLng !== null ? { latitude: pickupLat, longitude: pickupLng } : null);
+                if (coords && coords.latitude !== null && coords.longitude !== null) {
                   const url = `https://www.google.com/maps?q=${coords.latitude},${coords.longitude}`;
                   Linking.openURL(url);
                 }
@@ -366,53 +684,178 @@ const MapViewWithLiveTracking: React.FC<MapViewWithLiveTrackingProps> = ({
               showsCompass={true}
               toolbarEnabled={false}
             >
-            {/* Pickup Marker */}
-            {pickup?.latitude && pickup?.longitude && (
+            {/* Pickup Marker - Green Circle with Location Icon */}
+            {pickupLat !== null && pickupLng !== null && (
               <Marker
+                key={`pickup-${load._id}-${pickupLat.toFixed(4)}-${pickupLng.toFixed(4)}`}
                 coordinate={{
-                  latitude: pickup.latitude,
-                  longitude: pickup.longitude,
+                  latitude: pickupLat,
+                  longitude: pickupLng,
                 }}
-                title="Pickup Location"
-                description={pickup.place || `${pickup.city}, ${pickup.state}`}
+                anchor={{ x: 0.5, y: 0.5 }}
+                tracksViewChanges={false}
+                zIndex={2000}
               >
-                <View style={[styles.markerContainer, styles.pickupMarker]}>
-                  <Ionicons name="location" size={24} color="#fff" />
+                <View style={styles.pickupMarkerContainer} collapsable={false} pointerEvents="none">
+                  <View style={styles.pickupMarkerPulse} />
+                  <View style={styles.pickupMarker}>
+                    <Ionicons name="location" size={20} color="#fff" />
+                  </View>
                 </View>
+                {Callout && (
+                  <Callout>
+                    <View style={styles.calloutContainer}>
+                      <View style={[styles.calloutHeader, styles.pickupCalloutHeader]}>
+                        <Ionicons name="location" size={20} color="#fff" />
+                        <Text style={styles.calloutTitle}>Pickup Location</Text>
+                      </View>
+                      <Text style={styles.calloutText}>
+                        {pickup?.place || `${pickup?.city || ''}, ${pickup?.state || ''}`}
+                      </Text>
+                    </View>
+                  </Callout>
+                )}
               </Marker>
             )}
 
-            {/* Dropoff Marker */}
-            {dropoff?.latitude && dropoff?.longitude && (
+            {/* Dropoff Marker - Red Square/Diamond with Flag Icon (only if not multiple drops) */}
+            {!multipleDropOffs && dropoffLat !== null && dropoffLng !== null && (
               <Marker
+                key={`dropoff-${load._id}-${dropoffLat.toFixed(4)}-${dropoffLng.toFixed(4)}`}
                 coordinate={{
-                  latitude: dropoff.latitude,
-                  longitude: dropoff.longitude,
+                  latitude: dropoffLat,
+                  longitude: dropoffLng,
                 }}
-                title="Drop-off Location"
-                description={dropoff.place || `${dropoff.city}, ${dropoff.state}`}
+                anchor={{ x: 0.5, y: 0.5 }}
+                tracksViewChanges={false}
+                zIndex={1500}
               >
-                <View style={[styles.markerContainer, styles.dropoffMarker]}>
-                  <Ionicons name="flag" size={24} color="#fff" />
+                <View style={styles.dropoffMarkerContainer} collapsable={false} pointerEvents="none">
+                  <View style={styles.dropoffMarker}>
+                    <View style={styles.dropoffMarkerIcon}>
+                      <Ionicons name="flag" size={18} color="#fff" />
+                    </View>
+                  </View>
                 </View>
+                {Callout && (
+                  <Callout>
+                    <View style={styles.calloutContainer}>
+                      <View style={[styles.calloutHeader, styles.dropoffCalloutHeader]}>
+                        <Ionicons name="flag" size={20} color="#fff" />
+                        <Text style={styles.calloutTitle}>Drop-off Location</Text>
+                      </View>
+                      <Text style={styles.calloutText}>
+                        {dropoff?.place || `${dropoff?.city || ''}, ${dropoff?.state || ''}`}
+                      </Text>
+                    </View>
+                  </Callout>
+                )}
               </Marker>
             )}
 
-            {/* Vehicle Live Location Marker */}
+            {/* Waypoints Markers (only if multiple drops) */}
+            {validWaypoints.map((item, displayIndex) => {
+              const { waypoint, waypointLat, waypointLng, originalIndex, isDropoff, isPickup } = item;
+              
+              // Create unique key for each marker
+              const markerKey = `waypoint-${load._id}-${originalIndex}-${Math.round(waypointLat * 10000)}-${Math.round(waypointLng * 10000)}`;
+              
+              // Render marker content - separate components for stability
+              let markerContent;
+              if (isDropoff) {
+                // Dropoff waypoint - Red Diamond
+                markerContent = (
+                  <View style={styles.dropoffMarkerContainer} collapsable={false} pointerEvents="none">
+                    <View style={styles.dropoffMarker}>
+                      <View style={styles.dropoffMarkerIcon}>
+                        <Ionicons name="flag" size={18} color="#fff" />
+                      </View>
+                    </View>
+                  </View>
+                );
+              } else {
+                // Pickup waypoint or other waypoint - Orange Circle
+                markerContent = (
+                  <View style={styles.waypointMarkerContainer} collapsable={false} pointerEvents="none">
+                    <View style={styles.waypointMarker}>
+                      <Text style={styles.waypointNumber}>{displayIndex + 1}</Text>
+                    </View>
+                  </View>
+                );
+              }
+
+              return (
+                <Marker
+                  key={markerKey}
+                  coordinate={{
+                    latitude: waypointLat,
+                    longitude: waypointLng,
+                  }}
+                  anchor={{ x: 0.5, y: 0.5 }}
+                  tracksViewChanges={false}
+                  zIndex={1000 + originalIndex}
+                >
+                  {markerContent}
+                  {Callout && (
+                    <Callout>
+                      <View style={styles.calloutContainer}>
+                        <View style={[styles.calloutHeader, isDropoff ? styles.dropoffCalloutHeader : styles.waypointCalloutHeader]}>
+                          <Ionicons 
+                            name={isDropoff ? "flag" : isPickup ? "location" : "navigate"} 
+                            size={20} 
+                            color="#fff" 
+                          />
+                          <Text style={styles.calloutTitle}>
+                            {isDropoff ? "Drop-off" : isPickup ? "Pickup" : `Waypoint ${displayIndex + 1}`}
+                          </Text>
+                        </View>
+                        <Text style={styles.calloutText}>
+                          {waypoint.address?.place || `${waypoint.address?.city || ''}, ${waypoint.address?.state || ''}`}
+                        </Text>
+                      </View>
+                    </Callout>
+                  )}
+                </Marker>
+              );
+            })}
+
+            {/* Vehicle Live Location Marker - Updates in real-time from socket.io */}
             {vehicleCoordinates && (
               <Marker
+                key={`vehicle-${load._id}-${vehicleLocation?._id || 'unknown'}-${Math.round(vehicleCoordinates.latitude * 10000)}-${Math.round(vehicleCoordinates.longitude * 10000)}`}
                 coordinate={vehicleCoordinates}
-                title="Vehicle Location"
-                description={
-                  vehicleLocation?.plateNumber 
-                    ? `Vehicle: ${vehicleLocation.plateNumber}`
-                    : `Speed: ${vehicleLocation?.speed || 0} km/h`
-                }
                 anchor={{ x: 0.5, y: 0.5 }}
+                tracksViewChanges={true}
+                zIndex={3000}
               >
-                <View style={[styles.markerContainer, styles.vehicleMarker]}>
-                  <Ionicons name="car" size={24} color="#fff" />
+                <View style={[styles.simpleMarker, styles.vehicleMarker]} collapsable={false} pointerEvents="none">
+                  <Ionicons name="car" size={16} color="#fff" />
                 </View>
+                {Callout && (
+                  <Callout>
+                    <View style={styles.calloutContainer}>
+                      <View style={[styles.calloutHeader, styles.vehicleCalloutHeader]}>
+                        <Ionicons name="car" size={20} color="#fff" />
+                        <Text style={styles.calloutTitle}>Vehicle Location</Text>
+                      </View>
+                      {vehicleLocation?.plateNumber && (
+                        <Text style={styles.calloutText}>
+                          Vehicle: {vehicleLocation.plateNumber}
+                        </Text>
+                      )}
+                      {vehicleLocation?.speed !== undefined && (
+                        <Text style={styles.calloutText}>
+                          Speed: {vehicleLocation.speed || 0} km/h
+                        </Text>
+                      )}
+                      {vehicleLocation?.currentLocation?.address && (
+                        <Text style={styles.calloutAddress} numberOfLines={2}>
+                          {vehicleLocation.currentLocation.address}
+                        </Text>
+                      )}
+                    </View>
+                  </Callout>
+                )}
               </Marker>
             )}
 
@@ -422,7 +865,7 @@ const MapViewWithLiveTracking: React.FC<MapViewWithLiveTrackingProps> = ({
                 coordinates={routeCoordinates}
                 strokeColor="#8B5CF6"
                 strokeWidth={4}
-                lineDashPattern={[1]}
+                lineDashPattern={multipleDropOffs ? undefined : [1]}
               />
             )}
 
@@ -453,11 +896,11 @@ const MapViewWithLiveTracking: React.FC<MapViewWithLiveTrackingProps> = ({
                       <Text style={styles.fallbackSubtext}>
                         {pickup.place || `${pickup.city}, ${pickup.state}`}
                       </Text>
-                      {pickup.latitude && pickup.longitude && (
+                      {pickupLat !== null && pickupLng !== null && (
                         <TouchableOpacity
                           style={[styles.openMapsButton, { marginTop: 8 }]}
                           onPress={() => {
-                            const url = `https://www.google.com/maps?q=${pickup.latitude},${pickup.longitude}`;
+                            const url = `https://www.google.com/maps?q=${pickupLat},${pickupLng}`;
                             Linking.openURL(url);
                           }}
                         >
@@ -475,11 +918,11 @@ const MapViewWithLiveTracking: React.FC<MapViewWithLiveTrackingProps> = ({
                       <Text style={styles.fallbackSubtext}>
                         {dropoff.place || `${dropoff.city}, ${dropoff.state}`}
                       </Text>
-                      {dropoff.latitude && dropoff.longitude && (
+                      {dropoffLat !== null && dropoffLng !== null && (
                         <TouchableOpacity
                           style={[styles.openMapsButton, { marginTop: 8 }]}
                           onPress={() => {
-                            const url = `https://www.google.com/maps?q=${dropoff.latitude},${dropoff.longitude}`;
+                            const url = `https://www.google.com/maps?q=${dropoffLat},${dropoffLng}`;
                             Linking.openURL(url);
                           }}
                         >
@@ -503,8 +946,18 @@ const MapViewWithLiveTracking: React.FC<MapViewWithLiveTrackingProps> = ({
           </View>
           <View style={styles.infoRow}>
             <View style={[styles.legendItem, styles.dropoffLegend]} />
-            <Text style={styles.legendText}>Drop-off</Text>
+            <Text style={styles.legendText}>
+              {multipleDropOffs ? 'Drop-offs' : 'Drop-off'}
+            </Text>
           </View>
+          {multipleDropOffs && wayPoints.length > 0 && (
+            <View style={styles.infoRow}>
+              <View style={[styles.legendItem, styles.waypointLegend]} />
+              <Text style={styles.legendText}>
+                Waypoints ({wayPoints.filter(wp => wp.dropOff !== true && wp.pickup !== true).length})
+              </Text>
+            </View>
+          )}
           {vehicleLocation && (
             <>
               <View style={styles.infoRow}>
@@ -564,6 +1017,109 @@ const styles = StyleSheet.create({
   mapContainer: {
     flex: 1,
     position: 'relative',
+  },
+  distanceToggleButton: {
+    position: 'absolute',
+    top: 16,
+    right: 16,
+    zIndex: 1001,
+    elevation: 11,
+    backgroundColor: '#8B5CF6',
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    justifyContent: 'center',
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.25,
+    shadowRadius: 4,
+  },
+  mapDistanceOverlay: {
+    position: 'absolute',
+    top: 16,
+    left: 16,
+    right: 80, // Leave space for toggle button
+    zIndex: 1000,
+    elevation: 10,
+  },
+  mapDistanceCard: {
+    backgroundColor: '#fff',
+    borderRadius: 12,
+    padding: 14,
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.25,
+    shadowRadius: 8,
+    elevation: 8,
+    borderWidth: 1,
+    borderColor: '#e5e7eb',
+  },
+  mapDistanceHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  mapDistanceTitle: {
+    fontSize: 15,
+    fontWeight: 'bold',
+    color: '#1f2937',
+    flex: 1,
+  },
+  mapDistanceCloseButton: {
+    padding: 4,
+    marginLeft: 8,
+  },
+  mapDistanceRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-around',
+    alignItems: 'flex-start',
+    paddingVertical: 4,
+  },
+  mapDistanceItem: {
+    alignItems: 'center',
+    flex: 1,
+    minWidth: 80,
+  },
+  mapDistanceDivider: {
+    width: 1,
+    height: 50,
+    backgroundColor: '#e5e7eb',
+    marginHorizontal: 4,
+    alignSelf: 'center',
+  },
+  mapDistanceLabel: {
+    fontSize: 11,
+    color: '#6b7280',
+    fontWeight: '500',
+    marginTop: 6,
+    marginBottom: 4,
+    textAlign: 'center',
+  },
+  mapDistanceValue: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#1f2937',
+    textAlign: 'center',
+  },
+  mapDistanceWaypointContainer: {
+    marginTop: 10,
+    paddingTop: 10,
+    borderTopWidth: 1,
+    borderTopColor: '#e5e7eb',
+  },
+  mapDistanceWaypointInfo: {
+    fontSize: 11,
+    color: '#8B5CF6',
+    textAlign: 'center',
+    fontWeight: '600',
   },
   map: {
     width: '100%',
@@ -638,30 +1194,160 @@ const styles = StyleSheet.create({
     marginLeft: 8,
     fontWeight: '500',
   },
-  markerContainer: {
+  // Pickup Marker - Green Circle with Pulse Effect
+  pickupMarkerContainer: {
+    width: 50,
+    height: 50,
+    justifyContent: 'center',
+    alignItems: 'center',
+    position: 'relative',
+  },
+  pickupMarker: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: '#27ae60',
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 4,
+    borderColor: '#fff',
+    elevation: 7,
+    shadowColor: '#27ae60',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.5,
+    shadowRadius: 6,
+    zIndex: 2,
+  },
+  pickupMarkerPulse: {
+    position: 'absolute',
+    width: 50,
+    height: 50,
+    borderRadius: 25,
+    backgroundColor: '#27ae60',
+    opacity: 0.3,
+    zIndex: 1,
+  },
+  // Dropoff Marker - Red Diamond/Square Shape
+  dropoffMarkerContainer: {
+    width: 44,
+    height: 44,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  dropoffMarker: {
+    width: 44,
+    height: 44,
+    backgroundColor: '#e74c3c',
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 4,
+    borderColor: '#fff',
+    elevation: 7,
+    shadowColor: '#e74c3c',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.5,
+    shadowRadius: 6,
+    // Create diamond shape using transform
+    transform: [{ rotate: '45deg' }],
+  },
+  dropoffMarkerIcon: {
+    transform: [{ rotate: '-45deg' }],
+  },
+  // Vehicle Marker - Blue Circle (keep simple)
+  simpleMarker: {
     width: 40,
     height: 40,
     borderRadius: 20,
     justifyContent: 'center',
     alignItems: 'center',
     borderWidth: 3,
-    elevation: 5,
+    borderColor: '#fff',
+    elevation: 6,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.3,
+    shadowOpacity: 0.4,
     shadowRadius: 4,
-  },
-  pickupMarker: {
-    backgroundColor: '#27ae60',
-    borderColor: '#fff',
-  },
-  dropoffMarker: {
-    backgroundColor: '#e74c3c',
-    borderColor: '#fff',
   },
   vehicleMarker: {
     backgroundColor: '#3498db',
+  },
+  // Waypoint Marker - Orange Circle with Number
+  waypointMarkerContainer: {
+    width: 40,
+    height: 40,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  waypointMarker: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: '#f39c12',
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 3,
     borderColor: '#fff',
+    elevation: 6,
+    shadowColor: '#f39c12',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.5,
+    shadowRadius: 4,
+  },
+  waypointNumber: {
+    color: '#fff',
+    fontSize: 14,
+    fontWeight: 'bold',
+  },
+  waypointLegend: {
+    backgroundColor: '#f39c12',
+  },
+  waypointCalloutHeader: {
+    backgroundColor: '#f39c12',
+  },
+  calloutContainer: {
+    width: 200,
+    padding: 12,
+    backgroundColor: '#fff',
+    borderRadius: 8,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 4,
+    elevation: 5,
+  },
+  calloutHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 8,
+    paddingHorizontal: 10,
+    borderRadius: 6,
+    marginBottom: 8,
+  },
+  pickupCalloutHeader: {
+    backgroundColor: '#27ae60',
+  },
+  dropoffCalloutHeader: {
+    backgroundColor: '#e74c3c',
+  },
+  vehicleCalloutHeader: {
+    backgroundColor: '#3498db',
+  },
+  calloutTitle: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#fff',
+    marginLeft: 8,
+  },
+  calloutText: {
+    fontSize: 14,
+    color: '#333',
+    marginBottom: 4,
+  },
+  calloutAddress: {
+    fontSize: 12,
+    color: '#666',
+    marginTop: 4,
+    fontStyle: 'italic',
   },
   infoPanel: {
     backgroundColor: '#fff',
@@ -815,6 +1501,8 @@ const WebMapView: React.FC<WebMapViewProps> = ({
   const mapRef = React.useRef<HTMLDivElement>(null);
   const googleMapRef = React.useRef<any>(null);
   const markersRef = React.useRef<any[]>([]);
+  const vehicleMarkerRef = React.useRef<any>(null);
+  const vehicleInfoWindowRef = React.useRef<any>(null);
   const directionsServiceRef = React.useRef<any>(null);
   const directionsRendererRef = React.useRef<any>(null);
 
@@ -1007,8 +1695,10 @@ const WebMapView: React.FC<WebMapViewProps> = ({
   React.useEffect(() => {
     if (!mapLoaded || !mapRef.current || !(window as any).google?.maps) return;
 
-    const center = pickup
-      ? { lat: parseFloat(String(pickup.latitude)), lng: parseFloat(String(pickup.longitude)) }
+    const pickupLatNum = parseCoordinate(pickup?.latitude);
+    const pickupLngNum = parseCoordinate(pickup?.longitude);
+    const center = pickupLatNum !== null && pickupLngNum !== null
+      ? { lat: pickupLatNum, lng: pickupLngNum }
       : { lat: 43.6532, lng: -79.3832 }; // Default to Toronto
 
     // Create map
@@ -1031,10 +1721,10 @@ const WebMapView: React.FC<WebMapViewProps> = ({
     markersRef.current.forEach(marker => marker.setMap(null));
     markersRef.current = [];
 
-    // Add pickup marker
-    if (pickup?.latitude && pickup?.longitude) {
+    // Add pickup marker (reuse already parsed coordinates)
+    if (pickupLatNum !== null && pickupLngNum !== null) {
       const pickupMarker = new (window as any).google.maps.Marker({
-        position: { lat: parseFloat(String(pickup.latitude)), lng: parseFloat(String(pickup.longitude)) },
+        position: { lat: pickupLatNum, lng: pickupLngNum },
         map: googleMapRef.current,
         title: 'Pickup Location',
         label: {
@@ -1061,9 +1751,11 @@ const WebMapView: React.FC<WebMapViewProps> = ({
     }
 
     // Add dropoff marker
-    if (dropoff?.latitude && dropoff?.longitude) {
+    const dropoffLatNum = parseCoordinate(dropoff?.latitude);
+    const dropoffLngNum = parseCoordinate(dropoff?.longitude);
+    if (dropoffLatNum !== null && dropoffLngNum !== null) {
       const dropoffMarker = new (window as any).google.maps.Marker({
-        position: { lat: parseFloat(String(dropoff.latitude)), lng: parseFloat(String(dropoff.longitude)) },
+        position: { lat: dropoffLatNum, lng: dropoffLngNum },
         map: googleMapRef.current,
         title: 'Drop-off Location',
         label: {
@@ -1088,9 +1780,15 @@ const WebMapView: React.FC<WebMapViewProps> = ({
       dropoffMarker.addListener('click', () => dropoffInfo.open(googleMapRef.current, dropoffMarker));
     }
 
-    // Add vehicle marker if available
+    // Add vehicle marker if available (will be updated in separate useEffect)
     if (vehicleCoordinates?.latitude && vehicleCoordinates?.longitude) {
-      const vehicleMarker = new (window as any).google.maps.Marker({
+      // Remove old vehicle marker if it exists
+      if (vehicleMarkerRef.current) {
+        vehicleMarkerRef.current.setMap(null);
+        vehicleMarkerRef.current = null;
+      }
+
+      vehicleMarkerRef.current = new (window as any).google.maps.Marker({
         position: { lat: vehicleCoordinates.latitude, lng: vehicleCoordinates.longitude },
         map: googleMapRef.current,
         title: 'Vehicle Location',
@@ -1107,21 +1805,30 @@ const WebMapView: React.FC<WebMapViewProps> = ({
           strokeColor: '#fff',
           strokeWeight: 3,
         },
+        animation: (window as any).google.maps.Animation.DROP,
       });
-      markersRef.current.push(vehicleMarker);
+      markersRef.current.push(vehicleMarkerRef.current);
 
-      const vehicleInfo = new (window as any).google.maps.InfoWindow({
+      vehicleInfoWindowRef.current = new (window as any).google.maps.InfoWindow({
         content: `<div><strong>Vehicle</strong><br/>${vehicleLocation?.plateNumber || 'Live Location'}<br/>Speed: ${vehicleLocation?.speed || 0} km/h</div>`,
       });
-      vehicleMarker.addListener('click', () => vehicleInfo.open(googleMapRef.current, vehicleMarker));
+      vehicleMarkerRef.current.addListener('click', () => {
+        vehicleInfoWindowRef.current.open(googleMapRef.current, vehicleMarkerRef.current);
+      });
     }
 
     // Draw route if we have both pickup and dropoff
-    if (pickup?.latitude && dropoff?.latitude && directionsServiceRef.current && directionsRendererRef.current) {
+    const pickupLatForRoute = parseCoordinate(pickup?.latitude);
+    const pickupLngForRoute = parseCoordinate(pickup?.longitude);
+    const dropoffLatForRoute = parseCoordinate(dropoff?.latitude);
+    const dropoffLngForRoute = parseCoordinate(dropoff?.longitude);
+    if (pickupLatForRoute !== null && pickupLngForRoute !== null && 
+        dropoffLatForRoute !== null && dropoffLngForRoute !== null && 
+        directionsServiceRef.current && directionsRendererRef.current) {
       directionsServiceRef.current.route(
         {
-          origin: { lat: parseFloat(String(pickup.latitude)), lng: parseFloat(String(pickup.longitude)) },
-          destination: { lat: parseFloat(String(dropoff.latitude)), lng: parseFloat(String(dropoff.longitude)) },
+          origin: { lat: pickupLatForRoute, lng: pickupLngForRoute },
+          destination: { lat: dropoffLatForRoute, lng: dropoffLngForRoute },
           travelMode: (window as any).google.maps.TravelMode.DRIVING,
         },
         (result: any, status: any) => {
@@ -1143,7 +1850,63 @@ const WebMapView: React.FC<WebMapViewProps> = ({
       });
       googleMapRef.current.fitBounds(bounds);
     }
-  }, [mapLoaded, pickup, dropoff, vehicleCoordinates, vehicleLocation]);
+  }, [mapLoaded, pickup, dropoff]);
+
+  // Update vehicle marker position in real-time when location changes
+  React.useEffect(() => {
+    if (!mapLoaded || !googleMapRef.current || !(window as any).google?.maps) return;
+    if (!vehicleCoordinates?.latitude || !vehicleCoordinates?.longitude) return;
+
+    const vehicleLat = vehicleCoordinates.latitude;
+    const vehicleLng = vehicleCoordinates.longitude;
+
+    // Update existing vehicle marker position
+    if (vehicleMarkerRef.current) {
+      vehicleMarkerRef.current.setPosition({ lat: vehicleLat, lng: vehicleLng });
+      
+      // Update info window content with latest vehicle data
+      if (vehicleInfoWindowRef.current && vehicleLocation) {
+        vehicleInfoWindowRef.current.setContent(
+          `<div><strong>Vehicle</strong><br/>${vehicleLocation?.plateNumber || 'Live Location'}<br/>Speed: ${vehicleLocation?.speed || 0} km/h</div>`
+        );
+      }
+    } else {
+      // Create vehicle marker if it doesn't exist
+      vehicleMarkerRef.current = new (window as any).google.maps.Marker({
+        position: { lat: vehicleLat, lng: vehicleLng },
+        map: googleMapRef.current,
+        title: 'Vehicle Location',
+        label: {
+          text: 'V',
+          color: '#fff',
+          fontWeight: 'bold',
+        },
+        icon: {
+          path: (window as any).google.maps.SymbolPath.CIRCLE,
+          scale: 10,
+          fillColor: '#3498db',
+          fillOpacity: 1,
+          strokeColor: '#fff',
+          strokeWeight: 3,
+        },
+        animation: (window as any).google.maps.Animation.DROP,
+      });
+      
+      if (!markersRef.current.includes(vehicleMarkerRef.current)) {
+        markersRef.current.push(vehicleMarkerRef.current);
+      }
+
+      vehicleInfoWindowRef.current = new (window as any).google.maps.InfoWindow({
+        content: `<div><strong>Vehicle</strong><br/>${vehicleLocation?.plateNumber || 'Live Location'}<br/>Speed: ${vehicleLocation?.speed || 0} km/h</div>`,
+      });
+      
+      vehicleMarkerRef.current.addListener('click', () => {
+        if (vehicleInfoWindowRef.current) {
+          vehicleInfoWindowRef.current.open(googleMapRef.current, vehicleMarkerRef.current);
+        }
+      });
+    }
+  }, [mapLoaded, vehicleCoordinates, vehicleLocation]);
 
 
   if (!mapLoaded) {

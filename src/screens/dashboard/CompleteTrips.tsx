@@ -18,6 +18,7 @@ interface Load {
   orderType?: string;
   status: string;
   route?: {
+    multipleDropOffs?: boolean;
     selectPickup?: {
       place?: string;
       city?: string;
@@ -32,6 +33,17 @@ interface Load {
       latitude?: number;
       longitude?: number;
     };
+    wayPoints?: Array<{
+      address?: {
+        place?: string;
+        city?: string;
+        state?: string;
+        latitude?: number | string;
+        longitude?: number | string;
+      };
+      dropOff?: boolean;
+      pickup?: boolean;
+    }>;
   };
   payloads?: Array<{
     itemName?: string;
@@ -168,13 +180,28 @@ const CompleteTrips = () => {
           {loads.map((load) => {
             const pickup = load.route?.selectPickup;
             const dropoff = load.route?.selectDropOff;
+            const multipleDropOffs = load.route?.multipleDropOffs || false;
+            const wayPoints = load.route?.wayPoints || [];
+            
+            // Format route text based on multipleDropOffs
+            const formatRouteText = () => {
+              const pickupText = formatAddress(pickup);
+              
+              if (multipleDropOffs && wayPoints.length > 0) {
+                const waypointCount = wayPoints.length;
+                const dropoffCount = wayPoints.filter(wp => wp.dropOff === true).length;
+                return `${pickupText} → ${waypointCount} stop${waypointCount > 1 ? 's' : ''} (${dropoffCount} drop${dropoffCount > 1 ? 's' : ''})`;
+              } else {
+                return `${pickupText} → ${formatAddress(dropoff)}`;
+              }
+            };
             
             return (
               <View key={load._id} style={styles.loadCard}>
                 <View style={styles.cardHeader}>
                   <View style={styles.headerInfo}>
                     <Text style={styles.routeText}>
-                      {formatAddress(pickup)} → {formatAddress(dropoff)}
+                      {formatRouteText()}
                     </Text>
                     {load.internalId && (
                       <Text style={styles.loadIdText}>Load ID: {load.internalId}</Text>
