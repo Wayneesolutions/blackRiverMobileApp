@@ -63,15 +63,15 @@ export default function DashboardScreen() {
     const [refreshing, setRefreshing] = useState(false);
 
     const wishListItems = [
-        { id: 1, name: "Vehicle", icon: <Ionicons name="car-sport" size={28} color="#fff" />, color: "#906AD1", route: "Vehicle" },
-        { id: 2, name: "Trailer", icon: <FontAwesome5 name="truck-moving" size={28} color="#fff" />, color: "#FF9797", route: "Trailer" },
-        { id: 3, name: "HOS", icon: <MaterialIcons name="schedule" size={28} color="#fff" />, color: "#FFCC00", route: "HOS" },
-        { id: 4, name: "Asset Inspection", icon: <MaterialIcons name="report-problem" size={28} color="#fff" />, color: "#D74848", route: "AssetIncidents" },
-        { id: 5, name: "Settings", icon: <Ionicons name="settings" size={28} color="#fff" />, color: "#2CDBFA", route: "Settings" },
-        { id: 6, name: "Document", icon: <Ionicons name="document-text" size={28} color="#fff" />, color: "#C79EFF", route: "Documents" },
-        { id: 7, name: "Load Map", icon: <Ionicons name="map" size={28} color="#fff" />, color: "#831775", route: "LoadMap" },
-        { id: 8, name: "Transfer", icon: <Ionicons name="swap-horizontal" size={28} color="#fff" />, color: "#E61DCC", route: "Transfer" },
-        { id: 9, name: "Fuel", icon: <FontAwesome5 name="gas-pump" size={28} color="#fff" />, color: "#04AA30", route: "Fuel" },
+        // { id: 1, name: "Vehicle", icon: <Ionicons name="car-sport" size={28} color="#fff" />, color: "#906AD1", route: "Vehicle" },
+        // { id: 2, name: "Trailer", icon: <FontAwesome5 name="truck-moving" size={28} color="#fff" />, color: "#FF9797", route: "Trailer" },
+        // { id: 3, name: "HOS", icon: <MaterialIcons name="schedule" size={28} color="#fff" />, color: "#FFCC00", route: "HOS" },
+        // { id: 4, name: "Asset Inspection", icon: <MaterialIcons name="report-problem" size={28} color="#fff" />, color: "#D74848", route: "AssetIncidents" },
+        { id: 1, name: "Settings", icon: <Ionicons name="settings" size={28} color="#fff" />, color: "#2CDBFA", route: "Settings" },
+        { id: 2, name: "Document", icon: <Ionicons name="document-text" size={28} color="#fff" />, color: "#C79EFF", route: "Documents" },
+        { id: 3, name: "Load Map", icon: <Ionicons name="map" size={28} color="#fff" />, color: "#831775", route: "LoadMap" },
+        // { id: 8, name: "Transfer", icon: <Ionicons name="swap-horizontal" size={28} color="#fff" />, color: "#E61DCC", route: "Transfer" },
+        // { id: 9, name: "Fuel", icon: <FontAwesome5 name="gas-pump" size={28} color="#fff" />, color: "#04AA30", route: "Fuel" },
     ];
 
     // Fetch driver profile and statistics on mount
@@ -307,12 +307,12 @@ export default function DashboardScreen() {
 
                     {/* Daily Task Report */}
                     <View style={styles.section}>
-                        <View style={styles.sectionHeader}>
+                        {/* <View style={styles.sectionHeader}>
                             <Text style={styles.sectionTitle}>Daily task report</Text>
                             <TouchableOpacity onPress={() => navigation.navigate("NewTrip")}>
                                 <Text style={styles.linkText}>+ New Trip</Text>
                             </TouchableOpacity>
-                        </View>
+                        </View> */}
 
                         <View style={styles.taskContainer}>
                             <TouchableOpacity

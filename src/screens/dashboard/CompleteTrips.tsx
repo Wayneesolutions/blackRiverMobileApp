@@ -8,6 +8,8 @@ import {
   SafeAreaView,
   ActivityIndicator,
   RefreshControl,
+  Alert,
+  Linking,
 } from "react-native";
 import { apiService } from '../../services/api/apiService';
 import { logger } from '../../utils/loggerHelper';
@@ -59,6 +61,11 @@ interface Load {
   createdAt?: string;
   updatedAt?: string;
   completedAt?: string;
+  notes?: string;
+  documents?: Array<{
+    _id: string;
+    documentUrl: string;
+  }>;
 }
 
 const CompleteTrips = () => {
@@ -135,6 +142,108 @@ const CompleteTrips = () => {
       return load.payloads[0].itemName || 'Cargo';
     }
     return 'Cargo';
+  };
+
+  const getDocumentName = (url: string) => {
+    try {
+      // Handle both forward slashes and backslashes
+      const normalizedUrl = url.replace(/\\/g, '/');
+      const parts = normalizedUrl.split('/');
+      const fileName = parts[parts.length - 1];
+      
+      // Remove timestamp prefix (e.g., "1762586107913-")
+      const match = fileName.match(/^\d+-(.+)$/);
+      return match ? decodeURIComponent(match[1]) : decodeURIComponent(fileName);
+    } catch (error) {
+      console.error('Error parsing document name:', error);
+      return 'Document';
+    }
+  };
+
+  const getDocumentIcon = (fileName: string) => {
+    const extension = fileName.split('.').pop()?.toLowerCase();
+    switch (extension) {
+      case 'pdf': return '📄';
+      case 'doc':
+      case 'docx': return '📝';
+      case 'xls':
+      case 'xlsx': return '📊';
+      case 'jpg':
+      case 'jpeg':
+      case 'png':
+      case 'gif': return '🖼️';
+      case 'txt': return '📃';
+      case 'zip':
+      case 'rar': return '📦';
+      default: return '📎';
+    }
+  };
+
+  const normalizeDocumentUrl = (url: string) => {
+    try {
+      // Replace backslashes with forward slashes
+      let normalizedUrl = url.replace(/\\/g, '/');
+      
+      // If it's a localhost URL, you need to replace it with your actual server URL
+      // For development, you might use your computer's IP address
+      // For production, use your production server URL
+      
+      // Example replacements (uncomment and modify as needed):
+      // normalizedUrl = normalizedUrl.replace('http://localhost:3000', 'http://192.168.1.100:3000');
+      // normalizedUrl = normalizedUrl.replace('http://localhost:3000', 'https://your-production-server.com');
+      
+      return normalizedUrl;
+    } catch (error) {
+      console.error('Error normalizing URL:', error);
+      return url;
+    }
+  };
+
+  const handleDocumentPress = async (documentUrl: string, documentName: string) => {
+    const normalizedUrl = normalizeDocumentUrl(documentUrl);
+    
+    Alert.alert(
+      'Document',
+      documentName,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Open',
+          onPress: async () => {
+            try {
+              console.log('Opening document:', normalizedUrl);
+              
+              const supported = await Linking.canOpenURL(normalizedUrl);
+              
+              if (supported) {
+                await Linking.openURL(normalizedUrl);
+              } else {
+                Alert.alert(
+                  'Cannot Open Document',
+                  'Unable to open this document. The URL format may not be supported.',
+                  [{ text: 'OK' }]
+                );
+              }
+            } catch (error) {
+              console.error('Error opening document:', error);
+              Alert.alert(
+                'Error',
+                'Failed to open document. Please check your network connection.',
+                [{ text: 'OK' }]
+              );
+            }
+          },
+        },
+        {
+          text: 'Copy URL',
+          onPress: () => {
+            // You can implement clipboard copy here if needed
+            console.log('URL to copy:', normalizedUrl);
+            Alert.alert('Info', 'URL: ' + normalizedUrl);
+          },
+        },
+      ]
+    );
   };
 
   return (
@@ -253,6 +362,44 @@ const CompleteTrips = () => {
                     </View>
                   </View>
                 </View>
+
+                {load.notes && (
+                  <View style={styles.notesSection}>
+                    <Text style={styles.notesLabel}>Notes:</Text>
+                    <Text style={styles.notesText}>{load.notes}</Text>
+                  </View>
+                )}
+
+                {load.documents && load.documents.length > 0 && (
+                  <View style={styles.documentsSection}>
+                    <View style={styles.documentsSectionHeader}>
+                      <Text style={styles.documentsLabel}>📋 Documents</Text>
+                      <View style={styles.documentsBadge}>
+                        <Text style={styles.documentsBadgeText}>{load.documents.length}</Text>
+                      </View>
+                    </View>
+                    <View style={styles.documentsGrid}>
+                      {load.documents.map((doc) => {
+                        const docName = getDocumentName(doc.documentUrl);
+                        return (
+                          <TouchableOpacity
+                            key={doc._id}
+                            style={styles.documentCard}
+                            onPress={() => handleDocumentPress(doc.documentUrl, docName)}
+                            activeOpacity={0.7}
+                          >
+                            <Text style={styles.documentIcon}>
+                              {getDocumentIcon(docName)}
+                            </Text>
+                            <Text style={styles.documentName} numberOfLines={2}>
+                              {docName}
+                            </Text>
+                          </TouchableOpacity>
+                        );
+                      })}
+                    </View>
+                  </View>
+                )}
 
                 {load.completedAt && (
                   <View style={styles.dateSection}>
@@ -428,6 +575,88 @@ const styles = StyleSheet.create({
     fontSize: 13,
     color: "#7f8c8d",
     lineHeight: 18
+  },
+  notesSection: {
+    backgroundColor: "#f8f9fa",
+    borderRadius: 8,
+    padding: 12,
+    marginBottom: 16
+  },
+  notesLabel: {
+    fontSize: 14,
+    fontWeight: "600",
+    color: "#34495e",
+    marginBottom: 4
+  },
+  notesText: {
+    fontSize: 13,
+    color: "#7f8c8d",
+    lineHeight: 18
+  },
+  documentsSection: {
+    backgroundColor: "#f8f9fa",
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 16,
+    borderWidth: 1,
+    borderColor: "#e9ecef"
+  },
+  documentsSectionHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    marginBottom: 12
+  },
+  documentsLabel: {
+    fontSize: 15,
+    fontWeight: "700",
+    color: "#2c3e50"
+  },
+  documentsBadge: {
+    backgroundColor: "#2ecc71",
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 12,
+    minWidth: 28,
+    alignItems: "center"
+  },
+  documentsBadgeText: {
+    fontSize: 12,
+    fontWeight: "700",
+    color: "#ffffff"
+  },
+  documentsGrid: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 10
+  },
+  documentCard: {
+    backgroundColor: "#ffffff",
+    borderRadius: 10,
+    padding: 12,
+    width: "48%",
+    alignItems: "center",
+    borderWidth: 1,
+    borderColor: "#dee2e6",
+    shadowColor: "#000",
+    shadowOffset: {
+      width: 0,
+      height: 2
+    },
+    shadowOpacity: 0.05,
+    shadowRadius: 4,
+    elevation: 2
+  },
+  documentIcon: {
+    fontSize: 32,
+    marginBottom: 8
+  },
+  documentName: {
+    fontSize: 12,
+    fontWeight: "600",
+    color: "#495057",
+    textAlign: "center",
+    lineHeight: 16
   },
   dateSection: {
     borderTopWidth: 1,

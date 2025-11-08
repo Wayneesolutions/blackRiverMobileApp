@@ -9,6 +9,7 @@ import {
   ActivityIndicator,
   RefreshControl,
   Alert,
+  Linking,
 } from "react-native";
 import { apiService } from '../../services/api/apiService';
 import { logger } from '../../utils/loggerHelper';
@@ -58,6 +59,10 @@ interface Load {
     email?: string;
   };
   notes?: string;
+  documents?: Array<{
+    _id: string;
+    documentUrl: string;
+  }>;
 }
 
 const PendingTrips = () => {
@@ -71,21 +76,32 @@ const PendingTrips = () => {
 
   const fetchPendingLoads = async () => {
     try {
+      console.log("🔄 Fetching pending loads...");
       setLoading(true);
+
       const response = await apiService.getPendingLoads();
-      
-      if (response.success && response.data) {
+      console.log("✅ API Response:", response);
+
+      if (response?.success && response?.data) {
         const loadsData = response.data.loads || response.data || [];
-        setLoads(Array.isArray(loadsData) ? loadsData : []);
-        logger.info('Pending loads fetched', { count: loadsData.length });
+        console.log("📦 Extracted Loads Data (Full):", JSON.stringify(loadsData, null, 2));
+
+        if (Array.isArray(loadsData)) {
+          setLoads(loadsData);
+          console.log(`✅ Pending loads fetched successfully. Count: ${loadsData.length}`);
+        } else {
+          console.warn("⚠️ Data received is not an array. Resetting loads list.");
+          setLoads([]);
+        }
       } else {
-        logger.warn('Failed to fetch pending loads', { error: response.error });
+        console.warn("⚠️ Failed to fetch pending loads. Response:", response);
         setLoads([]);
       }
     } catch (error) {
-      logger.error('Error fetching pending loads', error);
+      console.error("❌ Error fetching pending loads:", error);
       setLoads([]);
     } finally {
+      console.log("✅ Fetch operation complete. Cleaning up states...");
       setLoading(false);
       setRefreshing(false);
     }
@@ -107,24 +123,19 @@ const PendingTrips = () => {
           style: 'default',
           onPress: async () => {
             try {
-              // If status is "planned", first transition to "dispatched", then to "in-delivery"
               if (currentStatus === 'planned') {
-                // First transition: planned → dispatched
                 const dispatchedResponse = await apiService.updateLoadStatus(loadId, 'dispatched');
                 if (!dispatchedResponse.success) {
                   Alert.alert('Error', dispatchedResponse.error || 'Failed to dispatch load');
                   return;
                 }
-                
-                // Small delay to ensure backend processes the first transition
                 await new Promise(resolve => setTimeout(resolve, 300));
               }
               
-              // Second transition: dispatched → in-delivery (or direct if already dispatched)
               const response = await apiService.updateLoadStatus(loadId, 'in-delivery');
               if (response.success) {
                 Alert.alert('Success', 'Load started successfully');
-                fetchPendingLoads(); // Refresh the list
+                fetchPendingLoads();
               } else {
                 Alert.alert('Error', response.error || 'Failed to start load');
               }
@@ -180,6 +191,108 @@ const PendingTrips = () => {
     }
   };
 
+  const getDocumentName = (url: string) => {
+    try {
+      // Handle both forward slashes and backslashes
+      const normalizedUrl = url.replace(/\\/g, '/');
+      const parts = normalizedUrl.split('/');
+      const fileName = parts[parts.length - 1];
+      
+      // Remove timestamp prefix (e.g., "1762586107913-")
+      const match = fileName.match(/^\d+-(.+)$/);
+      return match ? decodeURIComponent(match[1]) : decodeURIComponent(fileName);
+    } catch (error) {
+      console.error('Error parsing document name:', error);
+      return 'Document';
+    }
+  };
+
+  const getDocumentIcon = (fileName: string) => {
+    const extension = fileName.split('.').pop()?.toLowerCase();
+    switch (extension) {
+      case 'pdf': return '📄';
+      case 'doc':
+      case 'docx': return '📝';
+      case 'xls':
+      case 'xlsx': return '📊';
+      case 'jpg':
+      case 'jpeg':
+      case 'png':
+      case 'gif': return '🖼️';
+      case 'txt': return '📃';
+      case 'zip':
+      case 'rar': return '📦';
+      default: return '📎';
+    }
+  };
+
+  const normalizeDocumentUrl = (url: string) => {
+    try {
+      // Replace backslashes with forward slashes
+      let normalizedUrl = url.replace(/\\/g, '/');
+      
+      // If it's a localhost URL, you need to replace it with your actual server URL
+      // For development, you might use your computer's IP address
+      // For production, use your production server URL
+      
+      // Example replacements (uncomment and modify as needed):
+      // normalizedUrl = normalizedUrl.replace('http://localhost:3000', 'http://192.168.1.100:3000');
+      // normalizedUrl = normalizedUrl.replace('http://localhost:3000', 'https://your-production-server.com');
+      
+      return normalizedUrl;
+    } catch (error) {
+      console.error('Error normalizing URL:', error);
+      return url;
+    }
+  };
+
+  const handleDocumentPress = async (documentUrl: string, documentName: string) => {
+    const normalizedUrl = normalizeDocumentUrl(documentUrl);
+    
+    Alert.alert(
+      'Document',
+      documentName,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Open',
+          onPress: async () => {
+            try {
+              console.log('Opening document:', normalizedUrl);
+              
+              const supported = await Linking.canOpenURL(normalizedUrl);
+              
+              if (supported) {
+                await Linking.openURL(normalizedUrl);
+              } else {
+                Alert.alert(
+                  'Cannot Open Document',
+                  'Unable to open this document. The URL format may not be supported.',
+                  [{ text: 'OK' }]
+                );
+              }
+            } catch (error) {
+              console.error('Error opening document:', error);
+              Alert.alert(
+                'Error',
+                'Failed to open document. Please check your network connection.',
+                [{ text: 'OK' }]
+              );
+            }
+          },
+        },
+        {
+          text: 'Copy URL',
+          onPress: () => {
+            // You can implement clipboard copy here if needed
+            console.log('URL to copy:', normalizedUrl);
+            Alert.alert('Info', 'URL: ' + normalizedUrl);
+          },
+        },
+      ]
+    );
+  };
+
   return (
     <SafeAreaView style={styles.container}>
       <View style={styles.header}>
@@ -226,7 +339,6 @@ const PendingTrips = () => {
             const multipleDropOffs = load.route?.multipleDropOffs || false;
             const wayPoints = load.route?.wayPoints || [];
             
-            // Format route text based on multipleDropOffs
             const formatRouteText = () => {
               const pickupText = formatAddress(pickup);
               
@@ -301,6 +413,37 @@ const PendingTrips = () => {
                   <View style={styles.notesSection}>
                     <Text style={styles.notesLabel}>Notes:</Text>
                     <Text style={styles.notesText}>{load.notes}</Text>
+                  </View>
+                )}
+
+                {load.documents && load.documents.length > 0 && (
+                  <View style={styles.documentsSection}>
+                    <View style={styles.documentsSectionHeader}>
+                      <Text style={styles.documentsLabel}>📋 Documents</Text>
+                      <View style={styles.documentsBadge}>
+                        <Text style={styles.documentsBadgeText}>{load.documents.length}</Text>
+                      </View>
+                    </View>
+                    <View style={styles.documentsGrid}>
+                      {load.documents.map((doc) => {
+                        const docName = getDocumentName(doc.documentUrl);
+                        return (
+                          <TouchableOpacity
+                            key={doc._id}
+                            style={styles.documentCard}
+                            onPress={() => handleDocumentPress(doc.documentUrl, docName)}
+                            activeOpacity={0.7}
+                          >
+                            <Text style={styles.documentIcon}>
+                              {getDocumentIcon(docName)}
+                            </Text>
+                            <Text style={styles.documentName} numberOfLines={2}>
+                              {docName}
+                            </Text>
+                          </TouchableOpacity>
+                        );
+                      })}
+                    </View>
                   </View>
                 )}
 
@@ -494,6 +637,71 @@ const styles = StyleSheet.create({
     fontSize: 13,
     color: "#7f8c8d",
     lineHeight: 18
+  },
+  documentsSection: {
+    backgroundColor: "#f8f9fa",
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 16,
+    borderWidth: 1,
+    borderColor: "#e9ecef"
+  },
+  documentsSectionHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    marginBottom: 12
+  },
+  documentsLabel: {
+    fontSize: 15,
+    fontWeight: "700",
+    color: "#2c3e50"
+  },
+  documentsBadge: {
+    backgroundColor: "#8B5CF6",
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 12,
+    minWidth: 28,
+    alignItems: "center"
+  },
+  documentsBadgeText: {
+    fontSize: 12,
+    fontWeight: "700",
+    color: "#ffffff"
+  },
+  documentsGrid: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 10
+  },
+  documentCard: {
+    backgroundColor: "#ffffff",
+    borderRadius: 10,
+    padding: 12,
+    width: "48%",
+    alignItems: "center",
+    borderWidth: 1,
+    borderColor: "#dee2e6",
+    shadowColor: "#000",
+    shadowOffset: {
+      width: 0,
+      height: 2
+    },
+    shadowOpacity: 0.05,
+    shadowRadius: 4,
+    elevation: 2
+  },
+  documentIcon: {
+    fontSize: 32,
+    marginBottom: 8
+  },
+  documentName: {
+    fontSize: 12,
+    fontWeight: "600",
+    color: "#495057",
+    textAlign: "center",
+    lineHeight: 16
   },
   startButton: {
     backgroundColor: "#3498db",

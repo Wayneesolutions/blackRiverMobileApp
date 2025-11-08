@@ -36,73 +36,36 @@ interface QuickAction {
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Search'>;
 
-// All searchable pages/screens in your app
 const searchablePages: SearchablePage[] = [
   {
     id: '1',
-    name: 'Dashboard',
-    description: 'Main dashboard with trip overview and statistics',
-    icon: 'home-outline',
-    route: 'MainTabs',
-    category: 'Main',
-    keywords: ['home', 'main', 'overview', 'stats', 'dashboard']
+    name: 'Active Loads',
+    description: 'View and manage currently active loads',
+    icon: 'play-circle-outline',
+    route: 'ActiveTrips',
+    category: 'Load Management',
+    keywords: ['active', 'current', 'ongoing', 'loads', 'trips']
   },
   {
     id: '2',
-    name: 'New Trip',
-    description: 'Create and schedule new trips',
-    icon: 'add-circle-outline',
-    route: 'NewTrip',
-    category: 'Trip Management',
-    keywords: ['create', 'new', 'trip', 'schedule', 'add']
+    name: 'Completed Loads',
+    description: 'View completed load history',
+    icon: 'checkmark-circle-outline',
+    route: 'CompleteTrips',
+    category: 'Load Management',
+    keywords: ['completed', 'finished', 'history', 'past', 'loads', 'trips']
   },
   {
     id: '3',
-    name: 'Vehicle Management',
-    description: 'Manage vehicles, inspections, and maintenance',
-    icon: 'car-outline',
-    route: 'Vehicle',
-    category: 'Fleet Management',
-    keywords: ['vehicle', 'truck', 'inspection', 'maintenance', 'fleet']
+    name: 'Pending Loads',
+    description: 'View scheduled and pending loads',
+    icon: 'time-outline',
+    route: 'PendingTrips',
+    category: 'Load Management',
+    keywords: ['pending', 'scheduled', 'upcoming', 'waiting', 'loads', 'trips']
   },
   {
     id: '4',
-    name: 'Trailer Management',
-    description: 'Manage trailers and attachments',
-    icon: 'bicycle-outline',
-    route: 'Trailer',
-    category: 'Fleet Management',
-    keywords: ['trailer', 'attachment', 'equipment']
-  },
-  {
-    id: '5',
-    name: 'Hours of Service (HOS)',
-    description: 'Track driving hours and compliance',
-    icon: 'time-outline',
-    route: 'HOS',
-    category: 'Compliance',
-    keywords: ['hours', 'service', 'driving', 'compliance', 'log', 'duty']
-  },
-  {
-    id: '6',
-    name: 'Asset Incidents',
-    description: 'Report and manage vehicle incidents',
-    icon: 'warning-outline',
-    route: 'AssetIncidents',
-    category: 'Safety',
-    keywords: ['incident', 'accident', 'report', 'safety', 'damage']
-  },
-  {
-    id: '7',
-    name: 'Documents',
-    description: 'Manage licenses, permits, and documentation',
-    icon: 'document-text-outline',
-    route: 'Documents',
-    category: 'Compliance',
-    keywords: ['documents', 'license', 'permit', 'paperwork', 'compliance']
-  },
-  {
-    id: '8',
     name: 'Settings',
     description: 'App settings and preferences',
     icon: 'settings-outline',
@@ -111,123 +74,59 @@ const searchablePages: SearchablePage[] = [
     keywords: ['settings', 'preferences', 'account', 'profile']
   },
   {
-    id: '9',
+    id: '5',
+    name: 'Documents',
+    description: 'Manage licenses, permits, and documentation',
+    icon: 'document-text-outline',
+    route: 'Documents',
+    category: 'Compliance',
+    keywords: ['documents', 'license', 'permit', 'paperwork', 'compliance']
+  },
+  {
+    id: '6',
     name: 'Load Map',
     description: 'View routes and navigation maps',
     icon: 'map-outline',
     route: 'LoadMap',
     category: 'Navigation',
     keywords: ['map', 'route', 'navigation', 'gps', 'directions']
-  },
-  {
-    id: '10',
-    name: 'Transfer',
-    description: 'Manage cargo transfers and handoffs',
-    icon: 'swap-horizontal-outline',
-    route: 'Transfer',
-    category: 'Operations',
-    keywords: ['transfer', 'handoff', 'cargo', 'delivery']
-  },
-  {
-    id: '11',
-    name: 'Fuel Management',
-    description: 'Track fuel consumption and purchases',
-    icon: 'flame-outline',
-    route: 'Fuel',
-    category: 'Operations',
-    keywords: ['fuel', 'gas', 'diesel', 'consumption', 'station']
-  },
-  {
-    id: '12',
-    name: 'Active Trips',
-    description: 'View and manage currently active trips',
-    icon: 'play-circle-outline',
-    route: 'ActiveTrips',
-    category: 'Trip Management',
-    keywords: ['active', 'current', 'ongoing', 'trips']
-  },
-  {
-    id: '13',
-    name: 'Complete Trips',
-    description: 'View completed trip history',
-    icon: 'checkmark-circle-outline',
-    route: 'CompleteTrips',
-    category: 'Trip Management',
-    keywords: ['completed', 'finished', 'history', 'past', 'trips']
-  },
-  {
-    id: '14',
-    name: 'Pending Trips',
-    description: 'View scheduled and pending trips',
-    icon: 'time-outline',
-    route: 'PendingTrips',
-    category: 'Trip Management',
-    keywords: ['pending', 'scheduled', 'upcoming', 'waiting', 'trips']
-  },
-  {
-    id: '15',
-    name: 'Notifications',
-    description: 'View alerts, tasks, and system notifications',
-    icon: 'notifications-outline',
-    route: 'Notifications',
-    category: 'Communication',
-    keywords: ['notifications', 'alerts', 'tasks', 'messages', 'updates']
-  },
-  {
-    id: '16',
-    name: 'Help & Support',
-    description: 'Get help, FAQs, and contact support',
-    icon: 'help-circle-outline',
-    route: 'Help',
-    category: 'Support',
-    keywords: ['help', 'support', 'faq', 'assistance', 'contact']
-  },
-  {
-    id: '17',
-    name: 'Trip Information',
-    description: 'Detailed trip data and analytics',
-    icon: 'information-circle-outline',
-    route: 'Trips',
-    category: 'Trip Management',
-    keywords: ['trip', 'information', 'details', 'analytics', 'data']
   }
 ];
 
 const recentSearches: string[] = [
-  'Vehicle inspection',
-  'New trip',
-  'Fuel stations',
-  'HOS logs',
-  'Documents'
+  'Active loads',
+  'Load map',
+  'Documents',
+  'Completed loads'
 ];
 
 const quickActions: QuickAction[] = [
   {
     id: 'qa1',
-    name: 'Start New Trip',
-    icon: 'add-circle',
-    route: 'NewTrip',
+    name: 'Active Loads',
+    icon: 'play-circle',
+    route: 'ActiveTrips',
     color: '#906AD1'
   },
   {
     id: 'qa2',
-    name: 'Vehicle Check',
-    icon: 'car',
-    route: 'Vehicle',
-    color: '#10B981'
-  },
-  {
-    id: 'qa3',
     name: 'View Map',
     icon: 'map',
     route: 'LoadMap',
     color: '#3B82F6'
   },
   {
+    id: 'qa3',
+    name: 'Documents',
+    icon: 'document-text',
+    route: 'Documents',
+    color: '#10B981'
+  },
+  {
     id: 'qa4',
-    name: 'Fuel Log',
-    icon: 'flame',
-    route: 'Fuel',
+    name: 'Settings',
+    icon: 'settings',
+    route: 'Settings',
     color: '#F59E0B'
   }
 ];
@@ -316,12 +215,9 @@ export default function SearchScreen({ navigation }: Props) {
     }
 
     // Check if we're trying to navigate to a tab screen
-    const tabScreens = ['Dashboard', 'NewTrip', 'Vehicle', 'Trailer', 'HOS', 'AssetIncidents', 'Documents', 'Settings', 'LoadMap', 'Transfer', 'Fuel', 'ActiveTrips', 'CompleteTrips', 'PendingTrips'];
+    const tabScreens = ['Settings', 'Documents', 'LoadMap', 'ActiveTrips', 'CompleteTrips', 'PendingTrips'];
 
-    if (page.route === 'MainTabs') {
-      // Navigate to MainTabs with Dashboard as default
-      navigation.navigate('MainTabs', { screen: 'Dashboard' } as any);
-    } else if (tabScreens.includes(page.route as string)) {
+    if (tabScreens.includes(page.route as string)) {
       // Navigate to MainTabs first, then to the specific screen
       navigation.navigate('MainTabs', { screen: page.route } as any);
     } else {
@@ -329,6 +225,42 @@ export default function SearchScreen({ navigation }: Props) {
       navigation.navigate(page.route);
     }
   };
+
+  // Updated category list in the "All Pages" section
+  {
+    showRecent && (
+      <View style={styles.section}>
+        <Text style={styles.sectionTitle}>All Pages</Text>
+        {/* Group by category */}
+        {['Load Management', 'Navigation', 'Compliance', 'Account'].map(category => {
+          const categoryPages = searchablePages.filter(page => page.category === category);
+          if (categoryPages.length === 0) return null;
+
+          return (
+            <View key={category} style={styles.categoryContainer}>
+              <Text style={styles.categoryTitle}>{category}</Text>
+              {categoryPages.map(page => (
+                <TouchableOpacity
+                  key={page.id}
+                  style={styles.pageItem}
+                  onPress={() => handlePagePress(page)}
+                >
+                  <View style={styles.pageIconContainer}>
+                    <Ionicons name={page.icon} size={20} color="#906AD1" />
+                  </View>
+                  <View style={styles.pageContent}>
+                    <Text style={styles.pageTitle}>{page.name}</Text>
+                    <Text style={styles.pageDescription}>{page.description}</Text>
+                  </View>
+                  <Ionicons name="chevron-forward" size={16} color="#9CA3AF" />
+                </TouchableOpacity>
+              ))}
+            </View>
+          );
+        })}
+      </View>
+    )
+  }
 
   const handleRecentSearch = (query: string) => {
     setSearchQuery(query);
