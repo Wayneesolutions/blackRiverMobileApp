@@ -2,6 +2,23 @@
 import { apiService } from './api/apiService';
 import { logger } from '../utils/loggerHelper';
 
+export interface NotificationPreferences {
+    email?: boolean;
+    sms?: boolean;
+    appAlerts?: boolean;
+}
+
+export interface CompanyProfile {
+    _id: string;
+    companyName?: string;
+    companyCode?: string;
+    contactEmail?: string;
+    contactPhone?: string;
+    address?: string;
+    logoUrl?: string;
+    notificationPreferences?: NotificationPreferences;
+}
+
 export interface DriverProfile {
     _id: string;
     name: string;
@@ -12,6 +29,30 @@ export interface DriverProfile {
     status: string;
     createdAt: string;
     updatedAt: string;
+    company?: CompanyProfile | string | null;
+}
+
+export interface FormattedDriverCompany {
+    id: string;
+    name: string;
+    code: string;
+    contactEmail: string;
+    contactPhone: string;
+    address: string;
+    logoUrl?: string;
+}
+
+export interface FormattedDriverProfile {
+    id: string;
+    name: string;
+    email: string;
+    phone: string;
+    country: string;
+    profileImage?: string | null;
+    status: string;
+    memberSince: string;
+    lastUpdated: string;
+    company: FormattedDriverCompany | null;
 }
 
 export interface ProfileResponse {
@@ -48,6 +89,11 @@ class ProfileService {
             const response = await apiService.get<ProfileResponse>('/driver/profile');
 
             if (response.success && response.data?.data) {
+                try {
+                    console.log('[ProfileService] /driver/profile raw response:', JSON.stringify(response.data.data));
+                } catch (logError) {
+                    console.log('[ProfileService] /driver/profile raw response (non-serializable)', response.data.data);
+                }
                 this.cachedProfile = response.data.data;
                 this.lastFetchTime = Date.now();
                 
@@ -143,7 +189,7 @@ class ProfileService {
     /**
      * Format profile data for display
      */
-    formatProfileForDisplay(profile: DriverProfile) {
+    formatProfileForDisplay(profile: DriverProfile): FormattedDriverProfile {
         return {
             id: profile._id,
             name: profile.name || 'Not specified',
@@ -154,6 +200,7 @@ class ProfileService {
             status: profile.status,
             memberSince: this.formatDate(profile.createdAt),
             lastUpdated: this.formatDate(profile.updatedAt),
+            company: this.formatCompany(profile.company),
         };
     }
 
@@ -171,6 +218,22 @@ class ProfileService {
         } catch {
             return 'Unknown';
         }
+    }
+
+    private formatCompany(company?: CompanyProfile | string | null): FormattedDriverCompany | null {
+        if (!company || typeof company === 'string') {
+            return null;
+        }
+
+        return {
+            id: company._id ? company._id.toString() : '',
+            name: company.companyName || '',
+            code: company.companyCode || '',
+            contactEmail: company.contactEmail || '',
+            contactPhone: company.contactPhone || '',
+            address: company.address || '',
+            logoUrl: company.logoUrl || undefined,
+        };
     }
 
     /**

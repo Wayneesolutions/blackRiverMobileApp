@@ -16,23 +16,10 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
-import { profileService } from '../../services/ProfileService';
+import { profileService, FormattedDriverProfile } from '../../services/ProfileService';
 import { apiService } from '../../services/api/apiService';
 import { authManager } from '../../types/AuthManager';
 import { logger } from '../../utils/loggerHelper';
-
-interface DriverProfile {
-  id: string;
-  name: string;
-  email: string;
-  phone: string;
-  country: string;
-  profileImage?: string | null;
-  status: string;
-  memberSince: string;
-  lastUpdated: string;
-}
-
 
 const SettingsScreen = () => {
   const navigation = useNavigation();
@@ -42,7 +29,7 @@ const SettingsScreen = () => {
   const [updateStatus, setUpdateStatus] = useState('');
   const [isLoadingProfile, setIsLoadingProfile] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
-  const [driverProfile, setDriverProfile] = useState<DriverProfile | null>(null);
+  const [driverProfile, setDriverProfile] = useState<FormattedDriverProfile | null>(null);
   const [isChangingPassword, setIsChangingPassword] = useState(false);
   const [isSubmittingFeedback, setIsSubmittingFeedback] = useState(false);
 
@@ -68,6 +55,11 @@ const SettingsScreen = () => {
 
       if (profile) {
         const formattedProfile = profileService.formatProfileForDisplay(profile);
+        try {
+          console.log('[SettingsScreen] Formatted profile:', JSON.stringify(formattedProfile));
+        } catch (logError) {
+          console.log('[SettingsScreen] Formatted profile (non-serializable)', formattedProfile);
+        }
         setDriverProfile(formattedProfile);
       } else {
         Alert.alert(
@@ -481,6 +473,47 @@ const SettingsScreen = () => {
     );
   };
 
+  const renderCompanyInfo = () => {
+    if (isLoadingProfile) {
+      return (
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="small" color="#007AFF" />
+          <Text style={styles.loadingText}>Loading company info...</Text>
+        </View>
+      );
+    }
+
+    const company = driverProfile?.company;
+    const formatField = (value?: string) => (value && value.trim().length > 0 ? value : 'Not available');
+
+    if (!company) {
+      return (
+        <View style={styles.card}>
+          <Text style={styles.noDataText}>No company information available</Text>
+        </View>
+      );
+    }
+
+    const companyRows = [
+      { label: 'Company Name', value: company.name && company.name.trim().length > 0 ? company.name : 'Not assigned' },
+      { label: 'Company Code', value: formatField(company.code) },
+      { label: 'Contact Email', value: formatField(company.contactEmail) },
+      { label: 'Contact Phone', value: formatField(company.contactPhone) },
+      { label: 'Address', value: formatField(company.address) },
+    ];
+
+    return (
+      <View style={styles.card}>
+        {companyRows.map(({ label, value }) => (
+          <View style={styles.row} key={label}>
+            <Text style={styles.label}>{label}</Text>
+            <Text style={styles.value}>{value}</Text>
+          </View>
+        ))}
+      </View>
+    );
+  };
+
   return (
     <SafeAreaView style={styles.safeArea}>
       <ScrollView
@@ -585,37 +618,7 @@ const SettingsScreen = () => {
 
         {/* Company Info */}
         <Text style={styles.sectionTitle}>Company Information</Text>
-        <View style={styles.card}>
-        <View style={styles.row}>
-          <Text style={styles.label}>Company Name</Text>
-          <Text style={styles.value}>Zendo Demo</Text>
-        </View>
-
-        <TouchableOpacity style={styles.row} onPress={() => Alert.alert(
-          "Units Information",
-          "Units determine how distances and fuel are displayed:\n\n• Imperial: Miles, Gallons (MPG)\n• Metric: Kilometers, Liters (L/100km)\n\nThis affects fuel calculations, trip planning, and expense reporting. Contact your fleet manager to change units.",
-          [{ text: "OK" }]
-        )}>
-          <Text style={styles.label}>Units ℹ️</Text>
-          <Text style={styles.value}>Metric units (Kilometers, Liter)</Text>
-        </TouchableOpacity>
-        <TouchableOpacity style={styles.row} onPress={() => Alert.alert(
-          "Home Terminal Information",
-          "Your Home Terminal is your official base location set by your carrier.\n\nImportant:\n• All HOS logs use this terminal's time zone\n• Required for DOT compliance\n• Used for route planning and payroll\n• Cannot be changed without fleet manager approval\n\nIf this appears incorrect, contact dispatch immediately.",
-          [{ text: "OK" }]
-        )}>
-          <Text style={styles.label}>Home Terminal ℹ️</Text>
-          <Text style={styles.value}>Zendumo Demo</Text>
-        </TouchableOpacity>
-        <TouchableOpacity style={styles.row} onPress={() => Alert.alert(
-          "Time Zone Information",
-          "This is your Home Terminal time zone for all HOS logging.\n\nCritical Rules:\n• ALL log entries must use this time zone\n• Never changes based on your location\n• Required for DOT compliance\n• Used for 14-hour duty calculations\n\nEven if you're in a different time zone, your logs stay in Home Terminal time. Contact fleet manager if this is incorrect.",
-          [{ text: "OK" }]
-        )}>
-          <Text style={styles.label}>Time Zone ℹ️</Text>
-          <Text style={styles.value}>Canada/UAS</Text>
-        </TouchableOpacity>
-      </View>
+        {renderCompanyInfo()}
 
 
 
@@ -780,6 +783,12 @@ const styles = StyleSheet.create({
     color: 'white',
     fontSize: 14,
     fontWeight: '600',
+  },
+  noDataText: {
+    textAlign: 'center',
+    color: '#6B7280',
+    fontSize: 14,
+    paddingVertical: 12,
   },
 
   // Modal styles

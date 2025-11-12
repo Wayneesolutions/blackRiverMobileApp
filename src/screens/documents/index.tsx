@@ -474,7 +474,11 @@ const DocumentsScreen = () => {
             )}
           </View>
 
-          <ScrollView style={styles.modalScrollView}>
+          <ScrollView
+            style={styles.modalScrollView}
+            contentContainerStyle={styles.modalScrollContent}
+            keyboardShouldPersistTaps="handled"
+          >
             <View style={styles.formGroup}>
               <Text style={styles.label}>Document Type *</Text>
               <ScrollView horizontal showsHorizontalScrollIndicator={false}>
@@ -917,6 +921,9 @@ const styles = StyleSheet.create({
   },
   modalScrollView: {
     padding: 20,
+  },
+  modalScrollContent: {
+    paddingBottom: 60,
   },
   formGroup: {
     marginBottom: 16,
