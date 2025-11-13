@@ -18,6 +18,19 @@ export interface VehicleLocation {
     updatedAt?: string;
   };
   speed?: number;
+  fuelLevel?: number | string | null;
+  fuelLevelPercentage?: number | string | null;
+  fuelLevelLitres?: number | string | null;
+  fuelLevelLiters?: number | string | null;
+  fuel?: {
+    percentage?: number | string | null;
+    level?: number | string | null;
+    liters?: number | string | null;
+    litres?: number | string | null;
+    gallons?: number | string | null;
+    rangeKm?: number | string | null;
+    updatedAt?: string;
+  };
   status?: string;
   driver?: {
     _id: string;

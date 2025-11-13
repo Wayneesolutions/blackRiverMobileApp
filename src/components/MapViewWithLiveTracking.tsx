@@ -40,6 +40,14 @@ try {
 }
 
 const { width, height } = Dimensions.get('window');
+const SPEED_WARNING_THRESHOLD_KMH = 105;
+const FUEL_WARNING_THRESHOLD_PERCENT = 10;
+const FUEL_WARNING_THRESHOLD_LITERS = 40;
+const ENABLE_SPEED_WARNING_DEMO =
+  typeof process !== 'undefined' &&
+  process?.env?.EXPO_PUBLIC_ENABLE_SPEED_WARNING_DEMO === 'true'
+    ? true
+    : __DEV__;
 
 // Helper function to safely convert latitude/longitude to numbers
 const parseCoordinate = (value: string | number | undefined | null): number | null => {
@@ -53,6 +61,27 @@ const parseCoordinate = (value: string | number | undefined | null): number | nu
   }
   return null;
 };
+
+const parseNumericValue = (value: number | string | undefined | null): number | null => {
+  if (value === undefined || value === null) {
+    return null;
+  }
+
+  if (typeof value === 'number') {
+    return Number.isFinite(value) ? value : null;
+  }
+
+  if (typeof value === 'string') {
+    const parsed = parseFloat(value);
+    return Number.isFinite(parsed) ? parsed : null;
+  }
+
+  return null;
+};
+const parseSpeed = (value: number | string | undefined | null): number | null =>
+  parseNumericValue(value);
+const parseFuelValue = (value: number | string | undefined | null): number | null =>
+  parseNumericValue(value);
 
 const decodePolyline = (encoded: string): Array<{ latitude: number; longitude: number }> => {
   const points: Array<{ latitude: number; longitude: number }> = [];
@@ -155,6 +184,17 @@ interface MapViewWithLiveTrackingProps {
   };
 }
 
+type WarningBannerType = 'speed' | 'fuel';
+
+interface WarningBannerConfig {
+  id: string;
+  type: WarningBannerType;
+  icon: React.ComponentProps<typeof Ionicons>['name'];
+  title: string;
+  message: string;
+  note?: string;
+}
+
 const MapViewWithLiveTracking: React.FC<MapViewWithLiveTrackingProps> = ({
   visible,
   onClose,
@@ -164,6 +204,7 @@ const MapViewWithLiveTracking: React.FC<MapViewWithLiveTrackingProps> = ({
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [showDistanceInfo, setShowDistanceInfo] = useState(true);
+  const [forceWarningDemo, setForceWarningDemo] = useState(false);
   const mapRef = useRef<any>(null);
   const [routePath, setRoutePath] = useState<Array<{ latitude: number; longitude: number }>>([]);
   const googleMapsApiKeyRef = useRef<string | null | undefined>(undefined);
@@ -179,6 +220,9 @@ const MapViewWithLiveTracking: React.FC<MapViewWithLiveTrackingProps> = ({
       // Reset state when modal closes
       setVehicleLocation(null);
       setError(null);
+      if (ENABLE_SPEED_WARNING_DEMO) {
+        setForceWarningDemo(false);
+      }
       socketService.leaveVehicle();
       socketService.offVehicleLocation();
       return;
@@ -273,6 +317,56 @@ const MapViewWithLiveTracking: React.FC<MapViewWithLiveTrackingProps> = ({
               longitude: vehicle.currentLocation?.longitude,
               speed: vehicle.speed,
             }, 'MapViewWithLiveTracking');
+
+            const numericSpeed = parseSpeed(vehicle.speed ?? null);
+            if (numericSpeed !== null && numericSpeed > SPEED_WARNING_THRESHOLD_KMH) {
+              logger.warn('Vehicle speed exceeded threshold', {
+                vehicleId: vehicle._id,
+                internalId: vehicle.internalId,
+                plateNumber: vehicle.plateNumber,
+                speedKmh: numericSpeed,
+                thresholdKmh: SPEED_WARNING_THRESHOLD_KMH,
+              }, 'MapViewWithLiveTracking');
+            }
+
+            const numericFuelPercent = parseFuelValue(
+              vehicle.fuel?.percentage ??
+              vehicle.fuelLevelPercentage ??
+              (vehicle as any)?.fuelPercentage ??
+              null
+            );
+            let numericFuelLiters = parseFuelValue(
+              vehicle.fuel?.liters ??
+              vehicle.fuel?.litres ??
+              vehicle.fuelLevelLitres ??
+              vehicle.fuelLevelLiters ??
+              (vehicle as any)?.fuelLiters ??
+              null
+            );
+            if (numericFuelLiters === null) {
+              const gallonsValue = parseFuelValue(
+                vehicle.fuel?.gallons ?? (vehicle as any)?.fuelGallons ?? null
+              );
+              if (gallonsValue !== null) {
+                numericFuelLiters = gallonsValue * 3.78541;
+              }
+            }
+            if (
+              (numericFuelPercent !== null && numericFuelPercent <= FUEL_WARNING_THRESHOLD_PERCENT) ||
+              (numericFuelPercent === null &&
+                numericFuelLiters !== null &&
+                numericFuelLiters <= FUEL_WARNING_THRESHOLD_LITERS)
+            ) {
+              logger.warn('Vehicle fuel below threshold', {
+                vehicleId: vehicle._id,
+                internalId: vehicle.internalId,
+                plateNumber: vehicle.plateNumber,
+                fuelPercentage: numericFuelPercent,
+                fuelLiters: numericFuelLiters,
+                thresholdPercent: FUEL_WARNING_THRESHOLD_PERCENT,
+                thresholdLiters: FUEL_WARNING_THRESHOLD_LITERS,
+              }, 'MapViewWithLiveTracking');
+            }
             
             // Update map camera to show vehicle (only on first update to avoid constant movement)
             const vehicleLat = parseCoordinate(vehicle.currentLocation?.latitude);
@@ -461,6 +555,196 @@ const MapViewWithLiveTracking: React.FC<MapViewWithLiveTrackingProps> = ({
         longitude: vehicleLng,
       }
     : null;
+
+  const currentSpeedKmh = useMemo(() => parseSpeed(vehicleLocation?.speed ?? null), [vehicleLocation?.speed]);
+  const isSpeedDemoActive = ENABLE_SPEED_WARNING_DEMO && forceWarningDemo;
+  const isFuelDemoActive = isSpeedDemoActive;
+  const effectiveSpeedKmh = useMemo(() => {
+    if (isSpeedDemoActive) {
+      return SPEED_WARNING_THRESHOLD_KMH + 5;
+    }
+    return currentSpeedKmh;
+  }, [isSpeedDemoActive, currentSpeedKmh]);
+  const speedDisplayText = effectiveSpeedKmh !== null ? effectiveSpeedKmh.toFixed(1) : '0.0';
+  const speedDisplayWithUnit = `${speedDisplayText} km/h`;
+  const isSpeedWarningActive = effectiveSpeedKmh !== null && effectiveSpeedKmh > SPEED_WARNING_THRESHOLD_KMH;
+  const speedWarningExcessValue = isSpeedWarningActive && effectiveSpeedKmh !== null
+    ? Math.max(0, Math.ceil(effectiveSpeedKmh - SPEED_WARNING_THRESHOLD_KMH))
+    : null;
+  const speedLimitWithUnit = `${SPEED_WARNING_THRESHOLD_KMH} km/h`;
+  const rawFuelPercentage = useMemo(() => {
+    const sources: Array<number | string | null | undefined> = [
+      vehicleLocation?.fuel?.percentage,
+      vehicleLocation?.fuelLevelPercentage,
+      (vehicleLocation as any)?.fuelPercentage,
+      vehicleLocation?.fuelLevel,
+      vehicleLocation?.fuel?.level,
+    ];
+    for (const source of sources) {
+      const parsed = parseFuelValue(source ?? null);
+      if (parsed !== null) {
+        return parsed;
+      }
+    }
+    return null;
+  }, [vehicleLocation]);
+  const rawFuelLiters = useMemo(() => {
+    const literSources: Array<number | string | null | undefined> = [
+      vehicleLocation?.fuel?.liters,
+      vehicleLocation?.fuel?.litres,
+      vehicleLocation?.fuelLevelLitres,
+      vehicleLocation?.fuelLevelLiters,
+      (vehicleLocation as any)?.fuelLiters,
+    ];
+    for (const source of literSources) {
+      const parsed = parseFuelValue(source ?? null);
+      if (parsed !== null) {
+        return parsed;
+      }
+    }
+
+    const gallonSources: Array<number | string | null | undefined> = [
+      vehicleLocation?.fuel?.gallons,
+      (vehicleLocation as any)?.fuelGallons,
+    ];
+    for (const source of gallonSources) {
+      const parsedGallons = parseFuelValue(source ?? null);
+      if (parsedGallons !== null) {
+        return parsedGallons * 3.78541; // convert to litres
+      }
+    }
+
+    return null;
+  }, [vehicleLocation]);
+  const fuelPercentage = useMemo(() => {
+    if (rawFuelPercentage === null) {
+      return null;
+    }
+    return Math.min(100, Math.max(0, rawFuelPercentage));
+  }, [rawFuelPercentage]);
+  const fuelLiters = useMemo(() => {
+    if (rawFuelLiters === null) {
+      return null;
+    }
+    return Math.max(0, rawFuelLiters);
+  }, [rawFuelLiters]);
+  const baseFuelWarningActive =
+    (fuelPercentage !== null && fuelPercentage <= FUEL_WARNING_THRESHOLD_PERCENT) ||
+    (fuelPercentage === null && fuelLiters !== null && fuelLiters <= FUEL_WARNING_THRESHOLD_LITERS);
+  const isFuelWarningActive = baseFuelWarningActive || isFuelDemoActive;
+  const fuelDisplayPercentage = useMemo(() => {
+    if (fuelPercentage === null) {
+      return null;
+    }
+    return `${fuelPercentage.toFixed(1)}%`;
+  }, [fuelPercentage]);
+  const fuelDisplayLiters = useMemo(() => {
+    if (fuelLiters === null) {
+      return null;
+    }
+    return `${fuelLiters.toFixed(1)} L`;
+  }, [fuelLiters]);
+  const fuelDisplayText = useMemo(() => {
+    const parts: string[] = [];
+    if (fuelDisplayPercentage) {
+      parts.push(fuelDisplayPercentage);
+    }
+    if (fuelDisplayLiters) {
+      parts.push(fuelDisplayLiters);
+    }
+    if (parts.length === 0) {
+      return null;
+    }
+    return parts.join(' · ');
+  }, [fuelDisplayPercentage, fuelDisplayLiters]);
+  const fuelThresholdDescription = `${FUEL_WARNING_THRESHOLD_PERCENT}% or ${FUEL_WARNING_THRESHOLD_LITERS} L`;
+  const fuelDisplayTextForUi = useMemo(() => {
+    if (isFuelDemoActive) {
+      if (fuelDisplayText) {
+        return fuelDisplayText.includes('demo') ? fuelDisplayText : `${fuelDisplayText} (demo)`;
+      }
+      return `${Math.max(0, FUEL_WARNING_THRESHOLD_PERCENT - 2).toFixed(1)}% · ${(FUEL_WARNING_THRESHOLD_LITERS - 5).toFixed(1)} L (demo)`;
+    }
+    return fuelDisplayText;
+  }, [isFuelDemoActive, fuelDisplayText]);
+  const fuelWarningTitle = useMemo(() => {
+    if (isFuelDemoActive && !baseFuelWarningActive) {
+      return 'Low Fuel Warning (Demo)';
+    }
+    return 'Low Fuel Warning';
+  }, [isFuelDemoActive, baseFuelWarningActive]);
+  const warningBanners = useMemo<WarningBannerConfig[]>(() => {
+    const banners: WarningBannerConfig[] = [];
+    if (isSpeedWarningActive || isSpeedDemoActive) {
+      banners.push({
+        id: 'speed-warning',
+        type: 'speed',
+        icon: 'speedometer',
+        title: isSpeedDemoActive ? 'Speed Warning (Demo)' : 'Speed Warning',
+        message: `Current speed ${speedDisplayWithUnit}${
+          speedWarningExcessValue !== null ? ` (+${speedWarningExcessValue} km/h)` : ''
+        }. Slow down to ${speedLimitWithUnit} or below.`,
+        note: isSpeedDemoActive
+          ? 'Demo override active – showing example alert until GeoTab speed is available.'
+          : undefined,
+      });
+    }
+    if (isFuelWarningActive) {
+      const displayFuelText = fuelDisplayTextForUi ?? 'unknown';
+      const fuelMessage = `Fuel level ${displayFuelText} is below the recommended minimum (${fuelThresholdDescription}). Plan to refuel soon.`;
+      banners.push({
+        id: 'fuel-warning',
+        type: 'fuel',
+        icon: 'alert-circle',
+        title: fuelWarningTitle,
+        message: fuelMessage,
+        note:
+          fuelDisplayTextForUi === null
+            ? `Thresholds: ${fuelThresholdDescription}.`
+            : isFuelDemoActive && !baseFuelWarningActive
+              ? 'Demo override active – showing example alert until fuel telemetry is available.'
+              : undefined,
+      });
+    }
+    return banners;
+  }, [
+    isSpeedWarningActive,
+    isSpeedDemoActive,
+    speedDisplayWithUnit,
+    speedWarningExcessValue,
+    speedLimitWithUnit,
+    isFuelWarningActive,
+    fuelThresholdDescription,
+    fuelDisplayTextForUi,
+    fuelWarningTitle,
+    isFuelDemoActive,
+    baseFuelWarningActive,
+  ]);
+  const vehicleInfoContentHtml = useMemo(() => {
+    const name = vehicleLocation?.plateNumber || 'Live Location';
+    const speedLine = effectiveSpeedKmh !== null
+      ? `Speed: ${speedDisplayWithUnit}${isSpeedWarningActive ? ' (over limit)' : ''}${isSpeedDemoActive ? ' (demo)' : ''}`
+      : 'Speed: N/A';
+    const thresholdLine = `Warning threshold: ${speedLimitWithUnit}`;
+    const excessLine = speedWarningExcessValue !== null ? `<br/>Over by ${speedWarningExcessValue} km/h` : '';
+    const demoLine = isSpeedDemoActive ? '<br/><em>Demo warning override active</em>' : '';
+    const fuelLine = fuelDisplayTextForUi ? `<br/>Fuel: ${fuelDisplayTextForUi}` : '';
+    const fuelWarningLine = isFuelWarningActive
+      ? `<br/><strong>Fuel alert:</strong> Below minimum (${fuelThresholdDescription}).`
+      : '';
+    return `<div><strong>Vehicle</strong><br/>${name}<br/>${speedLine}<br/>${thresholdLine}${excessLine}${demoLine}${fuelLine}${fuelWarningLine}</div>`;
+  }, [
+    vehicleLocation?.plateNumber,
+    effectiveSpeedKmh,
+    speedDisplayWithUnit,
+    isSpeedWarningActive,
+    speedLimitWithUnit,
+    speedWarningExcessValue,
+    isSpeedDemoActive,
+    fuelDisplayTextForUi,
+    isFuelWarningActive,
+    fuelThresholdDescription,
+  ]);
 
   const fetchGoogleMapsApiKey = useCallback(async (): Promise<string | null> => {
     if (googleMapsApiKeyRef.current !== undefined) {
@@ -773,6 +1057,11 @@ const MapViewWithLiveTracking: React.FC<MapViewWithLiveTrackingProps> = ({
     validWaypoints,
     vehicleCoordinates,
   ]);
+  const hasDistanceMetrics =
+    distanceMetrics.total > 0 ||
+    distanceMetrics.traveled > 0 ||
+    distanceMetrics.remaining > 0;
+  const shouldShowDistanceOverlay = hasDistanceMetrics;
 
   return (
     <Modal
@@ -797,8 +1086,59 @@ const MapViewWithLiveTracking: React.FC<MapViewWithLiveTrackingProps> = ({
 
         {/* Map Container */}
         <View style={styles.mapContainer}>
+          {ENABLE_SPEED_WARNING_DEMO && (
+            <TouchableOpacity
+              onPress={() => setForceWarningDemo((prev) => !prev)}
+              style={[
+                styles.demoToggleFloating,
+                isSpeedDemoActive && styles.demoToggleFloatingActive,
+              ]}
+              activeOpacity={0.8}
+            >
+              <Ionicons
+                name={isSpeedDemoActive ? 'play-back' : 'flash'}
+                size={18}
+                color="#fff"
+              />
+              <Text style={styles.demoToggleFloatingText}>
+                {isSpeedDemoActive ? 'Hide Demo' : 'Demo Speed Warning'}
+              </Text>
+            </TouchableOpacity>
+          )}
+
+          {warningBanners.length > 0 && (
+            <View style={styles.warningStack}>
+              {warningBanners.map((banner, index) => (
+                <View
+                  key={banner.id}
+                  style={[
+                    styles.warningBanner,
+                    banner.type === 'speed'
+                      ? styles.warningBannerSpeed
+                      : styles.warningBannerFuel,
+                    index > 0 && styles.warningBannerSpacing,
+                  ]}
+                >
+                  <Ionicons
+                    name={banner.icon}
+                    size={22}
+                    color="#fff"
+                    style={styles.warningBannerIcon}
+                  />
+                  <View style={styles.warningBannerContent}>
+                    <Text style={styles.warningBannerTitle}>{banner.title}</Text>
+                    <Text style={styles.warningBannerMessage}>{banner.message}</Text>
+                    {banner.note && (
+                      <Text style={styles.warningBannerNote}>{banner.note}</Text>
+                    )}
+                  </View>
+                </View>
+              ))}
+            </View>
+          )}
+
           {/* Distance Toggle Button */}
-          {(distanceMetrics.total > 0 || distanceMetrics.traveled > 0 || distanceMetrics.remaining > 0) && (
+          {shouldShowDistanceOverlay && (
             <TouchableOpacity
               style={styles.distanceToggleButton}
               onPress={() => setShowDistanceInfo(!showDistanceInfo)}
@@ -813,43 +1153,58 @@ const MapViewWithLiveTracking: React.FC<MapViewWithLiveTrackingProps> = ({
           )}
 
           {/* Distance Info Overlay - Floating on Map */}
-          {showDistanceInfo && (distanceMetrics.total > 0 || distanceMetrics.traveled > 0 || distanceMetrics.remaining > 0) && (
+          {showDistanceInfo && shouldShowDistanceOverlay && (
             <View style={styles.mapDistanceOverlay}>
               <View style={styles.mapDistanceCard}>
                 <View style={styles.mapDistanceHeader}>
-                  <Text style={styles.mapDistanceTitle}>Distance Information</Text>
                   <TouchableOpacity
                     onPress={() => setShowDistanceInfo(false)}
                     style={styles.mapDistanceCloseButton}
                   >
-                    <Ionicons name="close" size={18} color="#6b7280" />
+                    <Ionicons name="close" size={16} color="#6b7280" />
                   </TouchableOpacity>
                 </View>
-                <View style={styles.mapDistanceRow}>
-                  <View style={styles.mapDistanceItem}>
-                    <Ionicons name="map-outline" size={20} color="#8B5CF6" />
-                    <Text style={styles.mapDistanceLabel}>Total</Text>
-                    <Text style={styles.mapDistanceValue}>
-                      {distanceMetrics.total > 0 ? `${distanceMetrics.total.toFixed(1)} km` : 'N/A'}
-                    </Text>
+                <View style={styles.mapDistanceList}>
+                  <View style={styles.mapDistanceListItem}>
+                    <Ionicons name="map-outline" size={16} color="#6366F1" style={styles.mapDistanceListIcon} />
+                    <View style={styles.mapDistanceItemContent}>
+                      <Text style={styles.mapDistanceLabel}>Total Distance</Text>
+                      <Text style={styles.mapDistanceValue}>
+                        {distanceMetrics.total > 0 ? `${distanceMetrics.total.toFixed(1)} km` : 'N/A'}
+                      </Text>
+                    </View>
                   </View>
-                  {vehicleCoordinates && (
+                  <View style={styles.mapDistanceSeparator} />
+                  <View style={styles.mapDistanceListItem}>
+                    <Ionicons name="checkmark-circle" size={16} color="#10B981" style={styles.mapDistanceListIcon} />
+                    <View style={styles.mapDistanceItemContent}>
+                      <Text style={styles.mapDistanceLabel}>Distance Traveled</Text>
+                      <Text style={styles.mapDistanceValue}>
+                        {distanceMetrics.traveled > 0 ? `${distanceMetrics.traveled.toFixed(1)} km` : '0.0 km'}
+                      </Text>
+                    </View>
+                  </View>
+                  <View style={styles.mapDistanceSeparator} />
+                  <View style={styles.mapDistanceListItem}>
+                    <Ionicons name="navigate-circle" size={16} color="#F59E0B" style={styles.mapDistanceListIcon} />
+                    <View style={styles.mapDistanceItemContent}>
+                      <Text style={styles.mapDistanceLabel}>Distance Remaining</Text>
+                      <Text style={styles.mapDistanceValue}>
+                        {distanceMetrics.remaining > 0 ? `${distanceMetrics.remaining.toFixed(1)} km` : '0.0 km'}
+                      </Text>
+                    </View>
+                  </View>
+                  {fuelDisplayTextForUi && (
                     <>
-                      <View style={styles.mapDistanceDivider} />
-                      <View style={styles.mapDistanceItem}>
-                        <Ionicons name="checkmark-circle" size={20} color="#10B981" />
-                        <Text style={styles.mapDistanceLabel}>Traveled</Text>
-                        <Text style={styles.mapDistanceValue}>
-                          {distanceMetrics.traveled > 0 ? `${distanceMetrics.traveled.toFixed(1)} km` : '0.0 km'}
-                        </Text>
-                      </View>
-                      <View style={styles.mapDistanceDivider} />
-                      <View style={styles.mapDistanceItem}>
-                        <Ionicons name="navigate-circle" size={20} color="#F59E0B" />
-                        <Text style={styles.mapDistanceLabel}>Remaining</Text>
-                        <Text style={styles.mapDistanceValue}>
-                          {distanceMetrics.remaining > 0 ? `${distanceMetrics.remaining.toFixed(1)} km` : '0.0 km'}
-                        </Text>
+                      <View style={styles.mapDistanceSeparator} />
+                      <View style={styles.mapDistanceListItem}>
+                        <Ionicons name="water" size={16} color="#0EA5E9" style={styles.mapDistanceListIcon} />
+                        <View style={styles.mapDistanceItemContent}>
+                          <Text style={styles.mapDistanceLabel}>Current Fuel Level</Text>
+                          <Text style={[styles.mapDistanceValue, isFuelWarningActive ? styles.mapDistanceValueWarning : undefined]}>
+                            {fuelDisplayTextForUi}
+                          </Text>
+                        </View>
                       </View>
                     </>
                   )}
@@ -889,6 +1244,17 @@ const MapViewWithLiveTracking: React.FC<MapViewWithLiveTrackingProps> = ({
               routeCoordinates={routeCoordinates}
             routePath={routePath.length >= 2 ? routePath : routeCoordinates}
               vehicleCoordinates={vehicleCoordinates}
+              speedDisplayWithUnit={speedDisplayWithUnit}
+              speedWarningExcessValue={speedWarningExcessValue}
+              speedLimitWithUnit={speedLimitWithUnit}
+              isSpeedWarningActive={isSpeedWarningActive}
+              isSpeedDemoActive={isSpeedDemoActive}
+              fuelDisplayText={fuelDisplayTextForUi}
+              isFuelWarningActive={isFuelWarningActive}
+              vehicleInfoContentHtml={vehicleInfoContentHtml}
+              warningBanners={warningBanners}
+              enableSpeedWarningDemo={ENABLE_SPEED_WARNING_DEMO}
+              onToggleSpeedDemo={() => setForceWarningDemo((prev) => !prev)}
               onOpenGoogleMaps={() => {
                 // Open Google Maps with route if coordinates are available
                 const coords = vehicleCoordinates || (pickupLat !== null && pickupLng !== null ? { latitude: pickupLat, longitude: pickupLng } : null);
@@ -1126,10 +1492,25 @@ const MapViewWithLiveTracking: React.FC<MapViewWithLiveTrackingProps> = ({
                 <View style={[styles.legendItem, styles.vehicleLegend]} />
                 <Text style={styles.legendText}>Vehicle (Live)</Text>
               </View>
-              {vehicleLocation.speed !== undefined && (
+              {(vehicleLocation.speed !== undefined && vehicleLocation.speed !== null) || isSpeedDemoActive ? (
+                <>
+                  <View style={styles.infoRow}>
+                    <Text style={[styles.speedText, isSpeedWarningActive ? styles.speedTextWarning : undefined]}>
+                      Speed: {speedDisplayWithUnit}
+                      {isSpeedDemoActive ? ' (demo)' : ''}
+                    </Text>
+                  </View>
+                  <View style={styles.infoRow}>
+                    <Text style={styles.speedLimitText}>
+                      Warning threshold {speedLimitWithUnit}
+                    </Text>
+                  </View>
+                </>
+              ) : null}
+              {fuelDisplayTextForUi && (
                 <View style={styles.infoRow}>
-                  <Text style={styles.speedText}>
-                    Speed: {vehicleLocation.speed || 0} km/h
+                  <Text style={[styles.fuelText, isFuelWarningActive ? styles.fuelTextWarning : undefined]}>
+                    Fuel: {fuelDisplayTextForUi}
                   </Text>
                 </View>
               )}
@@ -1180,6 +1561,63 @@ const styles = StyleSheet.create({
     flex: 1,
     position: 'relative',
   },
+  warningStack: {
+    position: 'absolute',
+    bottom: 16,
+    left: 16,
+    right: 16,
+    zIndex: 1100,
+  },
+  warningStackWeb: {
+    bottom: 140,
+    left: 20,
+    right: 20,
+  },
+  warningBanner: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    borderRadius: 14,
+    paddingVertical: 12,
+    paddingHorizontal: 14,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 6,
+    elevation: 12,
+  },
+  warningBannerSpeed: {
+    backgroundColor: 'rgba(220, 38, 38, 0.95)',
+  },
+  warningBannerFuel: {
+    backgroundColor: 'rgba(234, 179, 8, 0.95)',
+  },
+  warningBannerSpacing: {
+    marginTop: 12,
+  },
+  warningBannerIcon: {
+    marginRight: 12,
+    marginTop: 2,
+  },
+  warningBannerContent: {
+    flex: 1,
+  },
+  warningBannerTitle: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: '#fff',
+    marginBottom: 4,
+  },
+  warningBannerMessage: {
+    fontSize: 13,
+    color: '#F9FAFB',
+    lineHeight: 18,
+  },
+  warningBannerNote: {
+    marginTop: 6,
+    fontSize: 12,
+    color: '#FDE68A',
+    lineHeight: 16,
+  },
   distanceToggleButton: {
     position: 'absolute',
     top: 16,
@@ -1202,74 +1640,74 @@ const styles = StyleSheet.create({
   },
   mapDistanceOverlay: {
     position: 'absolute',
-    top: 16,
-    left: 16,
-    right: 80, // Leave space for toggle button
+    top: 12,
+    left: 12,
+    right: 72, // Leave space for toggle button
     zIndex: 1000,
     elevation: 10,
   },
   mapDistanceCard: {
     backgroundColor: '#fff',
     borderRadius: 12,
-    padding: 14,
+    paddingVertical: 8,
+    paddingHorizontal: 10,
     shadowColor: '#000',
     shadowOffset: {
       width: 0,
       height: 2,
     },
-    shadowOpacity: 0.25,
-    shadowRadius: 8,
-    elevation: 8,
+    shadowOpacity: 0.18,
+    shadowRadius: 5,
+    elevation: 5,
     borderWidth: 1,
     borderColor: '#e5e7eb',
+    minWidth: 120,
+    maxWidth: 160,
   },
   mapDistanceHeader: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
+    justifyContent: 'flex-end',
     alignItems: 'center',
-    marginBottom: 12,
-  },
-  mapDistanceTitle: {
-    fontSize: 15,
-    fontWeight: 'bold',
-    color: '#1f2937',
-    flex: 1,
+    marginBottom: 6,
   },
   mapDistanceCloseButton: {
     padding: 4,
     marginLeft: 8,
   },
-  mapDistanceRow: {
+  mapDistanceList: {
+    marginTop: 2,
+  },
+  mapDistanceListItem: {
     flexDirection: 'row',
-    justifyContent: 'space-around',
-    alignItems: 'flex-start',
+    alignItems: 'center',
     paddingVertical: 4,
   },
-  mapDistanceItem: {
-    alignItems: 'center',
-    flex: 1,
-    minWidth: 80,
+  mapDistanceListIcon: {
+    marginRight: 6,
+    width: 16,
+    textAlign: 'center',
   },
-  mapDistanceDivider: {
-    width: 1,
-    height: 50,
-    backgroundColor: '#e5e7eb',
-    marginHorizontal: 4,
-    alignSelf: 'center',
+  mapDistanceItemContent: {
+    flex: 1,
+  },
+  mapDistanceSeparator: {
+    height: 1,
+    backgroundColor: '#E5E7EB',
+    marginVertical: 3,
   },
   mapDistanceLabel: {
-    fontSize: 11,
-    color: '#6b7280',
-    fontWeight: '500',
-    marginTop: 6,
-    marginBottom: 4,
-    textAlign: 'center',
+    fontSize: 10,
+    color: '#6B7280',
+    fontWeight: '600',
   },
   mapDistanceValue: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    color: '#1f2937',
-    textAlign: 'center',
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#111827',
+    marginTop: 0,
+  },
+  mapDistanceValueWarning: {
+    color: '#DC2626',
   },
   mapDistanceWaypointContainer: {
     marginTop: 10,
@@ -1282,6 +1720,36 @@ const styles = StyleSheet.create({
     color: '#8B5CF6',
     textAlign: 'center',
     fontWeight: '600',
+  },
+  demoToggleFloating: {
+    position: 'absolute',
+    top: 80,
+    right: 16,
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    borderRadius: 999,
+    backgroundColor: 'rgba(99, 102, 241, 0.95)',
+    zIndex: 1100,
+    elevation: 12,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.25,
+    shadowRadius: 4,
+  },
+  demoToggleFloatingActive: {
+    backgroundColor: 'rgba(234, 88, 12, 0.95)',
+  },
+  demoToggleFloatingText: {
+    color: '#fff',
+    fontSize: 12,
+    fontWeight: '700',
+    marginLeft: 6,
+  },
+  demoToggleFloatingWeb: {
+    top: 100,
+    right: 20,
   },
   map: {
     width: '100%',
@@ -1625,6 +2093,23 @@ const styles = StyleSheet.create({
     color: '#8B5CF6',
     marginLeft: 8,
   },
+  speedTextWarning: {
+    color: '#F97316',
+  },
+  speedLimitText: {
+    fontSize: 12,
+    color: '#6B7280',
+    marginLeft: 8,
+  },
+  fuelText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#059669',
+    marginLeft: 8,
+  },
+  fuelTextWarning: {
+    color: '#DC2626',
+  },
   addressText: {
     fontSize: 12,
     color: '#666',
@@ -1672,6 +2157,34 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#333',
     fontWeight: '600',
+  },
+  webInfoValueWarning: {
+    color: '#DC2626',
+    fontWeight: '700',
+  },
+  webInfoAlert: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#DC2626',
+    borderRadius: 8,
+    paddingVertical: 8,
+    paddingHorizontal: 10,
+    marginTop: 8,
+  },
+  webInfoAlertIcon: {
+    marginRight: 8,
+  },
+  webInfoAlertText: {
+    color: '#fff',
+    fontSize: 13,
+    fontWeight: '500',
+    flex: 1,
+  },
+  webInfoDemoNote: {
+    marginTop: 6,
+    fontSize: 12,
+    color: '#B45309',
+    fontWeight: '500',
   },
   openMapsButton: {
     flexDirection: 'row',
@@ -1723,6 +2236,17 @@ interface WebMapViewProps {
   routeCoordinates: Array<{ latitude: number; longitude: number }>;
   routePath: Array<{ latitude: number; longitude: number }>;
   vehicleCoordinates: { latitude: number; longitude: number } | null;
+  speedDisplayWithUnit: string;
+  speedWarningExcessValue: number | null;
+  speedLimitWithUnit: string;
+  isSpeedWarningActive: boolean;
+  isSpeedDemoActive: boolean;
+  fuelDisplayText: string | null;
+  isFuelWarningActive: boolean;
+  vehicleInfoContentHtml: string;
+  warningBanners: WarningBannerConfig[];
+  enableSpeedWarningDemo: boolean;
+  onToggleSpeedDemo: () => void;
   onOpenGoogleMaps: () => void;
 }
 
@@ -1733,6 +2257,17 @@ const WebMapView: React.FC<WebMapViewProps> = ({
   routeCoordinates,
   routePath,
   vehicleCoordinates,
+  speedDisplayWithUnit,
+  speedWarningExcessValue,
+  speedLimitWithUnit,
+  isSpeedWarningActive,
+  isSpeedDemoActive,
+  fuelDisplayText,
+  isFuelWarningActive,
+  vehicleInfoContentHtml,
+  warningBanners,
+  enableSpeedWarningDemo,
+  onToggleSpeedDemo,
   onOpenGoogleMaps,
 }) => {
   const [mapLoaded, setMapLoaded] = React.useState(false);
@@ -2040,7 +2575,7 @@ const WebMapView: React.FC<WebMapViewProps> = ({
       markersRef.current.push(vehicleMarkerRef.current);
 
       vehicleInfoWindowRef.current = new (window as any).google.maps.InfoWindow({
-        content: `<div><strong>Vehicle</strong><br/>${vehicleLocation?.plateNumber || 'Live Location'}<br/>Speed: ${vehicleLocation?.speed || 0} km/h</div>`,
+        content: vehicleInfoContentHtml,
       });
       vehicleMarkerRef.current.addListener('click', () => {
         vehicleInfoWindowRef.current.open(googleMapRef.current, vehicleMarkerRef.current);
@@ -2100,9 +2635,7 @@ const WebMapView: React.FC<WebMapViewProps> = ({
       
       // Update info window content with latest vehicle data
       if (vehicleInfoWindowRef.current && vehicleLocation) {
-        vehicleInfoWindowRef.current.setContent(
-          `<div><strong>Vehicle</strong><br/>${vehicleLocation?.plateNumber || 'Live Location'}<br/>Speed: ${vehicleLocation?.speed || 0} km/h</div>`
-        );
+        vehicleInfoWindowRef.current.setContent(vehicleInfoContentHtml);
       }
     } else {
       // Create vehicle marker if it doesn't exist
@@ -2131,7 +2664,7 @@ const WebMapView: React.FC<WebMapViewProps> = ({
       }
 
       vehicleInfoWindowRef.current = new (window as any).google.maps.InfoWindow({
-        content: `<div><strong>Vehicle</strong><br/>${vehicleLocation?.plateNumber || 'Live Location'}<br/>Speed: ${vehicleLocation?.speed || 0} km/h</div>`,
+        content: vehicleInfoContentHtml,
       });
       
       vehicleMarkerRef.current.addListener('click', () => {
@@ -2159,7 +2692,7 @@ const WebMapView: React.FC<WebMapViewProps> = ({
     if (!bounds.isEmpty()) {
       googleMapRef.current.fitBounds(bounds);
     }
-  }, [mapLoaded, vehicleCoordinates, vehicleLocation]);
+  }, [mapLoaded, vehicleCoordinates, vehicleLocation, vehicleInfoContentHtml]);
 
   React.useEffect(() => {
     if (!mapLoaded || !googleMapRef.current || !(window as any).google?.maps) {
@@ -2223,7 +2756,59 @@ const WebMapView: React.FC<WebMapViewProps> = ({
     <View style={{ flex: 1 }}>
       {/* Google Maps container */}
       <div ref={mapRef} style={{ width: '100%', height: '100%', position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 }} />
-      
+
+      {enableSpeedWarningDemo && (
+        <TouchableOpacity
+          onPress={onToggleSpeedDemo}
+          style={[
+            styles.demoToggleFloating,
+            isSpeedDemoActive && styles.demoToggleFloatingActive,
+            styles.demoToggleFloatingWeb,
+          ]}
+          activeOpacity={0.8}
+        >
+          <Ionicons
+            name={isSpeedDemoActive ? 'play-back' : 'flash'}
+            size={18}
+            color="#fff"
+          />
+          <Text style={styles.demoToggleFloatingText}>
+            {isSpeedDemoActive ? 'Hide Demo' : 'Demo Speed Warning'}
+          </Text>
+        </TouchableOpacity>
+      )}
+
+      {warningBanners.length > 0 && (
+        <View style={[styles.warningStack, styles.warningStackWeb]}>
+          {warningBanners.map((banner, index) => (
+            <View
+              key={banner.id}
+              style={[
+                styles.warningBanner,
+                banner.type === 'speed'
+                  ? styles.warningBannerSpeed
+                  : styles.warningBannerFuel,
+                index > 0 && styles.warningBannerSpacing,
+              ]}
+            >
+              <Ionicons
+                name={banner.icon}
+                size={22}
+                color="#fff"
+                style={styles.warningBannerIcon}
+              />
+              <View style={styles.warningBannerContent}>
+                <Text style={styles.warningBannerTitle}>{banner.title}</Text>
+                <Text style={styles.warningBannerMessage}>{banner.message}</Text>
+                {banner.note && (
+                  <Text style={styles.warningBannerNote}>{banner.note}</Text>
+                )}
+              </View>
+            </View>
+          ))}
+        </View>
+      )}
+
       {/* Vehicle info overlay */}
       {vehicleLocation && (
         <View style={[styles.webInfoContainer, { position: 'absolute', bottom: 0, left: 0, right: 0, backgroundColor: 'rgba(255, 255, 255, 0.95)' }]}>
@@ -2233,10 +2818,42 @@ const WebMapView: React.FC<WebMapViewProps> = ({
               {vehicleLocation.plateNumber || vehicleLocation.internalId}
             </Text>
           </View>
-          {vehicleLocation.speed !== undefined && (
+          {((vehicleLocation.speed !== undefined && vehicleLocation.speed !== null) || isSpeedDemoActive) && (
+            <>
+              <View style={styles.webInfoRow}>
+                <Text style={styles.webInfoLabel}>Speed:</Text>
+                <Text style={[styles.webInfoValue, isSpeedWarningActive ? styles.webInfoValueWarning : undefined]}>
+                  {speedDisplayWithUnit}
+                  {isSpeedDemoActive ? ' (demo)' : ''}
+                </Text>
+              </View>
+              <View style={styles.webInfoRow}>
+                <Text style={styles.webInfoLabel}>Threshold:</Text>
+                <Text style={styles.webInfoValue}>{speedLimitWithUnit}</Text>
+              </View>
+              {isSpeedWarningActive && (
+                <View style={styles.webInfoAlert}>
+                  <Ionicons name="warning" size={16} color="#fff" style={styles.webInfoAlertIcon} />
+                  <Text style={styles.webInfoAlertText}>
+                    {isSpeedDemoActive
+                      ? `Demo override: showing ${speedWarningExcessValue ?? 0} km/h over the limit.`
+                      : `Over by ${speedWarningExcessValue ?? 0} km/h. Reduce speed immediately.`}
+                  </Text>
+                </View>
+              )}
+              {isSpeedDemoActive && (
+                <Text style={styles.webInfoDemoNote}>
+                  Demo mode is active to preview the speed warning while GeoTab data is offline.
+                </Text>
+              )}
+            </>
+          )}
+          {fuelDisplayText && (
             <View style={styles.webInfoRow}>
-              <Text style={styles.webInfoLabel}>Speed:</Text>
-              <Text style={styles.webInfoValue}>{vehicleLocation.speed || 0} km/h</Text>
+              <Text style={styles.webInfoLabel}>Fuel:</Text>
+              <Text style={[styles.webInfoValue, isFuelWarningActive ? styles.webInfoValueWarning : undefined]}>
+                {fuelDisplayText}
+              </Text>
             </View>
           )}
           {vehicleCoordinates && (
