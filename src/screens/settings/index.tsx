@@ -15,14 +15,22 @@ import {
   InteractionManager
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { useNavigation } from '@react-navigation/native';
+import { useNavigation, NavigationProp, CommonActions } from '@react-navigation/native';
 import { profileService, FormattedDriverProfile } from '../../services/ProfileService';
 import { apiService } from '../../services/api/apiService';
 import { authManager } from '../../types/AuthManager';
 import { logger } from '../../utils/loggerHelper';
+import { RootStackParamList } from '../../navigation/AppNavigator';
+import { AuthService } from '../../navigation/AppNavigator';
 
-const SettingsScreen = () => {
-  const navigation = useNavigation();
+interface SettingsScreenProps {
+  route?: any;
+  navigation?: NavigationProp<RootStackParamList>;
+  onLogout?: () => void;
+}
+
+const SettingsScreen = ({ route, navigation: navProp, onLogout }: SettingsScreenProps = {}) => {
+  const navigation = navProp || useNavigation<NavigationProp<RootStackParamList>>();
   const [isUpdating, setIsUpdating] = useState(false);
   const [showPasswordModal, setShowPasswordModal] = useState(false);
   const [showFeedbackModal, setShowFeedbackModal] = useState(false);
@@ -244,14 +252,73 @@ const SettingsScreen = () => {
           style: "destructive",
           onPress: async () => {
             try {
-              await apiService.logout();
+              // Call API logout
+              try {
+                await apiService.logout();
+              } catch (apiError) {
+                // Log but don't fail - we'll logout locally anyway
+                logger.error('API logout error (continuing with local logout)', apiError);
+              }
+              
+              // Clear auth data
               await authManager.logout();
-              // Navigation will be handled by AppNavigator based on auth state
+              await AuthService.clearAuth();
+              
               logger.userAction('Logout', {}, 'SettingsScreen');
+              
+              // Navigate to login screen
+              // Use the onLogout callback if provided (preferred method)
+              if (onLogout && typeof onLogout === 'function') {
+                onLogout();
+              } else {
+                // Fallback: Try to get root navigator and reset to Login
+                try {
+                  // Get the root navigator
+                  const rootNavigation = (navigation as any).getParent?.() || navigation;
+                  rootNavigation.dispatch(
+                    CommonActions.reset({
+                      index: 0,
+                      routes: [{ name: 'Login' }],
+                    })
+                  );
+                } catch (navError) {
+                  logger.error('Navigation error during logout', navError);
+                  // If navigation fails, the AppNavigator should handle it via auth state
+                  // But we can try a simple navigate as last resort
+                  try {
+                    (navigation as any).navigate('Login');
+                  } catch (finalError) {
+                    logger.error('Final navigation fallback failed', finalError);
+                  }
+                }
+              }
             } catch (error: any) {
               logger.error('Error during logout', error);
-              // Still logout locally even if API call fails
-              await authManager.logout();
+              // Still logout locally even if something fails
+              try {
+                await authManager.logout();
+                await AuthService.clearAuth();
+                // Try to navigate to login using onLogout or navigation
+                if (onLogout && typeof onLogout === 'function') {
+                  onLogout();
+                } else {
+                  try {
+                    const rootNavigation = (navigation as any).getParent?.() || navigation;
+                    rootNavigation.dispatch(
+                      CommonActions.reset({
+                        index: 0,
+                        routes: [{ name: 'Login' }],
+                      })
+                    );
+                  } catch (navError) {
+                    // Last resort: try simple navigate
+                    (navigation as any).navigate('Login');
+                  }
+                }
+              } catch (fallbackError) {
+                logger.error('Error during fallback logout', fallbackError);
+                Alert.alert('Error', 'Failed to logout completely. Please restart the app.');
+              }
             }
           }
         }

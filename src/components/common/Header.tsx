@@ -1,12 +1,14 @@
 import React from "react";
-import { View, Text, StyleSheet } from "react-native";
+import { View, Image, StyleSheet } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+
+const logo = require("../../../assets/FleetGo.png");
 
 export default function Header() {
   return (
     <SafeAreaView edges={["top"]} style={styles.safeArea}>
       <View style={styles.header}>
-        <Text style={styles.logo}>FleetGo</Text>
+        <Image source={logo} style={styles.logo} resizeMode="contain" />
       </View>
     </SafeAreaView>
   );
@@ -21,8 +23,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   logo: {
-    fontSize: 22,
-    fontWeight: "bold",
-    color: "black",
+    width: 100,
+    height: 35,
   },
 });

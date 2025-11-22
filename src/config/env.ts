@@ -9,15 +9,35 @@ try {
   // expo-network not available (e.g., in Expo Go)
   console.warn('expo-network not available, using fallback IP detection');
 }
-import { API_BASE_URL as ENV_API_BASE_URL, SOCKET_URL as ENV_SOCKET_URL, 
-    NODE_ENV as ENV_NODE_ENV, DB_NAME as ENV_DB_NAME } from '@env';
+
+// Try to import from @env, but handle if it fails (e.g., during EAS build)
+let ENV_API_BASE_URL: string | undefined;
+let ENV_SOCKET_URL: string | undefined;
+let ENV_NODE_ENV: string | undefined;
+let ENV_DB_NAME: string | undefined;
+
+try {
+  const envModule = require('@env');
+  ENV_API_BASE_URL = envModule.API_BASE_URL;
+  ENV_SOCKET_URL = envModule.SOCKET_URL;
+  ENV_NODE_ENV = envModule.NODE_ENV;
+  ENV_DB_NAME = envModule.DB_NAME;
+} catch (e) {
+  // @env not available, use process.env (from EAS build env vars)
+  console.log('⚠️ @env module not available, using process.env');
+  ENV_API_BASE_URL = process.env.API_BASE_URL;
+  ENV_SOCKET_URL = process.env.SOCKET_URL;
+  ENV_NODE_ENV = process.env.NODE_ENV;
+  ENV_DB_NAME = process.env.DB_NAME;
+}
 
 // Debug: Log imported .env values
-console.log('📦 .env values imported:', {
+console.log('📦 Environment values loaded:', {
     ENV_API_BASE_URL,
     ENV_SOCKET_URL,
     ENV_NODE_ENV,
-    ENV_DB_NAME
+    ENV_DB_NAME,
+    source: ENV_API_BASE_URL ? (ENV_API_BASE_URL.includes('portal.logistiqinnovations.ca') ? 'EAS/production' : '@env') : 'none'
 });
 
 type ManifestWithReleaseChannel = typeof Constants.manifest & {
@@ -195,22 +215,38 @@ const getEnvVars = async (env = manifest?.releaseChannel): Promise<Config> => {
 // These will be updated by initConfig() but provide immediate values from .env
 let config: Config | null = null;
 
-// Get values from .env file, with platform-specific fallbacks
+// Get values from .env file, process.env (EAS), or Constants.extra, with platform-specific fallbacks
 const getDefaultBaseURL = (): string => {
-  // Use .env value if available
+  // Priority 1: .env or process.env value
   if (ENV_API_BASE_URL && ENV_API_BASE_URL !== 'undefined') {
     return ENV_API_BASE_URL;
   }
-  // Platform-specific fallbacks
+  
+  // Priority 2: Constants.extra (from app.json)
+  const extraConfig = Constants.expoConfig?.extra;
+  if (extraConfig?.apiBaseUrl) {
+    return extraConfig.apiBaseUrl;
+  }
+  
+  // Priority 3: Platform-specific fallbacks
   return Platform.OS === 'android' 
     ? 'http://10.0.2.2:3000/api/v1'  // Android emulator default
     : 'http://localhost:3000/api/v1'; // iOS simulator / web default
 };
 
 const getDefaultSocketURL = (): string => {
+  // Priority 1: .env or process.env value
   if (ENV_SOCKET_URL && ENV_SOCKET_URL !== 'undefined') {
     return ENV_SOCKET_URL;
   }
+  
+  // Priority 2: Constants.extra (from app.json)
+  const extraConfig = Constants.expoConfig?.extra;
+  if (extraConfig?.socketUrl) {
+    return extraConfig.socketUrl;
+  }
+  
+  // Priority 3: Platform-specific fallbacks
   return Platform.OS === 'android'
     ? 'http://10.0.2.2:3000'
     : 'http://localhost:3000';

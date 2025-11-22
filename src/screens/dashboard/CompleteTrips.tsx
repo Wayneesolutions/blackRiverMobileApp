@@ -9,90 +9,92 @@ import {
   ActivityIndicator,
   RefreshControl,
   Alert,
-  Linking,
 } from "react-native";
 import { apiService } from '../../services/api/apiService';
 import { logger } from '../../utils/loggerHelper';
 
-interface Load {
+interface Trip {
   _id: string;
-  internalId?: string;
-  orderType?: string;
+  tripNumber: string;
   status: string;
-  route?: {
-    multipleDropOffs?: boolean;
-    selectPickup?: {
-      place?: string;
-      city?: string;
-      state?: string;
-      latitude?: number;
-      longitude?: number;
-    };
-    selectDropOff?: {
-      place?: string;
-      city?: string;
-      state?: string;
-      latitude?: number;
-      longitude?: number;
-    };
-    wayPoints?: Array<{
-      address?: {
-        place?: string;
-        city?: string;
-        state?: string;
-        latitude?: number | string;
-        longitude?: number | string;
-      };
-      dropOff?: boolean;
-      pickup?: boolean;
-    }>;
-  };
-  payloads?: Array<{
-    itemName?: string;
-    description?: string;
-    measurementAndWeight?: {
-      weight?: number;
-    };
-  }>;
-  customer?: {
-    name?: string;
-    email?: string;
-  };
-  createdAt?: string;
-  updatedAt?: string;
-  completedAt?: string;
-  notes?: string;
-  documents?: Array<{
+  driver?: {
     _id: string;
-    documentUrl: string;
+    name: string;
+  };
+  truck?: {
+    _id: string;
+    plateNumber?: string;
+    internalId?: string;
+    make?: string;
+    model?: string;
+  };
+  trailer?: {
+    _id: string;
+    plateNumber?: string;
+    trailerNumber?: string;
+  };
+  orders?: Array<{
+    _id: string;
+    orderNumber: string;
+    customerOrderNo?: string;
+    status?: string;
+    customer?: {
+      name?: string;
+      email?: string;
+    };
+    pickupLocation?: {
+      place?: string;
+      placeId?: {
+        name?: string;
+        currentLocation?: {
+          address?: string;
+        };
+      };
+    };
+    deliveryLocation?: {
+      place?: string;
+      placeId?: {
+        name?: string;
+        currentLocation?: {
+          address?: string;
+        };
+      };
+    };
+    pickupDate?: string;
+    deliveryDate?: string;
   }>;
+  plannedStartDate?: string;
+  plannedEndDate?: string;
+  actualStartDate?: string;
+  actualEndDate?: string;
+  notes?: string;
 }
 
 const CompleteTrips = () => {
-  const [loads, setLoads] = useState<Load[]>([]);
+  const [trips, setTrips] = useState<Trip[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
 
   useEffect(() => {
-    fetchCompletedLoads();
+    fetchCompletedTrips();
   }, []);
 
-  const fetchCompletedLoads = async () => {
+  const fetchCompletedTrips = async () => {
     try {
       setLoading(true);
-      const response = await apiService.getCompletedLoads();
+      const response = await apiService.getCompletedTrips();
       
       if (response.success && response.data) {
-        const loadsData = response.data.loads || response.data || [];
-        setLoads(Array.isArray(loadsData) ? loadsData : []);
-        logger.info('Completed loads fetched', { count: loadsData.length });
+        const tripsData = response.data.data || response.data || [];
+        setTrips(Array.isArray(tripsData) ? tripsData : []);
+        logger.info('Completed trips fetched', { count: tripsData.length });
       } else {
-        logger.warn('Failed to fetch completed loads', { error: response.error });
-        setLoads([]);
+        logger.warn('Failed to fetch completed trips', { error: response.error });
+        setTrips([]);
       }
     } catch (error) {
-      logger.error('Error fetching completed loads', error);
-      setLoads([]);
+      logger.error('Error fetching completed trips', error);
+      setTrips([]);
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -101,16 +103,15 @@ const CompleteTrips = () => {
 
   const onRefresh = () => {
     setRefreshing(true);
-    fetchCompletedLoads();
+    fetchCompletedTrips();
   };
 
   const formatAddress = (location: any) => {
     if (!location) return 'N/A';
     if (location.place) return location.place;
-    if (location.city && location.state) {
-      return `${location.city}, ${location.state}`;
-    }
-    return location.city || location.state || 'Unknown Location';
+    if (location.placeId?.name) return location.placeId.name;
+    if (location.placeId?.currentLocation?.address) return location.placeId.currentLocation.address;
+    return 'Unknown Location';
   };
 
   const formatDate = (dateString?: string) => {
@@ -121,557 +122,277 @@ const CompleteTrips = () => {
         year: 'numeric',
         month: 'short',
         day: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit',
       });
     } catch {
       return dateString;
     }
   };
 
-  const getLoadWeight = (load: Load) => {
-    if (load.payloads && load.payloads.length > 0) {
-      const totalWeight = load.payloads.reduce((sum, payload) => {
-        return sum + (payload.measurementAndWeight?.weight || 0);
-      }, 0);
-      return totalWeight > 0 ? `${totalWeight.toLocaleString()} lbs` : 'N/A';
-    }
-    return 'N/A';
-  };
-
-  const getLoadItemName = (load: Load) => {
-    if (load.payloads && load.payloads.length > 0) {
-      return load.payloads[0].itemName || 'Cargo';
-    }
-    return 'Cargo';
-  };
-
-  const getDocumentName = (url: string) => {
-    try {
-      // Handle both forward slashes and backslashes
-      const normalizedUrl = url.replace(/\\/g, '/');
-      const parts = normalizedUrl.split('/');
-      const fileName = parts[parts.length - 1];
-      
-      // Remove timestamp prefix (e.g., "1762586107913-")
-      const match = fileName.match(/^\d+-(.+)$/);
-      return match ? decodeURIComponent(match[1]) : decodeURIComponent(fileName);
-    } catch (error) {
-      console.error('Error parsing document name:', error);
-      return 'Document';
-    }
-  };
-
-  const getDocumentIcon = (fileName: string) => {
-    const extension = fileName.split('.').pop()?.toLowerCase();
-    switch (extension) {
-      case 'pdf': return '📄';
-      case 'doc':
-      case 'docx': return '📝';
-      case 'xls':
-      case 'xlsx': return '📊';
-      case 'jpg':
-      case 'jpeg':
-      case 'png':
-      case 'gif': return '🖼️';
-      case 'txt': return '📃';
-      case 'zip':
-      case 'rar': return '📦';
-      default: return '📎';
-    }
-  };
-
-  const normalizeDocumentUrl = (url: string) => {
-    try {
-      // Replace backslashes with forward slashes
-      let normalizedUrl = url.replace(/\\/g, '/');
-      
-      // If it's a localhost URL, you need to replace it with your actual server URL
-      // For development, you might use your computer's IP address
-      // For production, use your production server URL
-      
-      // Example replacements (uncomment and modify as needed):
-      // normalizedUrl = normalizedUrl.replace('http://localhost:3000', 'http://192.168.1.100:3000');
-      // normalizedUrl = normalizedUrl.replace('http://localhost:3000', 'https://your-production-server.com');
-      
-      return normalizedUrl;
-    } catch (error) {
-      console.error('Error normalizing URL:', error);
-      return url;
-    }
-  };
-
-  const handleDocumentPress = async (documentUrl: string, documentName: string) => {
-    const normalizedUrl = normalizeDocumentUrl(documentUrl);
-    
-    Alert.alert(
-      'Document',
-      documentName,
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Open',
-          onPress: async () => {
-            try {
-              console.log('Opening document:', normalizedUrl);
-              
-              const supported = await Linking.canOpenURL(normalizedUrl);
-              
-              if (supported) {
-                await Linking.openURL(normalizedUrl);
-              } else {
-                Alert.alert(
-                  'Cannot Open Document',
-                  'Unable to open this document. The URL format may not be supported.',
-                  [{ text: 'OK' }]
-                );
-              }
-            } catch (error) {
-              console.error('Error opening document:', error);
-              Alert.alert(
-                'Error',
-                'Failed to open document. Please check your network connection.',
-                [{ text: 'OK' }]
-              );
-            }
-          },
-        },
-        {
-          text: 'Copy URL',
-          onPress: () => {
-            // You can implement clipboard copy here if needed
-            console.log('URL to copy:', normalizedUrl);
-            Alert.alert('Info', 'URL: ' + normalizedUrl);
-          },
-        },
-      ]
+  if (loading && !refreshing) {
+    return (
+      <SafeAreaView style={styles.container}>
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="large" color="#2563eb" />
+          <Text style={styles.loadingText}>Loading completed trips...</Text>
+        </View>
+      </SafeAreaView>
     );
-  };
+  }
 
   return (
     <SafeAreaView style={styles.container}>
-      <View style={styles.header}>
-        <View style={styles.headerContent}>
-          <Text style={styles.headerTitle}>Completed Loads</Text>
-          <Text style={styles.headerSubtitle}>View your delivery history</Text>
-          <View style={styles.statsContainer}>
-            <View style={styles.statItem}>
-              <Text style={styles.statNumber}>{loads.length}</Text>
-              <Text style={styles.statLabel}>Completed</Text>
-            </View>
+      <ScrollView
+        style={styles.scrollView}
+        refreshControl={
+          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
+        }
+      >
+        {trips.length === 0 ? (
+          <View style={styles.emptyContainer}>
+            <Text style={styles.emptyText}>No completed trips</Text>
+            <Text style={styles.emptySubtext}>You don't have any completed trips yet.</Text>
           </View>
-        </View>
-      </View>
-
-      {loading ? (
-        <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color="#8B5CF6" />
-          <Text style={styles.loadingText}>Loading completed loads...</Text>
-        </View>
-      ) : loads.length === 0 ? (
-        <View style={styles.emptyContainer}>
-          <Text style={styles.emptyIcon}>✅</Text>
-          <Text style={styles.emptyText}>No Completed Loads</Text>
-          <Text style={styles.emptySubtext}>You haven't completed any loads yet</Text>
-        </View>
-      ) : (
-        <ScrollView
-          style={styles.scrollView}
-          showsVerticalScrollIndicator={false}
-          contentContainerStyle={styles.scrollContent}
-          refreshControl={
-            <RefreshControl
-              refreshing={refreshing}
-              onRefresh={onRefresh}
-              colors={['#8B5CF6']}
-              tintColor="#8B5CF6"
-            />
-          }
-        >
-          {loads.map((load) => {
-            const pickup = load.route?.selectPickup;
-            const dropoff = load.route?.selectDropOff;
-            const multipleDropOffs = load.route?.multipleDropOffs || false;
-            const wayPoints = load.route?.wayPoints || [];
-            
-            // Format route text based on multipleDropOffs
-            const formatRouteText = () => {
-              const pickupText = formatAddress(pickup);
-              
-              if (multipleDropOffs && wayPoints.length > 0) {
-                const waypointCount = wayPoints.length;
-                const dropoffCount = wayPoints.filter(wp => wp.dropOff === true).length;
-                return `${pickupText} → ${waypointCount} stop${waypointCount > 1 ? 's' : ''} (${dropoffCount} drop${dropoffCount > 1 ? 's' : ''})`;
-              } else {
-                return `${pickupText} → ${formatAddress(dropoff)}`;
-              }
-            };
-            
-            return (
-              <View key={load._id} style={styles.loadCard}>
-                <View style={styles.cardHeader}>
-                  <View style={styles.headerInfo}>
-                    <Text style={styles.routeText}>
-                      {formatRouteText()}
-                    </Text>
-                    {load.internalId && (
-                      <Text style={styles.loadIdText}>Load ID: {load.internalId}</Text>
-                    )}
-                  </View>
-                  <View style={styles.completedBadge}>
-                    <Text style={styles.completedText}>✓ Completed</Text>
-                  </View>
+        ) : (
+          trips.map((trip) => (
+            <View key={trip._id} style={styles.tripCard}>
+              <View style={styles.tripHeader}>
+                <View>
+                  <Text style={styles.tripNumber}>{trip.tripNumber}</Text>
+                  <Text style={styles.tripDate}>
+                    Completed: {formatDate(trip.actualEndDate || trip.plannedEndDate)}
+                  </Text>
                 </View>
-
-                <View style={styles.detailsGrid}>
-                  <View style={styles.detailSection}>
-                    <View style={styles.detailItem}>
-                      <Text style={styles.detailIcon}>📦</Text>
-                      <View style={styles.detailContent}>
-                        <Text style={styles.detailTitle}>{getLoadItemName(load)}</Text>
-                        <Text style={styles.detailSubtext}>Weight: {getLoadWeight(load)}</Text>
-                      </View>
-                    </View>
-
-                    {load.customer && (
-                      <View style={styles.detailItem}>
-                        <Text style={styles.detailIcon}>👤</Text>
-                        <View style={styles.detailContent}>
-                          <Text style={styles.detailTitle}>{load.customer.name || 'Customer'}</Text>
-                          {load.customer.email && (
-                            <Text style={styles.detailSubtext}>{load.customer.email}</Text>
-                          )}
-                        </View>
-                      </View>
-                    )}
-                  </View>
-
-                  <View style={styles.detailSection}>
-                    <View style={styles.detailItem}>
-                      <Text style={styles.detailIcon}>📍</Text>
-                      <View style={styles.detailContent}>
-                        <Text style={styles.detailTitle}>Pickup</Text>
-                        <Text style={styles.detailSubtext}>{formatAddress(pickup)}</Text>
-                      </View>
-                    </View>
-
-                    <View style={styles.detailItem}>
-                      <Text style={styles.detailIcon}>🎯</Text>
-                      <View style={styles.detailContent}>
-                        <Text style={styles.detailTitle}>Drop-off</Text>
-                        <Text style={styles.detailSubtext}>{formatAddress(dropoff)}</Text>
-                      </View>
-                    </View>
-                  </View>
+                <View style={styles.statusBadge}>
+                  <Text style={styles.statusText}>Completed</Text>
                 </View>
-
-                {load.notes && (
-                  <View style={styles.notesSection}>
-                    <Text style={styles.notesLabel}>Notes:</Text>
-                    <Text style={styles.notesText}>{load.notes}</Text>
-                  </View>
-                )}
-
-                {load.documents && load.documents.length > 0 && (
-                  <View style={styles.documentsSection}>
-                    <View style={styles.documentsSectionHeader}>
-                      <Text style={styles.documentsLabel}>📋 Documents</Text>
-                      <View style={styles.documentsBadge}>
-                        <Text style={styles.documentsBadgeText}>{load.documents.length}</Text>
-                      </View>
-                    </View>
-                    <View style={styles.documentsGrid}>
-                      {load.documents.map((doc) => {
-                        const docName = getDocumentName(doc.documentUrl);
-                        return (
-                          <TouchableOpacity
-                            key={doc._id}
-                            style={styles.documentCard}
-                            onPress={() => handleDocumentPress(doc.documentUrl, docName)}
-                            activeOpacity={0.7}
-                          >
-                            <Text style={styles.documentIcon}>
-                              {getDocumentIcon(docName)}
-                            </Text>
-                            <Text style={styles.documentName} numberOfLines={2}>
-                              {docName}
-                            </Text>
-                          </TouchableOpacity>
-                        );
-                      })}
-                    </View>
-                  </View>
-                )}
-
-                {load.completedAt && (
-                  <View style={styles.dateSection}>
-                    <Text style={styles.dateLabel}>Completed on:</Text>
-                    <Text style={styles.dateText}>{formatDate(load.completedAt)}</Text>
-                  </View>
-                )}
               </View>
-            );
-          })}
-        </ScrollView>
-      )}
+
+              {trip.truck && (
+                <View style={styles.infoRow}>
+                  <Text style={styles.infoLabel}>Truck:</Text>
+                  <Text style={styles.infoValue}>
+                    {trip.truck.plateNumber || trip.truck.internalId || 'N/A'}
+                  </Text>
+                </View>
+              )}
+
+              {trip.trailer && (
+                <View style={styles.infoRow}>
+                  <Text style={styles.infoLabel}>Trailer:</Text>
+                  <Text style={styles.infoValue}>
+                    {trip.trailer.plateNumber || trip.trailer.trailerNumber || 'N/A'}
+                  </Text>
+                </View>
+              )}
+
+              <View style={styles.infoRow}>
+                <Text style={styles.infoLabel}>Started:</Text>
+                <Text style={styles.infoValue}>
+                  {formatDate(trip.actualStartDate || trip.plannedStartDate)}
+                </Text>
+              </View>
+
+              {trip.orders && trip.orders.length > 0 && (
+                <View style={styles.ordersSection}>
+                  <Text style={styles.ordersTitle}>
+                    Orders ({trip.orders.length}):
+                  </Text>
+                  {trip.orders.map((order, index) => (
+                    <View key={order._id || index} style={styles.orderItem}>
+                      <Text style={styles.orderNumber}>{order.orderNumber}</Text>
+                      {order.customerOrderNo && (
+                        <Text style={styles.customerOrderNo}>
+                          Customer Order: {order.customerOrderNo}
+                        </Text>
+                      )}
+                      {order.customer?.name && (
+                        <Text style={styles.customerName}>Customer: {order.customer.name}</Text>
+                      )}
+                      <View style={styles.locationRow}>
+                        <Text style={styles.locationLabel}>Pickup: </Text>
+                        <Text style={styles.locationValue}>
+                          {formatAddress(order.pickupLocation)}
+                        </Text>
+                      </View>
+                      <View style={styles.locationRow}>
+                        <Text style={styles.locationLabel}>Delivery: </Text>
+                        <Text style={styles.locationValue}>
+                          {formatAddress(order.deliveryLocation)}
+                        </Text>
+                      </View>
+                    </View>
+                  ))}
+                </View>
+              )}
+
+              {trip.notes && (
+                <View style={styles.notesSection}>
+                  <Text style={styles.notesLabel}>Notes:</Text>
+                  <Text style={styles.notesText}>{trip.notes}</Text>
+                </View>
+              )}
+            </View>
+          ))
+        )}
+      </ScrollView>
     </SafeAreaView>
   );
 };
 
-export default CompleteTrips;
-
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#f5f6fa"
+    backgroundColor: '#f5f5f5',
   },
-  header: {
-    backgroundColor: "#8B5CF6",
-    paddingBottom: 20
-  },
-  headerContent: {
-    paddingHorizontal: 20,
-    paddingTop: 20
-  },
-  headerTitle: {
-    fontSize: 28,
-    fontWeight: "bold",
-    color: "#ffffff",
-    marginBottom: 8
-  },
-  headerSubtitle: {
-    fontSize: 16,
-    color: "#e8d8ff",
-    marginBottom: 16
-  },
-  statsContainer: {
-    flexDirection: "row",
-    gap: 24
-  },
-  statItem: {
-    alignItems: "center"
-  },
-  statNumber: {
-    fontSize: 32,
-    fontWeight: "bold",
-    color: "#ffffff"
-  },
-  statLabel: {
-    fontSize: 14,
-    color: "#e8d8ff"
+  scrollView: {
+    flex: 1,
   },
   loadingContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    padding: 40,
   },
   loadingText: {
-    marginTop: 12,
-    fontSize: 16,
-    color: "#6B7280",
+    marginTop: 10,
+    color: '#666',
   },
   emptyContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
     padding: 40,
-  },
-  emptyIcon: {
-    fontSize: 64,
-    marginBottom: 16,
+    marginTop: 100,
   },
   emptyText: {
-    fontSize: 20,
-    fontWeight: 'bold',
-    color: "#2c3e50",
+    fontSize: 18,
+    fontWeight: '600',
+    color: '#333',
     marginBottom: 8,
   },
   emptySubtext: {
     fontSize: 14,
-    color: "#7f8c8d",
+    color: '#666',
     textAlign: 'center',
   },
-  scrollView: {
-    flex: 1
-  },
-  scrollContent: {
-    paddingHorizontal: 20,
-    paddingVertical: 16
-  },
-  loadCard: {
-    backgroundColor: "#ffffff",
-    borderRadius: 16,
-    marginBottom: 20,
-    padding: 20,
-    shadowColor: "#000",
-    shadowOffset: {
-      width: 0,
-      height: 4
-    },
+  tripCard: {
+    backgroundColor: '#fff',
+    margin: 12,
+    padding: 16,
+    borderRadius: 12,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
-    shadowRadius: 8,
-    elevation: 5,
-    borderWidth: 1,
-    borderColor: "#f1f2f6"
+    shadowRadius: 4,
+    elevation: 3,
   },
-  cardHeader: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "flex-start",
-    marginBottom: 20
+  tripHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+    marginBottom: 12,
   },
-  headerInfo: {
-    flex: 1,
-    marginRight: 12
-  },
-  routeText: {
+  tripNumber: {
     fontSize: 18,
-    fontWeight: "700",
-    color: "#2c3e50",
-    marginBottom: 6
+    fontWeight: 'bold',
+    color: '#2563eb',
+    marginBottom: 4,
   },
-  loadIdText: {
+  tripDate: {
     fontSize: 12,
-    color: "#7f8c8d",
-    marginTop: 4,
+    color: '#666',
   },
-  completedBadge: {
-    backgroundColor: "#2ecc71",
+  statusBadge: {
+    backgroundColor: '#2ecc71',
     paddingHorizontal: 12,
     paddingVertical: 6,
-    borderRadius: 20
+    borderRadius: 12,
   },
-  completedText: {
+  statusText: {
+    color: '#fff',
     fontSize: 12,
-    fontWeight: "700",
-    color: "#ffffff"
+    fontWeight: '600',
   },
-  detailsGrid: {
-    flexDirection: "row",
-    marginBottom: 16
+  infoRow: {
+    flexDirection: 'row',
+    marginBottom: 8,
   },
-  detailSection: {
+  infoLabel: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#333',
+    width: 80,
+  },
+  infoValue: {
+    fontSize: 14,
+    color: '#666',
     flex: 1,
-    gap: 16
   },
-  detailItem: {
-    flexDirection: "row",
-    alignItems: "flex-start"
+  ordersSection: {
+    marginTop: 12,
+    paddingTop: 12,
+    borderTopWidth: 1,
+    borderTopColor: '#e5e5e5',
   },
-  detailIcon: {
-    fontSize: 20,
-    marginRight: 12,
-    marginTop: 2
-  },
-  detailContent: {
-    flex: 1
-  },
-  detailTitle: {
+  ordersTitle: {
     fontSize: 16,
-    fontWeight: "600",
-    color: "#2c3e50",
-    marginBottom: 2
+    fontWeight: '600',
+    color: '#333',
+    marginBottom: 8,
   },
-  detailSubtext: {
-    fontSize: 13,
-    color: "#7f8c8d",
-    lineHeight: 18
+  orderItem: {
+    backgroundColor: '#f9f9f9',
+    padding: 12,
+    borderRadius: 8,
+    marginBottom: 8,
+  },
+  orderNumber: {
+    fontSize: 15,
+    fontWeight: '600',
+    color: '#2563eb',
+    marginBottom: 4,
+  },
+  customerOrderNo: {
+    fontSize: 12,
+    color: '#666',
+    marginBottom: 4,
+  },
+  customerName: {
+    fontSize: 12,
+    color: '#666',
+    marginBottom: 4,
+  },
+  locationRow: {
+    flexDirection: 'row',
+    marginBottom: 4,
+  },
+  locationLabel: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#333',
+  },
+  locationValue: {
+    fontSize: 12,
+    color: '#666',
+    flex: 1,
   },
   notesSection: {
-    backgroundColor: "#f8f9fa",
-    borderRadius: 8,
-    padding: 12,
-    marginBottom: 16
+    marginTop: 12,
+    paddingTop: 12,
+    borderTopWidth: 1,
+    borderTopColor: '#e5e5e5',
   },
   notesLabel: {
     fontSize: 14,
-    fontWeight: "600",
-    color: "#34495e",
-    marginBottom: 4
+    fontWeight: '600',
+    color: '#333',
+    marginBottom: 4,
   },
   notesText: {
-    fontSize: 13,
-    color: "#7f8c8d",
-    lineHeight: 18
-  },
-  documentsSection: {
-    backgroundColor: "#f8f9fa",
-    borderRadius: 12,
-    padding: 16,
-    marginBottom: 16,
-    borderWidth: 1,
-    borderColor: "#e9ecef"
-  },
-  documentsSectionHeader: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    marginBottom: 12
-  },
-  documentsLabel: {
-    fontSize: 15,
-    fontWeight: "700",
-    color: "#2c3e50"
-  },
-  documentsBadge: {
-    backgroundColor: "#2ecc71",
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: 12,
-    minWidth: 28,
-    alignItems: "center"
-  },
-  documentsBadgeText: {
-    fontSize: 12,
-    fontWeight: "700",
-    color: "#ffffff"
-  },
-  documentsGrid: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    gap: 10
-  },
-  documentCard: {
-    backgroundColor: "#ffffff",
-    borderRadius: 10,
-    padding: 12,
-    width: "48%",
-    alignItems: "center",
-    borderWidth: 1,
-    borderColor: "#dee2e6",
-    shadowColor: "#000",
-    shadowOffset: {
-      width: 0,
-      height: 2
-    },
-    shadowOpacity: 0.05,
-    shadowRadius: 4,
-    elevation: 2
-  },
-  documentIcon: {
-    fontSize: 32,
-    marginBottom: 8
-  },
-  documentName: {
-    fontSize: 12,
-    fontWeight: "600",
-    color: "#495057",
-    textAlign: "center",
-    lineHeight: 16
-  },
-  dateSection: {
-    borderTopWidth: 1,
-    borderTopColor: "#f1f2f6",
-    paddingTop: 12,
-    marginTop: 12
-  },
-  dateLabel: {
-    fontSize: 12,
-    color: "#7f8c8d",
-    marginBottom: 4
-  },
-  dateText: {
     fontSize: 14,
-    fontWeight: "600",
-    color: "#2c3e50"
-  }
+    color: '#666',
+  },
 });
+
+export default CompleteTrips;

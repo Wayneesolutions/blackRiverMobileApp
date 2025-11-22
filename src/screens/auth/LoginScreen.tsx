@@ -21,6 +21,7 @@ import { authManager } from "../../types/AuthManager";
 import { logger } from '../../utils/loggerHelper';
 // Asset import - using require for better compatibility with Expo Go
 const shape = require("../../../assets/images/shape.png");
+const logo = require("../../../assets/FleetGo.png");
 
 type Props = NativeStackScreenProps<RootStackParamList, "Login"> & {
   onAuthSuccess: (userData?: any) => void;
@@ -232,7 +233,7 @@ export default function LoginScreen({ navigation, onAuthSuccess }: Props) {
         {/* Top Purple Section */}
         <View style={styles.topSection}>
           <Image source={shape} style={styles.shapeImage} resizeMode="cover" />
-          <Text style={styles.logoText}>FleetGo</Text>
+          <Image source={logo} style={styles.logoImage} resizeMode="contain" />
           <Text style={styles.tagline}>All in One</Text>
           <Text style={styles.subtitle}>Driver Platform</Text>
         </View>
@@ -357,13 +358,12 @@ const styles = StyleSheet.create({
     width: 175,
     height: 250,
   },
-  logoText: {
+  logoImage: {
     position: "absolute",
     left: 15,
     top: 12,
-    fontSize: 32,
-    fontWeight: "bold",
-    color: "#fff",
+    width: 120,
+    height: 40,
   },
   tagline: {
     fontSize: 26,

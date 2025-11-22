@@ -14,31 +14,67 @@
     "assetBundlePatterns": [
       "**/*"
     ],
-    "platforms": [
-      "ios",
-      "android",
-      "web"
-    ],
-    "plugins": [
-      "expo-font"
-    ],
-    "android": {
-      "package": "com.blackriverlogistics.app",
-      "adaptiveIcon": {
-        "foregroundImage": "./assets/adaptive-icon.png",
-        "backgroundColor": "#FFFFFF"
-      }
-    },
+    "scheme": "com.blackriverlogistics.app",
     "ios": {
-      "bundleIdentifier": "com.blackriverlogistics.app",
       "supportsTablet": true,
+      "bundleIdentifier": "com.blackriverlogistics.app",
       "infoPlist": {
         "NSLocationWhenInUseUsageDescription": "This app needs access to your location to show your current position on the map.",
         "NSLocationAlwaysUsageDescription": "This app needs access to your location for live tracking of your trips.",
         "NSPhotoLibraryUsageDescription": "This app needs access to your photos to upload document images.",
         "NSCameraUsageDescription": "This app needs access to your camera to take photos of documents."
+      },
+      "splash": {
+        "image": "./assets/splash-icon.png",
+        "resizeMode": "contain",
+        "backgroundColor": "#ffffff"
       }
     },
+    "android": {
+      "package": "com.blackriverlogistics.app",
+      "versionCode": 1,
+      "minSdkVersion": 24,
+      "targetSdkVersion": 34,
+      "compileSdkVersion": 34,
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "backgroundColor": "#FFFFFF"
+      },
+      "splash": {
+        "image": "./assets/splash-icon.png",
+        "resizeMode": "contain",
+        "backgroundColor": "#ffffff"
+      },
+      "permissions": [
+        "ACCESS_FINE_LOCATION",
+        "ACCESS_COARSE_LOCATION",
+        "ACCESS_BACKGROUND_LOCATION",
+        "CAMERA",
+        "READ_EXTERNAL_STORAGE",
+        "WRITE_EXTERNAL_STORAGE",
+        "INTERNET",
+        "ACCESS_NETWORK_STATE"
+      ],
+      "usesCleartextTraffic": false,
+      "networkSecurityConfig": {
+        "cleartextTrafficPermitted": false
+      },
+      "intentFilters": [
+        {
+          "action": "VIEW",
+          "autoVerify": true,
+          "data": [
+            {
+              "scheme": "com.blackriverlogistics.app"
+            }
+          ],
+          "category": ["BROWSABLE", "DEFAULT"]
+        }
+      ]
+    },
+    "plugins": [
+      "expo-font"
+    ],
     "web": {
       "favicon": "./assets/favicon.png",
       "bundler": "metro",
@@ -47,9 +83,11 @@
     },
     "extra": {
       "eas": {
-        "projectId": "a647baa0-f882-4663-8863-0f38cf52a393"
-      }
+        "projectId": "2f9de5f5-ceeb-4539-88bd-1c37b25d2865"
+      },
+      "apiBaseUrl": "https://portal.logistiqinnovations.ca/api/v1",
+      "socketUrl": "https://portal.logistiqinnovations.ca"
     },
-    "owner": "fleetgo"
+    "owner": "krishnadas7"
   }
 }

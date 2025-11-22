@@ -2,6 +2,8 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { API_BASE_URL, API_ENDPOINTS, IS_DEV, getAPIBaseURL } from '../../config/env';
 import { logger } from '../../utils/loggerHelper';
+import { authManager } from '../../types/AuthManager';
+import { AuthService } from '../../navigation/AppNavigator';
 
 interface ApiResponse<T = any> {
     success: boolean;
@@ -28,12 +30,56 @@ class ApiService {
     private isInitialized: boolean = false;
     private configInitialized: boolean = false;
     private requestCache = new Map();
+    private onTokenExpiredCallback: (() => void) | null = null;
+    private isLoggingOut: boolean = false;
 
     constructor() {
         // Initialize immediately without async operations
         this.loadTokenSync();
         // Try to get baseURL from config (might be undefined if config not loaded yet)
         this.baseURL = API_BASE_URL || null;
+    }
+
+    // Set callback for token expiration
+    setOnTokenExpired(callback: () => void) {
+        this.onTokenExpiredCallback = callback;
+    }
+
+    // Handle token expiration - clear auth and trigger logout
+    private async handleTokenExpiration(): Promise<void> {
+        // Prevent multiple simultaneous logout attempts
+        if (this.isLoggingOut) {
+            logger.warn('Logout already in progress, skipping duplicate call');
+            return;
+        }
+
+        this.isLoggingOut = true;
+        logger.warn('⚠️ Token expired or invalid. Logging out automatically...');
+
+        try {
+            // Clear token from API service
+            await this.removeAuthToken();
+            
+            // Clear auth data from authManager
+            await authManager.logout();
+            
+            // Clear auth data from AuthService
+            await AuthService.clearAuth();
+            
+            logger.info('Auth data cleared successfully');
+            
+            // Trigger callback if set (for navigation)
+            if (this.onTokenExpiredCallback) {
+                this.onTokenExpiredCallback();
+            }
+        } catch (error) {
+            logger.error('Error during automatic logout', error);
+        } finally {
+            // Reset flag after a delay to allow logout to complete
+            setTimeout(() => {
+                this.isLoggingOut = false;
+            }, 2000);
+        }
     }
 
     // 🔧 FIXED: Synchronous token loading
@@ -308,6 +354,26 @@ class ApiService {
                         dataType: typeof responseData
                     });
 
+                    // Check for token expiration in successful responses (200 with success: false)
+                    if (responseData && typeof responseData === 'object' && responseData.success === false) {
+                        const message = responseData.message || responseData.error || '';
+                        const lowerMessage = message.toLowerCase();
+                        
+                        // Check if message indicates token expiration
+                        if (lowerMessage.includes('token has expired') || 
+                            lowerMessage.includes('token expired') ||
+                            lowerMessage.includes('no token provided') ||
+                            lowerMessage.includes('please login again') ||
+                            lowerMessage.includes('invalid token')) {
+                            await this.handleTokenExpiration();
+                            return {
+                                success: false,
+                                error: message || 'Token has expired. Please login again.',
+                                statusCode: 401,
+                            };
+                        }
+                    }
+
                     // Handle response format: backend returns {success: true/false, message: "..."}
                     // For password change, we check responseData.success explicitly
                     const backendSuccess = responseData?.success === true;
@@ -343,11 +409,38 @@ class ApiService {
                         errorMessage = responseData?.message || responseData?.error || 'Invalid request. Please check your input.';
                         break;
                     case 401:
-                        errorMessage = responseData?.message || 'Authentication failed. Please login again.';
-                        await this.removeAuthToken();
+                        // Check for token-related errors
+                        const message = responseData?.message || responseData?.error || '';
+                        const lowerMessage = message.toLowerCase();
+                        
+                        // Check if it's a token expiration/invalid token error
+                        if (lowerMessage.includes('token has expired') || 
+                            lowerMessage.includes('token expired') ||
+                            lowerMessage.includes('no token provided') ||
+                            lowerMessage.includes('invalid token') ||
+                            lowerMessage.includes('please login again') ||
+                            message.includes('No token provided')) {
+                            // Trigger automatic logout
+                            await this.handleTokenExpiration();
+                            errorMessage = message || 'Token has expired. Please login again.';
+                        } else {
+                            errorMessage = message || 'Authentication failed. Please login again.';
+                            await this.handleTokenExpiration();
+                        }
                         break;
                     case 403:
-                        errorMessage = responseData?.message || 'Access denied. Insufficient permissions.';
+                        // Check if 403 is due to token issues
+                        const forbiddenMessage = responseData?.message || responseData?.error || '';
+                        const lowerForbiddenMessage = forbiddenMessage.toLowerCase();
+                        
+                        if (lowerForbiddenMessage.includes('token') || 
+                            lowerForbiddenMessage.includes('expired') ||
+                            lowerForbiddenMessage.includes('invalid token')) {
+                            await this.handleTokenExpiration();
+                            errorMessage = forbiddenMessage || 'Token has expired. Please login again.';
+                        } else {
+                            errorMessage = forbiddenMessage || 'Access denied. Insufficient permissions.';
+                        }
                         break;
                     case 404:
                         errorMessage = responseData?.message || 'Service not found.';
@@ -486,6 +579,31 @@ class ApiService {
         return this.request('/driver/loads/status', {
             method: 'PUT',
             body: JSON.stringify({ loadId, status })
+        }, true);
+    }
+
+    // Driver Trips endpoints
+    async getPendingTrips(): Promise<ApiResponse<{ count: number; data: any[] }>> {
+        return this.request('/driver/trips?status=planned', { method: 'GET' }, true);
+    }
+
+    async getActiveTrips(): Promise<ApiResponse<{ count: number; data: any[] }>> {
+        return this.request('/driver/trips?status=in-progress', { method: 'GET' }, true);
+    }
+
+    async getCompletedTrips(): Promise<ApiResponse<{ count: number; data: any[] }>> {
+        return this.request('/driver/trips?status=completed', { method: 'GET' }, true);
+    }
+
+    async startTrip(tripId: string): Promise<ApiResponse> {
+        return this.request(`/driver/trips/${tripId}/start`, {
+            method: 'POST'
+        }, true);
+    }
+
+    async completeTrip(tripId: string): Promise<ApiResponse> {
+        return this.request(`/driver/trips/${tripId}/complete`, {
+            method: 'POST'
         }, true);
     }
 

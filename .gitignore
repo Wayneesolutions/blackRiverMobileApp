@@ -31,10 +31,17 @@ yarn-error.*
 *.pem
 
 # local env files
-.env
+# Note: .env is needed for EAS builds, so we keep it but don't commit sensitive data
 .env*.local
+.env.development
+.env.staging
+.env.production
 
 # typescript
 *.tsbuildinfo
+
+# Native folders (managed workflow)
+/android
+/ios
 
 .vercel

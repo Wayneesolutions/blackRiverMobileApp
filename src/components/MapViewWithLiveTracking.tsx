@@ -209,11 +209,74 @@ const MapViewWithLiveTracking: React.FC<MapViewWithLiveTrackingProps> = ({
   const [routePath, setRoutePath] = useState<Array<{ latitude: number; longitude: number }>>([]);
   const googleMapsApiKeyRef = useRef<string | null | undefined>(undefined);
 
-  const pickup = load.route?.selectPickup;
-  const dropoff = load.route?.selectDropOff;
-  const vehicleId = load.vehicle?.internalId;
+  // Validate load data early
+  if (!load) {
+    return (
+      <Modal visible={visible} animationType="slide" onRequestClose={onClose}>
+        <View style={styles.container}>
+          <View style={styles.header}>
+            <TouchableOpacity onPress={onClose} style={styles.closeButton}>
+              <Ionicons name="close" size={24} color="#fff" />
+            </TouchableOpacity>
+            <Text style={styles.headerTitle}>Map View</Text>
+          </View>
+          <View style={styles.mapFallback}>
+            <Ionicons name="alert-circle" size={64} color="#FF6B6B" />
+            <Text style={styles.fallbackText}>Invalid Load Data</Text>
+            <Text style={styles.fallbackSubtext}>Load information is not available.</Text>
+            <TouchableOpacity style={styles.errorButton} onPress={onClose}>
+              <Text style={styles.errorButtonText}>Close</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+    );
+  }
+
+  // Validate route data
+  if (!load.route) {
+    return (
+      <Modal visible={visible} animationType="slide" onRequestClose={onClose}>
+        <View style={styles.container}>
+          <View style={styles.header}>
+            <TouchableOpacity onPress={onClose} style={styles.closeButton}>
+              <Ionicons name="close" size={24} color="#fff" />
+            </TouchableOpacity>
+            <Text style={styles.headerTitle}>Map View</Text>
+          </View>
+          <View style={styles.mapFallback}>
+            <Ionicons name="map-outline" size={64} color="#8B5CF6" />
+            <Text style={styles.fallbackText}>Route Not Available</Text>
+            <Text style={styles.fallbackSubtext}>Route information is not available for this load.</Text>
+            <TouchableOpacity style={styles.errorButton} onPress={onClose}>
+              <Text style={styles.errorButtonText}>Close</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+    );
+  }
+
   const multipleDropOffs = load.route?.multipleDropOffs || false;
   const wayPoints = load.route?.wayPoints || [];
+  
+  // For multiple dropoffs, pickup might be in wayPoints instead of selectPickup
+  // Find pickup waypoint if multipleDropOffs is true and selectPickup doesn't exist
+  let pickup = load.route?.selectPickup;
+  if (multipleDropOffs && !pickup && wayPoints.length > 0) {
+    const pickupWaypoint = wayPoints.find(wp => wp.pickup === true);
+    if (pickupWaypoint && pickupWaypoint.address) {
+      pickup = pickupWaypoint.address;
+      logger.info('Pickup found in waypoints', {
+        waypointIndex: wayPoints.indexOf(pickupWaypoint),
+        place: pickupWaypoint.address.place,
+        hasCoordinates: !!(pickupWaypoint.address.latitude && pickupWaypoint.address.longitude)
+      });
+    }
+  }
+  
+  const dropoff = load.route?.selectDropOff;
+  const vehicleId = load.vehicle?.internalId;
 
   useEffect(() => {
     if (!visible) {
@@ -424,7 +487,7 @@ const MapViewWithLiveTracking: React.FC<MapViewWithLiveTrackingProps> = ({
   const calculateRegion = () => {
     const coordinates: Array<{ latitude: number; longitude: number }> = [];
 
-    // Add pickup location
+    // Add pickup location (either from selectPickup or from waypoint with pickup: true)
     const pickupLat = parseCoordinate(pickup?.latitude);
     const pickupLng = parseCoordinate(pickup?.longitude);
     if (pickupLat !== null && pickupLng !== null) {
@@ -437,8 +500,30 @@ const MapViewWithLiveTracking: React.FC<MapViewWithLiveTrackingProps> = ({
     // Add waypoints if multipleDropOffs is true
     if (multipleDropOffs && wayPoints.length > 0) {
       wayPoints.forEach((waypoint) => {
-        const waypointLat = parseCoordinate(waypoint.address?.latitude);
-        const waypointLng = parseCoordinate(waypoint.address?.longitude);
+        // Skip if this waypoint is the pickup (already added above)
+        if (waypoint.pickup === true && pickup) {
+          return;
+        }
+        
+        // Try multiple ways to get coordinates
+        let waypointLat = parseCoordinate(waypoint.address?.latitude);
+        let waypointLng = parseCoordinate(waypoint.address?.longitude);
+        
+        // If not found in address, try direct on waypoint
+        if (waypointLat === null || waypointLng === null) {
+          waypointLat = parseCoordinate((waypoint as any)?.latitude);
+          waypointLng = parseCoordinate((waypoint as any)?.longitude);
+        }
+        
+        // If still not found, try coordinates array
+        if ((waypointLat === null || waypointLng === null) && (waypoint.address as any)?.coordinates) {
+          const coords = (waypoint.address as any).coordinates;
+          if (Array.isArray(coords) && coords.length >= 2) {
+            waypointLng = parseCoordinate(coords[0]); // longitude first in GeoJSON
+            waypointLat = parseCoordinate(coords[1]); // latitude second in GeoJSON
+          }
+        }
+        
         if (waypointLat !== null && waypointLng !== null) {
           coordinates.push({
             latitude: waypointLat,
@@ -500,10 +585,37 @@ const MapViewWithLiveTracking: React.FC<MapViewWithLiveTrackingProps> = ({
   const dropoffLat = parseCoordinate(dropoff?.latitude);
   const dropoffLng = parseCoordinate(dropoff?.longitude);
 
+  // Validate that we have at least pickup coordinates before rendering map
+  if (pickupLat === null || pickupLng === null) {
+    return (
+      <Modal visible={visible} animationType="slide" onRequestClose={onClose}>
+        <View style={styles.container}>
+          <View style={styles.header}>
+            <TouchableOpacity onPress={onClose} style={styles.closeButton}>
+              <Ionicons name="close" size={24} color="#fff" />
+            </TouchableOpacity>
+            <Text style={styles.headerTitle}>Map View</Text>
+          </View>
+          <View style={styles.mapFallback}>
+            <Ionicons name="map-outline" size={64} color="#8B5CF6" />
+            <Text style={styles.fallbackText}>Route Coordinates Missing</Text>
+            <Text style={styles.fallbackSubtext}>
+              Pickup location coordinates are not available for this load. Please contact support.
+            </Text>
+            <TouchableOpacity style={styles.errorButton} onPress={onClose}>
+              <Text style={styles.errorButtonText}>Close</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+    );
+  }
+
   // Build route coordinates based on multipleDropOffs flag
   const routeCoordinates: Array<{ latitude: number; longitude: number }> = useMemo(() => {
     const coords: Array<{ latitude: number; longitude: number }> = [];
 
+    // Add pickup first (either from selectPickup or from waypoint with pickup: true)
     if (pickupLat !== null && pickupLng !== null) {
       coords.push({
         latitude: pickupLat,
@@ -512,9 +624,41 @@ const MapViewWithLiveTracking: React.FC<MapViewWithLiveTrackingProps> = ({
     }
 
     if (multipleDropOffs && wayPoints.length > 0) {
-      wayPoints.forEach((waypoint) => {
-        const waypointLat = parseCoordinate(waypoint.address?.latitude);
-        const waypointLng = parseCoordinate(waypoint.address?.longitude);
+      // Sort waypoints: pickup first (if not already added), then others
+      const sortedWaypoints = [...wayPoints].sort((a, b) => {
+        // If pickup is already in coords, don't prioritize it
+        if (a.pickup === true && pickup) return 1;
+        if (b.pickup === true && pickup) return -1;
+        return 0;
+      });
+      
+      sortedWaypoints.forEach((waypoint) => {
+        // Skip if this waypoint is the pickup and we already added it
+        if (waypoint.pickup === true && pickup && 
+            parseCoordinate(waypoint.address?.latitude) === pickupLat &&
+            parseCoordinate(waypoint.address?.longitude) === pickupLng) {
+          return;
+        }
+        
+        // Try multiple ways to get coordinates
+        let waypointLat = parseCoordinate(waypoint.address?.latitude);
+        let waypointLng = parseCoordinate(waypoint.address?.longitude);
+        
+        // If not found in address, try direct on waypoint
+        if (waypointLat === null || waypointLng === null) {
+          waypointLat = parseCoordinate((waypoint as any)?.latitude);
+          waypointLng = parseCoordinate((waypoint as any)?.longitude);
+        }
+        
+        // If still not found, try coordinates array
+        if ((waypointLat === null || waypointLng === null) && (waypoint.address as any)?.coordinates) {
+          const coords = (waypoint.address as any).coordinates;
+          if (Array.isArray(coords) && coords.length >= 2) {
+            waypointLng = parseCoordinate(coords[0]); // longitude first in GeoJSON
+            waypointLat = parseCoordinate(coords[1]); // latitude second in GeoJSON
+          }
+        }
+        
         if (waypointLat !== null && waypointLng !== null) {
           coords.push({
             latitude: waypointLat,
@@ -530,7 +674,70 @@ const MapViewWithLiveTracking: React.FC<MapViewWithLiveTrackingProps> = ({
     }
 
     return coords;
-  }, [pickupLat, pickupLng, dropoffLat, dropoffLng, multipleDropOffs, wayPoints]);
+  }, [pickupLat, pickupLng, dropoffLat, dropoffLng, multipleDropOffs, wayPoints, pickup]);
+
+  // Prepare valid waypoints for rendering (filter out invalid coordinates)
+  // Use useMemo to ensure stable array reference - defined early so it can be used in useEffect
+  const validWaypoints = useMemo(() => {
+    if (!multipleDropOffs || !wayPoints || wayPoints.length === 0) {
+      return [];
+    }
+
+    const valid = wayPoints
+      .map((waypoint, originalIndex) => {
+        // Try multiple ways to get coordinates
+        // 1. From waypoint.address.latitude/longitude (most common)
+        // 2. From waypoint.latitude/longitude (direct on waypoint)
+        // 3. From waypoint.address.coordinates (if stored as array)
+        let waypointLat = parseCoordinate(waypoint.address?.latitude);
+        let waypointLng = parseCoordinate(waypoint.address?.longitude);
+        
+        // If not found in address, try direct on waypoint
+        if (waypointLat === null || waypointLng === null) {
+          waypointLat = parseCoordinate((waypoint as any)?.latitude);
+          waypointLng = parseCoordinate((waypoint as any)?.longitude);
+        }
+        
+        // If still not found, try coordinates array
+        if ((waypointLat === null || waypointLng === null) && (waypoint.address as any)?.coordinates) {
+          const coords = (waypoint.address as any).coordinates;
+          if (Array.isArray(coords) && coords.length >= 2) {
+            waypointLng = parseCoordinate(coords[0]); // longitude first in GeoJSON
+            waypointLat = parseCoordinate(coords[1]); // latitude second in GeoJSON
+          }
+        }
+        
+        // Log warning if coordinates are missing
+        if (waypointLat === null || waypointLng === null) {
+          logger.warn('Waypoint missing coordinates', {
+            waypointIndex: originalIndex,
+            hasAddress: !!waypoint.address,
+            addressKeys: waypoint.address ? Object.keys(waypoint.address) : [],
+            waypointKeys: Object.keys(waypoint),
+            place: waypoint.address?.place,
+          });
+          return null;
+        }
+
+        return {
+          waypoint,
+          waypointLat,
+          waypointLng,
+          originalIndex,
+          isDropoff: waypoint.dropOff === true,
+          isPickup: waypoint.pickup === true,
+        };
+      })
+      .filter((item): item is NonNullable<typeof item> => item !== null);
+    
+    logger.info('Valid waypoints prepared', {
+      totalWaypoints: wayPoints.length,
+      validWaypoints: valid.length,
+      multipleDropOffs,
+    });
+    
+    return valid;
+  }, [multipleDropOffs, wayPoints]);
 
   const vehicleLat = parseCoordinate(vehicleLocation?.currentLocation?.latitude);
   const vehicleLng = parseCoordinate(vehicleLocation?.currentLocation?.longitude);
@@ -768,12 +975,14 @@ const MapViewWithLiveTracking: React.FC<MapViewWithLiveTrackingProps> = ({
   }, []);
 
   const fetchRoutePolyline = useCallback(async () => {
-    if (
-      pickupLat === null ||
-      pickupLng === null ||
-      dropoffLat === null ||
-      dropoffLng === null
-    ) {
+    // For multiple dropoffs, we don't need dropoffLat/dropoffLng
+    if (pickupLat === null || pickupLng === null) {
+      setRoutePath([]);
+      return;
+    }
+
+    // For single dropoff, we need dropoff coordinates
+    if (!multipleDropOffs && (dropoffLat === null || dropoffLng === null)) {
       setRoutePath([]);
       return;
     }
@@ -785,25 +994,76 @@ const MapViewWithLiveTracking: React.FC<MapViewWithLiveTrackingProps> = ({
         return;
       }
 
-      const waypointParams: string[] = [];
+      // For multiple dropoffs, use waypoints in order
+      // Otherwise use the single dropoff location
+      let destinationLat: number;
+      let destinationLng: number;
+      let waypointParams: string[] = [];
+      
       if (multipleDropOffs && wayPoints.length > 0) {
-        const waypointCoords = wayPoints
-          .map((waypoint) => {
-            const lat = parseCoordinate(waypoint.address?.latitude);
-            const lng = parseCoordinate(waypoint.address?.longitude);
-            if (lat !== null && lng !== null) {
-              return `${lat},${lng}`;
+        // Process waypoints in array order (preserving sequence)
+        const waypointCoords: Array<{ lat: number; lng: number; coord: string }> = [];
+        
+        wayPoints.forEach((waypoint) => {
+          // Skip pickup waypoint if it's being used as origin
+          if (waypoint.pickup === true && pickup && 
+              parseCoordinate(waypoint.address?.latitude) === pickupLat &&
+              parseCoordinate(waypoint.address?.longitude) === pickupLng) {
+            return;
+          }
+          
+          // Try multiple ways to get coordinates
+          let lat = parseCoordinate(waypoint.address?.latitude);
+          let lng = parseCoordinate(waypoint.address?.longitude);
+          
+          // If not found in address, try direct on waypoint
+          if (lat === null || lng === null) {
+            lat = parseCoordinate((waypoint as any)?.latitude);
+            lng = parseCoordinate((waypoint as any)?.longitude);
+          }
+          
+          // If still not found, try coordinates array
+          if ((lat === null || lng === null) && (waypoint.address as any)?.coordinates) {
+            const coords = (waypoint.address as any).coordinates;
+            if (Array.isArray(coords) && coords.length >= 2) {
+              lng = parseCoordinate(coords[0]); // longitude first in GeoJSON
+              lat = parseCoordinate(coords[1]); // latitude second in GeoJSON
             }
-            return null;
-          })
-          .filter((entry): entry is string => entry !== null);
+          }
+          
+          if (lat !== null && lng !== null) {
+            waypointCoords.push({
+              lat,
+              lng,
+              coord: `${lat},${lng}`
+            });
+          }
+        });
 
         if (waypointCoords.length > 0) {
-          waypointParams.push(`waypoints=${encodeURIComponent(waypointCoords.join('|'))}`);
+          // Use the last waypoint coordinate as destination
+          const lastWaypoint = waypointCoords[waypointCoords.length - 1];
+          destinationLat = lastWaypoint.lat;
+          destinationLng = lastWaypoint.lng;
+          
+          // Use all waypoints except the last one as intermediate stops
+          // This preserves the order from the array
+          const intermediateWaypoints = waypointCoords.slice(0, -1);
+          if (intermediateWaypoints.length > 0) {
+            waypointParams.push(`waypoints=${encodeURIComponent(intermediateWaypoints.map(w => w.coord).join('|'))}`);
+          }
+        } else {
+          // If no valid waypoints, use pickup as both origin and destination
+          destinationLat = pickupLat;
+          destinationLng = pickupLng;
         }
+      } else {
+        // Single dropoff - use dropoff as destination
+        destinationLat = dropoffLat!;
+        destinationLng = dropoffLng!;
       }
-
-      const directionsUrl = `https://maps.googleapis.com/maps/api/directions/json?origin=${pickupLat},${pickupLng}&destination=${dropoffLat},${dropoffLng}&mode=driving${waypointParams.length ? `&${waypointParams.join('&')}` : ''}&key=${apiKey}`;
+      
+      const directionsUrl = `https://maps.googleapis.com/maps/api/directions/json?origin=${pickupLat},${pickupLng}&destination=${destinationLat},${destinationLng}&mode=driving${waypointParams.length > 0 ? `&${waypointParams.join('&')}` : ''}&key=${apiKey}`;
 
       const response = await fetch(directionsUrl);
       if (!response.ok) {
@@ -835,6 +1095,7 @@ const MapViewWithLiveTracking: React.FC<MapViewWithLiveTrackingProps> = ({
     dropoffLng,
     wayPoints,
     routeCoordinates,
+    pickup,
   ]);
 
   useEffect(() => {
@@ -842,12 +1103,14 @@ const MapViewWithLiveTracking: React.FC<MapViewWithLiveTrackingProps> = ({
       return;
     }
 
-    if (
-      pickupLat === null ||
-      pickupLng === null ||
-      dropoffLat === null ||
-      dropoffLng === null
-    ) {
+    // For multiple dropoffs, we only need pickup and waypoints
+    // For single dropoff, we need both pickup and dropoff
+    if (pickupLat === null || pickupLng === null) {
+      setRoutePath(routeCoordinates.slice());
+      return;
+    }
+
+    if (!multipleDropOffs && (dropoffLat === null || dropoffLng === null)) {
       setRoutePath(routeCoordinates.slice());
       return;
     }
@@ -881,9 +1144,23 @@ const MapViewWithLiveTracking: React.FC<MapViewWithLiveTrackingProps> = ({
     if (pickupLat !== null && pickupLng !== null) {
       points.push({ latitude: pickupLat, longitude: pickupLng });
     }
-    if (dropoffLat !== null && dropoffLng !== null) {
+    
+    // Add waypoints if multipleDropOffs is true
+    if (multipleDropOffs && validWaypoints.length > 0) {
+      validWaypoints.forEach((item) => {
+        // Skip pickup waypoint if it's already added
+        if (item.isPickup && pickup && 
+            item.waypointLat === pickupLat && 
+            item.waypointLng === pickupLng) {
+          return;
+        }
+        points.push({ latitude: item.waypointLat, longitude: item.waypointLng });
+      });
+    } else if (dropoffLat !== null && dropoffLng !== null) {
+      // Only add dropoff if not multiple dropoffs
       points.push({ latitude: dropoffLat, longitude: dropoffLng });
     }
+    
     if (vehicleCoordinates) {
       points.push(vehicleCoordinates);
     }
@@ -913,35 +1190,9 @@ const MapViewWithLiveTracking: React.FC<MapViewWithLiveTrackingProps> = ({
     vehicleCoordinates?.latitude,
     vehicleCoordinates?.longitude,
     routePath,
+    multipleDropOffs,
+    validWaypoints,
   ]);
-
-  // Prepare valid waypoints for rendering (filter out invalid coordinates)
-  // Use useMemo to ensure stable array reference
-  const validWaypoints = useMemo(() => {
-    if (!multipleDropOffs || !wayPoints || wayPoints.length === 0) {
-      return [];
-    }
-
-    return wayPoints
-      .map((waypoint, originalIndex) => {
-        const waypointLat = parseCoordinate(waypoint.address?.latitude);
-        const waypointLng = parseCoordinate(waypoint.address?.longitude);
-        
-        if (waypointLat === null || waypointLng === null) {
-          return null;
-        }
-
-        return {
-          waypoint,
-          waypointLat,
-          waypointLng,
-          originalIndex,
-          isDropoff: waypoint.dropOff === true,
-          isPickup: waypoint.pickup === true,
-        };
-      })
-      .filter((item): item is NonNullable<typeof item> => item !== null);
-  }, [multipleDropOffs, wayPoints]);
 
   // Calculate distance metrics
   const distanceMetrics = useMemo(() => {
@@ -1264,17 +1515,35 @@ const MapViewWithLiveTracking: React.FC<MapViewWithLiveTrackingProps> = ({
                 }
               }}
             />
-          ) : MapView && PROVIDER_GOOGLE ? (
-            <MapView
-              ref={mapRef}
-              style={styles.map}
-              provider={PROVIDER_GOOGLE}
-              initialRegion={calculateRegion()}
-              showsUserLocation={false}
-              showsMyLocationButton={false}
-              showsCompass={true}
-              toolbarEnabled={false}
-            >
+          ) : MapView && PROVIDER_GOOGLE ? (() => {
+            try {
+              const region = calculateRegion();
+              // Validate region coordinates
+              if (!region || isNaN(region.latitude) || isNaN(region.longitude) || 
+                  !isFinite(region.latitude) || !isFinite(region.longitude)) {
+                throw new Error('Invalid map region coordinates');
+              }
+              
+              return (
+                <MapView
+                  ref={mapRef}
+                  style={styles.map}
+                  provider={PROVIDER_GOOGLE}
+                  initialRegion={region}
+                  showsUserLocation={false}
+                  showsMyLocationButton={false}
+                  showsCompass={true}
+                  toolbarEnabled={false}
+                  onMapReady={() => {
+                    logger.info('Map ready');
+                    setLoading(false);
+                  }}
+                  onError={(error: any) => {
+                    logger.error('Map error', error);
+                    setError('Map failed to load. Please try again.');
+                    setLoading(false);
+                  }}
+                >
             {/* Pickup Marker with Label */}
             {pickupLat !== null && pickupLng !== null && (
               <Marker
@@ -1328,6 +1597,14 @@ const MapViewWithLiveTracking: React.FC<MapViewWithLiveTrackingProps> = ({
             {/* Waypoint Markers with Labels */}
             {validWaypoints.map((item, displayIndex) => {
               const { waypoint, waypointLat, waypointLng, originalIndex, isDropoff, isPickup } = item;
+              
+              // Skip rendering pickup waypoint if it's already shown as pickup marker
+              // Only skip if pickup exists and coordinates match
+              if (isPickup && pickup && 
+                  parseCoordinate(pickup?.latitude) === waypointLat &&
+                  parseCoordinate(pickup?.longitude) === waypointLng) {
+                return null;
+              }
               
               // Create unique key for each marker
               const markerKey = `waypoint-${load._id}-${originalIndex}-${Math.round(waypointLat * 10000)}-${Math.round(waypointLng * 10000)}`;
@@ -1406,62 +1683,51 @@ const MapViewWithLiveTracking: React.FC<MapViewWithLiveTrackingProps> = ({
               />
             )}
 
-            </MapView>
-          ) : (
+                </MapView>
+              );
+            } catch (mapError: any) {
+              logger.error('Error rendering map', mapError);
+              return (
+                <View style={styles.mapFallback}>
+                  <Ionicons name="alert-circle" size={64} color="#FF6B6B" />
+                  <Text style={styles.fallbackText}>Map Error</Text>
+                  <Text style={styles.fallbackSubtext}>
+                    {mapError?.message || 'Failed to render map. Please try again.'}
+                  </Text>
+                  <TouchableOpacity 
+                    style={styles.errorButton} 
+                    onPress={() => {
+                      const pickupLat = parseCoordinate(pickup?.latitude);
+                      const pickupLng = parseCoordinate(pickup?.longitude);
+                      if (pickupLat !== null && pickupLng !== null) {
+                        const url = `https://www.google.com/maps?q=${pickupLat},${pickupLng}`;
+                        Linking.openURL(url);
+                      }
+                    }}
+                  >
+                    <Text style={styles.errorButtonText}>Open in Google Maps</Text>
+                  </TouchableOpacity>
+                </View>
+              );
+            }
+          })() : (
             <View style={styles.mapFallback}>
               <Ionicons name="map-outline" size={64} color="#8B5CF6" />
-              <Text style={styles.fallbackText}>Maps Not Available in Expo Go</Text>
+              <Text style={styles.fallbackText}>Maps Not Available</Text>
               <Text style={styles.fallbackSubtext}>
-                For full map features, please build a development client or use the web version.
+                {!MapView ? 'react-native-maps is not installed. Please rebuild the app with EAS Build.' : 'Map provider is not available. Please check your configuration.'}
               </Text>
-              {(pickup || dropoff) && (
-                <View style={{ marginTop: 24, padding: 16, backgroundColor: '#f5f5f5', borderRadius: 8, width: '90%' }}>
-                  {pickup && (
-                    <View style={{ marginBottom: 12 }}>
-                      <Text style={[styles.fallbackSubtext, { fontWeight: 'bold', color: '#27ae60' }]}>
-                        📍 Pickup Location:
-                      </Text>
-                      <Text style={styles.fallbackSubtext}>
-                        {pickup.place || `${pickup.city}, ${pickup.state}`}
-                      </Text>
-                      {pickupLat !== null && pickupLng !== null && (
-                        <TouchableOpacity
-                          style={[styles.openMapsButton, { marginTop: 8 }]}
-                          onPress={() => {
-                            const url = `https://www.google.com/maps?q=${pickupLat},${pickupLng}`;
-                            Linking.openURL(url);
-                          }}
-                        >
-                          <Ionicons name="navigate" size={16} color="#fff" />
-                          <Text style={styles.openMapsButtonText}>Open in Google Maps</Text>
-                        </TouchableOpacity>
-                      )}
-                    </View>
-                  )}
-                  {dropoff && (
-                    <View>
-                      <Text style={[styles.fallbackSubtext, { fontWeight: 'bold', color: '#e74c3c' }]}>
-                        🎯 Drop-off Location:
-                      </Text>
-                      <Text style={styles.fallbackSubtext}>
-                        {dropoff.place || `${dropoff.city}, ${dropoff.state}`}
-                      </Text>
-                      {dropoffLat !== null && dropoffLng !== null && (
-                        <TouchableOpacity
-                          style={[styles.openMapsButton, { marginTop: 8 }]}
-                          onPress={() => {
-                            const url = `https://www.google.com/maps?q=${dropoffLat},${dropoffLng}`;
-                            Linking.openURL(url);
-                          }}
-                        >
-                          <Ionicons name="navigate" size={16} color="#fff" />
-                          <Text style={styles.openMapsButtonText}>Open in Google Maps</Text>
-                        </TouchableOpacity>
-                      )}
-                    </View>
-                  )}
-                </View>
-              )}
+              <TouchableOpacity 
+                style={styles.errorButton} 
+                onPress={() => {
+                  if (pickupLat !== null && pickupLng !== null) {
+                    const url = `https://www.google.com/maps?q=${pickupLat},${pickupLng}`;
+                    Linking.openURL(url);
+                  }
+                }}
+              >
+                <Text style={styles.errorButtonText}>Open in Google Maps</Text>
+              </TouchableOpacity>
             </View>
           )}
         </View>
@@ -2225,6 +2491,18 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#333',
     flex: 1,
+  },
+  errorButton: {
+    backgroundColor: '#8B5CF6',
+    paddingVertical: 12,
+    paddingHorizontal: 24,
+    borderRadius: 8,
+    marginTop: 16,
+  },
+  errorButtonText: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: '600',
   },
 });
 

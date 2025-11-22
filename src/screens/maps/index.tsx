@@ -79,16 +79,68 @@ const parseCoordinate = (value: number | string | undefined | null): number | nu
   return Number.isFinite(parsed) ? parsed : null;
 };
 
+// Helper function to extract waypoint coordinates (tries multiple formats)
+const getWaypointCoordinates = (waypoint: LoadWaypoint): { lat: number | null; lng: number | null } => {
+  // Try multiple ways to get coordinates
+  let lat = parseCoordinate(waypoint.address?.latitude);
+  let lng = parseCoordinate(waypoint.address?.longitude);
+  
+  // If not found in address, try direct on waypoint
+  if (lat === null || lng === null) {
+    lat = parseCoordinate((waypoint as any)?.latitude);
+    lng = parseCoordinate((waypoint as any)?.longitude);
+  }
+  
+  // If still not found, try coordinates array
+  if ((lat === null || lng === null) && (waypoint.address as any)?.coordinates) {
+    const coords = (waypoint.address as any).coordinates;
+    if (Array.isArray(coords) && coords.length >= 2) {
+      lng = parseCoordinate(coords[0]); // longitude first in GeoJSON
+      lat = parseCoordinate(coords[1]); // latitude second in GeoJSON
+    }
+  }
+  
+  return { lat, lng };
+};
+
 const hasValidCoordinates = (load: Load): boolean => {
-  const pickup = load.route?.selectPickup;
+  let pickup = load.route?.selectPickup;
   const dropoff = load.route?.selectDropOff;
+  const multipleDropOffs = load.route?.multipleDropOffs || false;
+  const wayPoints = load.route?.wayPoints || [];
+
+  // For multiple dropoffs, pickup might be in wayPoints instead of selectPickup
+  if (!pickup && multipleDropOffs && wayPoints.length > 0) {
+    const pickupWaypoint = wayPoints.find(wp => wp.pickup === true);
+    if (pickupWaypoint && pickupWaypoint.address) {
+      pickup = pickupWaypoint.address;
+    }
+  }
 
   const pickupLat = parseCoordinate(pickup?.latitude);
   const pickupLng = parseCoordinate(pickup?.longitude);
-  const dropLat = parseCoordinate(dropoff?.latitude);
-  const dropLng = parseCoordinate(dropoff?.longitude);
+  
+  // Must have pickup coordinates
+  if (pickupLat === null || pickupLng === null) {
+    return false;
+  }
 
-  return pickupLat !== null && pickupLng !== null && dropLat !== null && dropLng !== null;
+  // For multiple dropoffs, check if we have at least one waypoint with valid coordinates
+  if (multipleDropOffs) {
+    if (wayPoints.length === 0) {
+      return false;
+    }
+    // Check if at least one waypoint has valid coordinates
+    return wayPoints.some(wp => {
+      const { lat, lng } = getWaypointCoordinates(wp);
+      return lat !== null && lng !== null;
+    });
+  } else {
+    // For single dropoff, check dropoff coordinates
+    const dropLat = parseCoordinate(dropoff?.latitude);
+    const dropLng = parseCoordinate(dropoff?.longitude);
+    return dropLat !== null && dropLng !== null;
+  }
 };
 
 const getStatusColor = (status: string) => {

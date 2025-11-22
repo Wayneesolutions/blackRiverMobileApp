@@ -1,20 +1,36 @@
 {
   "cli": {
-    "version": ">= 7.8.6"
+    "version": ">= 16.8.0",
+    "appVersionSource": "remote"
   },
   "build": {
     "development": {
       "developmentClient": true,
-      "distribution": "internal",
-      "android": {
-        "buildType": "apk"
-      }
+      "distribution": "internal"
     },
     "preview": {
       "distribution": "internal",
       "android": {
-        "buildType": "apk"
+        "buildType": "apk",
+        "gradleCommand": ":app:assembleRelease",
+        "withoutCredentials": false
+      }
+    },
+    "production": {
+      "autoIncrement": true,
+      "android": {
+        "buildType": "apk",
+        "gradleCommand": ":app:assembleRelease"
+      },
+      "env": {
+        "API_BASE_URL": "https://portal.logistiqinnovations.ca/api/v1",
+        "SOCKET_URL": "https://portal.logistiqinnovations.ca",
+        "NODE_ENV": "production",
+        "DB_NAME": "blackriver"
       }
     }
+  },
+  "submit": {
+    "production": {}
   }
 }

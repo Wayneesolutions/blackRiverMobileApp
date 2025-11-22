@@ -10,7 +10,6 @@ import {
   ActivityIndicator,
   RefreshControl,
   Alert,
-  Linking,
 } from "react-native";
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
@@ -23,97 +22,212 @@ type NavigationProp = NativeStackNavigationProp<RootStackParamList>;
 
 const { width } = Dimensions.get('window');
 
-interface Load {
+interface Trip {
   _id: string;
-  internalId?: string;
-  orderType?: string;
+  tripNumber: string;
   status: string;
-  route?: {
-    multipleDropOffs?: boolean;
-    selectPickup?: {
-      place?: string;
-      city?: string;
-      state?: string;
-      latitude?: number;
-      longitude?: number;
-    };
-    selectDropOff?: {
-      place?: string;
-      city?: string;
-      state?: string;
-      latitude?: number;
-      longitude?: number;
-    };
-    wayPoints?: Array<{
-      address?: {
-        place?: string;
-        city?: string;
-        state?: string;
-        latitude?: number | string;
-        longitude?: number | string;
-      };
-      dropOff?: boolean;
-      pickup?: boolean;
-    }>;
-  };
-  payloads?: Array<{
-    itemName?: string;
-    description?: string;
-    measurementAndWeight?: {
-      weight?: number;
-    };
-    itemImageUrl?: string;
-  }>;
-  customer?: {
-    name?: string;
-    email?: string;
-  };
-  vehicle?: {
+  driver?: {
     _id: string;
-    internalId: string;
+    name: string;
+  };
+  truck?: {
+    _id: string;
     plateNumber?: string;
+    internalId?: string;
     make?: string;
     model?: string;
   };
-  notes?: string;
-  documents?: Array<{
+  trailer?: {
     _id: string;
-    documentUrl: string;
+    plateNumber?: string;
+    trailerNumber?: string;
+  };
+  orders?: Array<{
+    _id: string;
+    orderNumber: string;
+    customerOrderNo?: string;
+    status?: string;
+    customer?: {
+      name?: string;
+      email?: string;
+    };
+    pickupLocation?: {
+      place?: string;
+      latitude?: string | number;
+      longitude?: string | number;
+      placeId?: {
+        name?: string;
+        currentLocation?: {
+          address?: string;
+          latitude?: string | number;
+          longitude?: string | number;
+        };
+      };
+    };
+    deliveryLocation?: {
+      place?: string;
+      latitude?: string | number;
+      longitude?: string | number;
+      placeId?: {
+        name?: string;
+        currentLocation?: {
+          address?: string;
+          latitude?: string | number;
+          longitude?: string | number;
+        };
+      };
+    };
+    pickupDate?: string;
+    deliveryDate?: string;
   }>;
+  plannedStartDate?: string;
+  plannedEndDate?: string;
+  actualStartDate?: string;
+  actualEndDate?: string;
+  notes?: string;
 }
 
-interface LoadCardProps {
-  load: Load;
-}
+// Helper to convert trip to load-like structure for MapViewWithLiveTracking
+const convertTripToLoadForMap = (trip: Trip) => {
+  if (!trip.orders || trip.orders.length === 0) {
+    return null;
+  }
+
+  // Get first order's pickup and last order's delivery
+  const firstOrder = trip.orders[0];
+  const lastOrder = trip.orders[trip.orders.length - 1];
+
+  const parseCoord = (val: any): number | null => {
+    if (val === undefined || val === null) return null;
+    if (typeof val === 'number') return isNaN(val) ? null : val;
+    if (typeof val === 'string') {
+      const parsed = parseFloat(val);
+      return isNaN(parsed) ? null : parsed;
+    }
+    return null;
+  };
+
+  const getLocationCoords = (location: any) => {
+    if (!location) return { lat: null, lng: null };
+    
+    let lat = parseCoord(location.latitude);
+    let lng = parseCoord(location.longitude);
+    
+    if ((lat === null || lng === null) && location.placeId?.currentLocation) {
+      lat = parseCoord(location.placeId.currentLocation.latitude);
+      lng = parseCoord(location.placeId.currentLocation.longitude);
+    }
+    
+    return { lat, lng };
+  };
+
+  const pickup = firstOrder.pickupLocation;
+  const dropoff = lastOrder.deliveryLocation;
+  const pickupCoords = getLocationCoords(pickup);
+  const dropoffCoords = getLocationCoords(dropoff);
+
+  // Create waypoints for all orders (pickups and deliveries)
+  const wayPoints: Array<{
+    address: {
+      place: string;
+      latitude: number | string | null;
+      longitude: number | string | null;
+    };
+    pickup?: boolean;
+    dropOff?: boolean;
+  }> = [];
+
+  trip.orders.forEach((order, index) => {
+    const pickupLoc = order.pickupLocation;
+    const deliveryLoc = order.deliveryLocation;
+    const pickupCoords = getLocationCoords(pickupLoc);
+    const deliveryCoords = getLocationCoords(deliveryLoc);
+
+    if (pickupCoords.lat !== null && pickupCoords.lng !== null) {
+      wayPoints.push({
+        address: {
+          place: pickupLoc?.place || pickupLoc?.placeId?.name || `Pickup ${index + 1}`,
+          latitude: pickupCoords.lat,
+          longitude: pickupCoords.lng,
+        },
+        pickup: true,
+      });
+    }
+
+    if (deliveryCoords.lat !== null && deliveryCoords.lng !== null) {
+      wayPoints.push({
+        address: {
+          place: deliveryLoc?.place || deliveryLoc?.placeId?.name || `Delivery ${index + 1}`,
+          latitude: deliveryCoords.lat,
+          longitude: deliveryCoords.lng,
+        },
+        dropOff: true,
+      });
+    }
+  });
+
+  return {
+    _id: trip._id,
+    internalId: trip.tripNumber,
+      route: {
+        multipleDropOffs: trip.orders.length > 1,
+        selectPickup: {
+          place: pickup?.place || pickup?.placeId?.name || 'Pickup',
+          latitude: pickupCoords.lat !== null ? pickupCoords.lat : undefined,
+          longitude: pickupCoords.lng !== null ? pickupCoords.lng : undefined,
+        },
+        selectDropOff: {
+          place: dropoff?.place || dropoff?.placeId?.name || 'Delivery',
+          latitude: dropoffCoords.lat !== null ? dropoffCoords.lat : undefined,
+          longitude: dropoffCoords.lng !== null ? dropoffCoords.lng : undefined,
+        },
+        wayPoints: wayPoints.filter(wp => wp.address.latitude !== null && wp.address.longitude !== null).map(wp => ({
+          address: {
+            place: wp.address.place,
+            latitude: wp.address.latitude !== null ? wp.address.latitude : undefined,
+            longitude: wp.address.longitude !== null ? wp.address.longitude : undefined,
+          },
+          pickup: wp.pickup,
+          dropOff: wp.dropOff,
+        })),
+      },
+    vehicle: trip.truck ? {
+      _id: trip.truck._id,
+      internalId: trip.truck.internalId || trip.truck.plateNumber || '',
+      plateNumber: trip.truck.plateNumber,
+    } : undefined,
+  };
+};
 
 const ActiveTrips = () => {
-  const [loads, setLoads] = useState<Load[]>([]);
+  const [trips, setTrips] = useState<Trip[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [mapModalVisible, setMapModalVisible] = useState(false);
-  const [selectedLoadForMap, setSelectedLoadForMap] = useState<Load | null>(null);
+  const [selectedTripForMap, setSelectedTripForMap] = useState<Trip | null>(null);
+  const navigation = useNavigation<NavigationProp>();
 
   useEffect(() => {
-    fetchActiveLoads();
+    fetchActiveTrips();
   }, []);
 
-  const fetchActiveLoads = async () => {
+  const fetchActiveTrips = async () => {
     try {
       setLoading(true);
-      const response = await apiService.getActiveLoads();
+      const response = await apiService.getActiveTrips();
       
       if (response.success && response.data) {
-        const loadsData = response.data.loads || response.data || [];
-        setLoads(Array.isArray(loadsData) ? loadsData : []);
-        logger.info('Active loads fetched', { count: loadsData.length });
+        const tripsData = response.data.data || response.data || [];
+        setTrips(Array.isArray(tripsData) ? tripsData : []);
+        logger.info('Active trips fetched', { count: tripsData.length });
       } else {
-        logger.warn('Failed to fetch active loads', { error: response.error });
-        setLoads([]);
+        logger.warn('Failed to fetch active trips', { error: response.error });
+        setTrips([]);
       }
     } catch (error) {
-      logger.error('Error fetching active loads', error);
-      setLoads([]);
-      Alert.alert('Error', 'Failed to load active loads. Please try again.');
+      logger.error('Error fetching active trips', error);
+      setTrips([]);
+      Alert.alert('Error', 'Failed to load active trips. Please try again.');
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -122,43 +236,13 @@ const ActiveTrips = () => {
 
   const onRefresh = () => {
     setRefreshing(true);
-    fetchActiveLoads();
+    fetchActiveTrips();
   };
 
-  const navigation = useNavigation<NavigationProp>();
-
-  const handleMarkDelivered = async (loadId: string) => {
+  const handleCompleteTrip = async (tripId: string) => {
     Alert.alert(
-      'Mark as Delivered',
-      'Have you successfully delivered the goods to the destination?',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Mark Delivered',
-          style: 'default',
-          onPress: async () => {
-            try {
-              const response = await apiService.updateLoadStatus(loadId, 'delivered');
-              if (response.success) {
-                Alert.alert('Success', 'Load marked as delivered');
-                fetchActiveLoads(); // Refresh the list
-              } else {
-                Alert.alert('Error', response.error || 'Failed to mark load as delivered');
-              }
-            } catch (error) {
-              logger.error('Error marking load as delivered', error);
-              Alert.alert('Error', 'Failed to mark load as delivered. Please try again.');
-            }
-          },
-        },
-      ]
-    );
-  };
-
-  const handleCompleteLoad = async (loadId: string) => {
-    Alert.alert(
-      'Complete Load',
-      'Are you sure you want to mark this load as completed?',
+      'Complete Trip',
+      'Are you sure you want to mark this trip as completed? This will mark all orders as completed.',
       [
         { text: 'Cancel', style: 'cancel' },
         {
@@ -166,727 +250,328 @@ const ActiveTrips = () => {
           style: 'default',
           onPress: async () => {
             try {
-              const response = await apiService.updateLoadStatus(loadId, 'completed');
+              const response = await apiService.completeTrip(tripId);
               if (response.success) {
                 Alert.alert(
                   'Success',
-                  'Load marked as completed',
+                  'Trip marked as completed',
                   [
                     {
                       text: 'OK',
                       onPress: () => {
-                        // Navigate to Dashboard after completion
                         navigation.navigate('MainTabs', { screen: 'Dashboard' });
                       },
                     },
                   ]
                 );
-                fetchActiveLoads(); // Refresh the list
+                fetchActiveTrips();
               } else {
-                Alert.alert('Error', response.error || 'Failed to update load status');
+                Alert.alert('Error', response.error || response.message || 'Failed to complete trip');
               }
             } catch (error) {
-              logger.error('Error completing load', error);
-              Alert.alert('Error', 'Failed to complete load. Please try again.');
+              logger.error('Error completing trip', error);
+              Alert.alert('Error', 'Failed to complete trip. Please try again.');
             }
           },
         },
       ]
     );
-  };
-
-  const getStatusColor = (status: string) => {
-    switch (status?.toLowerCase()) {
-      case "in-delivery": return "#27ae60";
-      case "delivered": return "#f39c12";
-      case "completed": return "#2ecc71";
-      case "dispatched": return "#3498db";
-      case "planned": return "#95a5a6";
-      default: return "#95a5a6";
-    }
   };
 
   const formatAddress = (location: any) => {
     if (!location) return 'N/A';
     if (location.place) return location.place;
-    if (location.city && location.state) {
-      return `${location.city}, ${location.state}`;
-    }
-    return location.city || location.state || 'Unknown Location';
+    if (location.placeId?.name) return location.placeId.name;
+    if (location.placeId?.currentLocation?.address) return location.placeId.currentLocation.address;
+    return 'Unknown Location';
   };
 
-  const getLoadWeight = (load: Load) => {
-    if (load.payloads && load.payloads.length > 0) {
-      const totalWeight = load.payloads.reduce((sum, payload) => {
-        return sum + (payload.measurementAndWeight?.weight || 0);
-      }, 0);
-      return totalWeight > 0 ? `${totalWeight.toLocaleString()} lbs` : 'N/A';
-    }
-    return 'N/A';
-  };
-
-  const getLoadItemName = (load: Load) => {
-    if (load.payloads && load.payloads.length > 0) {
-      return load.payloads[0].itemName || 'Cargo';
-    }
-    return 'Cargo';
-  };
-
-  const getDocumentName = (url: string) => {
+  const formatDate = (dateString?: string) => {
+    if (!dateString) return 'N/A';
     try {
-      // Handle both forward slashes and backslashes
-      const normalizedUrl = url.replace(/\\/g, '/');
-      const parts = normalizedUrl.split('/');
-      const fileName = parts[parts.length - 1];
-      
-      // Remove timestamp prefix (e.g., "1762586107913-")
-      const match = fileName.match(/^\d+-(.+)$/);
-      return match ? decodeURIComponent(match[1]) : decodeURIComponent(fileName);
-    } catch (error) {
-      console.error('Error parsing document name:', error);
-      return 'Document';
+      const date = new Date(dateString);
+      return date.toLocaleDateString('en-US', {
+        year: 'numeric',
+        month: 'short',
+        day: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit',
+      });
+    } catch {
+      return dateString;
     }
   };
 
-  const getDocumentIcon = (fileName: string) => {
-    const extension = fileName.split('.').pop()?.toLowerCase();
-    switch (extension) {
-      case 'pdf': return '📄';
-      case 'doc':
-      case 'docx': return '📝';
-      case 'xls':
-      case 'xlsx': return '📊';
-      case 'jpg':
-      case 'jpeg':
-      case 'png':
-      case 'gif': return '🖼️';
-      case 'txt': return '📃';
-      case 'zip':
-      case 'rar': return '📦';
-      default: return '📎';
+  const getStatusColor = (status: string) => {
+    switch (status?.toLowerCase()) {
+      case "in-progress": return "#27ae60";
+      case "in-delivery": return "#3498db";
+      case "completed": return "#2ecc71";
+      case "planned": return "#95a5a6";
+      default: return "#95a5a6";
     }
   };
 
-  const normalizeDocumentUrl = (url: string) => {
-    try {
-      // Replace backslashes with forward slashes
-      let normalizedUrl = url.replace(/\\/g, '/');
-      
-      // If it's a localhost URL, you need to replace it with your actual server URL
-      // For development, you might use your computer's IP address
-      // For production, use your production server URL
-      
-      // Example replacements (uncomment and modify as needed):
-      // normalizedUrl = normalizedUrl.replace('http://localhost:3000', 'http://192.168.1.100:3000');
-      // normalizedUrl = normalizedUrl.replace('http://localhost:3000', 'https://your-production-server.com');
-      
-      return normalizedUrl;
-    } catch (error) {
-      console.error('Error normalizing URL:', error);
-      return url;
-    }
-  };
-
-  const handleDocumentPress = async (documentUrl: string, documentName: string) => {
-    const normalizedUrl = normalizeDocumentUrl(documentUrl);
+  const canShowMap = (trip: Trip) => {
+    if (!trip.orders || trip.orders.length === 0) return false;
     
-    Alert.alert(
-      'Document',
-      documentName,
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Open',
-          onPress: async () => {
-            try {
-              console.log('Opening document:', normalizedUrl);
-              
-              const supported = await Linking.canOpenURL(normalizedUrl);
-              
-              if (supported) {
-                await Linking.openURL(normalizedUrl);
-              } else {
-                Alert.alert(
-                  'Cannot Open Document',
-                  'Unable to open this document. The URL format may not be supported.',
-                  [{ text: 'OK' }]
-                );
-              }
-            } catch (error) {
-              console.error('Error opening document:', error);
-              Alert.alert(
-                'Error',
-                'Failed to open document. Please check your network connection.',
-                [{ text: 'OK' }]
-              );
-            }
-          },
-        },
-        {
-          text: 'Copy URL',
-          onPress: () => {
-            // You can implement clipboard copy here if needed
-            console.log('URL to copy:', normalizedUrl);
-            Alert.alert('Info', 'URL: ' + normalizedUrl);
-          },
-        },
-      ]
-    );
-  };
-
-  const LoadCard: React.FC<LoadCardProps> = ({ load }) => {
-    const pickup = load.route?.selectPickup;
-    const dropoff = load.route?.selectDropOff;
-    const multipleDropOffs = load.route?.multipleDropOffs || false;
-    const wayPoints = load.route?.wayPoints || [];
+    const firstOrder = trip.orders[0];
+    const pickup = firstOrder.pickupLocation;
     
-    // Format route text based on multipleDropOffs
-    const formatRouteText = () => {
-      const pickupText = formatAddress(pickup);
-      
-      if (multipleDropOffs && wayPoints.length > 0) {
-        const waypointCount = wayPoints.length;
-        const dropoffCount = wayPoints.filter(wp => wp.dropOff === true).length;
-        return `${pickupText} → ${waypointCount} stop${waypointCount > 1 ? 's' : ''} (${dropoffCount} drop${dropoffCount > 1 ? 's' : ''})`;
-      } else {
-        return `${pickupText} → ${formatAddress(dropoff)}`;
+    const parseCoord = (val: any): number | null => {
+      if (val === undefined || val === null) return null;
+      if (typeof val === 'number') return isNaN(val) ? null : val;
+      if (typeof val === 'string') {
+        const parsed = parseFloat(val);
+        return isNaN(parsed) ? null : parsed;
       }
+      return null;
     };
-    
-    return (
-      <View style={styles.tripCard}>
-        <View style={styles.cardHeader}>
-          <View style={styles.headerInfo}>
-            <Text style={styles.routeText}>
-              {formatRouteText()}
-            </Text>
-            {load.internalId && (
-              <Text style={styles.loadIdText}>Load ID: {load.internalId}</Text>
-            )}
-          </View>
-          <View style={[styles.statusBadge, { backgroundColor: getStatusColor(load.status) }]}>
-            <Text style={styles.statusText}>{load.status || 'Active'}</Text>
-          </View>
-        </View>
 
-        <View style={styles.detailsGrid}>
-          <View style={styles.detailSection}>
-            <View style={styles.detailItem}>
-              <Text style={styles.detailIcon}>📦</Text>
-              <View style={styles.detailContent}>
-                <Text style={styles.detailTitle}>{getLoadItemName(load)}</Text>
-                {load.internalId && (
-                  <Text style={styles.detailSubtext}>Load ID: {load.internalId}</Text>
-                )}
-                <Text style={styles.detailSubtext}>Weight: {getLoadWeight(load)}</Text>
-              </View>
-            </View>
+    const getLat = (loc: any) => {
+      if (!loc) return null;
+      return parseCoord(loc.latitude) || parseCoord(loc.placeId?.currentLocation?.latitude);
+    };
 
-            {load.customer && (
-              <View style={styles.detailItem}>
-                <Text style={styles.detailIcon}>👤</Text>
-                <View style={styles.detailContent}>
-                  <Text style={styles.detailTitle}>{load.customer.name || 'Customer'}</Text>
-                  {load.customer.email && (
-                    <Text style={styles.detailSubtext}>{load.customer.email}</Text>
-                  )}
-                </View>
-              </View>
-            )}
-          </View>
+    const getLng = (loc: any) => {
+      if (!loc) return null;
+      return parseCoord(loc.longitude) || parseCoord(loc.placeId?.currentLocation?.longitude);
+    };
 
-          <View style={styles.detailSection}>
-            <View style={styles.detailItem}>
-              <Text style={styles.detailIcon}>📍</Text>
-              <View style={styles.detailContent}>
-                <Text style={styles.detailTitle}>Pickup</Text>
-                <Text style={styles.detailSubtext}>{formatAddress(pickup)}</Text>
-              </View>
-            </View>
+    const pickupLat = getLat(pickup);
+    const pickupLng = getLng(pickup);
 
-            <View style={styles.detailItem}>
-              <Text style={styles.detailIcon}>🎯</Text>
-              <View style={styles.detailContent}>
-                <Text style={styles.detailTitle}>Drop-off</Text>
-                <Text style={styles.detailSubtext}>{formatAddress(dropoff)}</Text>
-              </View>
-            </View>
-          </View>
-        </View>
+    if (pickupLat === null || pickupLng === null) return false;
 
-        {load.notes && (
-          <View style={styles.notesSection}>
-            <Text style={styles.notesLabel}>Notes:</Text>
-            <Text style={styles.notesText}>{load.notes}</Text>
-          </View>
-        )}
-
-        {load.documents && load.documents.length > 0 && (
-          <View style={styles.documentsSection}>
-            <View style={styles.documentsSectionHeader}>
-              <Text style={styles.documentsLabel}>📋 Documents</Text>
-              <View style={styles.documentsBadge}>
-                <Text style={styles.documentsBadgeText}>{load.documents.length}</Text>
-              </View>
-            </View>
-            <View style={styles.documentsGrid}>
-              {load.documents.map((doc) => {
-                const docName = getDocumentName(doc.documentUrl);
-                return (
-                  <TouchableOpacity
-                    key={doc._id}
-                    style={styles.documentCard}
-                    onPress={() => handleDocumentPress(doc.documentUrl, docName)}
-                    activeOpacity={0.7}
-                  >
-                    <Text style={styles.documentIcon}>
-                      {getDocumentIcon(docName)}
-                    </Text>
-                    <Text style={styles.documentName} numberOfLines={2}>
-                      {docName}
-                    </Text>
-                  </TouchableOpacity>
-                );
-              })}
-            </View>
-          </View>
-        )}
-
-        <View style={styles.buttonContainer}>
-          <TouchableOpacity
-            style={styles.primaryButton}
-            onPress={() => {
-              // Check if we can show map (pickup exists, and either dropoff or waypoints exist)
-              const canShowMap = load.route?.selectPickup?.latitude && 
-                ((!multipleDropOffs && load.route?.selectDropOff?.latitude) || 
-                 (multipleDropOffs && wayPoints.length > 0 && wayPoints.some(wp => wp.address?.latitude)));
-              
-              if (canShowMap) {
-                setSelectedLoadForMap(load);
-                setMapModalVisible(true);
-              } else {
-                Alert.alert('Route Information', 'Route coordinates are not available for this load.');
-              }
-            }}
-          >
-            <Text style={styles.primaryButtonText}>View Map</Text>
-          </TouchableOpacity>
-
-          {load.status === 'in-delivery' && (
-            <>
-              <TouchableOpacity
-                style={styles.deliveredButton}
-                onPress={() => handleMarkDelivered(load._id)}
-              >
-                <Text style={styles.deliveredButtonText}>Mark Delivered</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={styles.completeButton}
-                onPress={() => handleCompleteLoad(load._id)}
-              >
-                <Text style={styles.completeButtonText}>Complete</Text>
-              </TouchableOpacity>
-            </>
-          )}
-
-          {load.status === 'delivered' && (
-            <TouchableOpacity
-              style={[styles.completeButton, { flex: 2 }]}
-              onPress={() => handleCompleteLoad(load._id)}
-            >
-              <Text style={styles.completeButtonText}>Complete Load</Text>
-            </TouchableOpacity>
-          )}
-        </View>
-      </View>
-    );
+    // Check if at least one order has delivery location
+    return trip.orders.some(order => {
+      const deliveryLat = getLat(order.deliveryLocation);
+      const deliveryLng = getLng(order.deliveryLocation);
+      return deliveryLat !== null && deliveryLng !== null;
+    });
   };
+
+  if (loading && !refreshing) {
+    return (
+      <SafeAreaView style={styles.container}>
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="large" color="#2563eb" />
+          <Text style={styles.loadingText}>Loading active trips...</Text>
+        </View>
+      </SafeAreaView>
+    );
+  }
 
   return (
     <SafeAreaView style={styles.container}>
       <View style={styles.header}>
         <View style={styles.headerContent}>
-          <View style={styles.titleContainer}>
-            <Text style={styles.headerTitle}>Active Trips</Text>
-          </View>
-          <Text style={styles.headerSubtitle}>Monitor your ongoing shipments in real-time</Text>
+          <Text style={styles.headerTitle}>Active Trips</Text>
+          <Text style={styles.headerSubtitle}>Monitor your ongoing trips in real-time</Text>
           <View style={styles.statsContainer}>
             <View style={styles.statItem}>
-              <View style={[styles.statDot, { backgroundColor: '#27ae60' }]} />
-              <Text style={styles.statText}>{loads.length} Active Loads</Text>
-            </View>
-            <View style={styles.statItem}>
-              <View style={[styles.statDot, { backgroundColor: '#3498db' }]} />
-              <Text style={styles.statText}>Real-time Tracking</Text>
+              <Text style={styles.statNumber}>{trips.length}</Text>
+              <Text style={styles.statLabel}>Active Trips</Text>
             </View>
           </View>
         </View>
       </View>
 
-      {loading ? (
-        <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color="#8B5CF6" />
-          <Text style={styles.loadingText}>Loading active loads...</Text>
-        </View>
-      ) : loads.length === 0 ? (
+      {trips.length === 0 ? (
         <View style={styles.emptyContainer}>
           <Text style={styles.emptyIcon}>🚛</Text>
-          <Text style={styles.emptyText}>No Active Loads</Text>
-          <Text style={styles.emptySubtext}>You don't have any active loads at the moment</Text>
+          <Text style={styles.emptyText}>No Active Trips</Text>
+          <Text style={styles.emptySubtext}>You don't have any active trips at the moment</Text>
         </View>
       ) : (
         <ScrollView
           style={styles.scrollView}
-          showsVerticalScrollIndicator={false}
-          contentContainerStyle={styles.scrollContent}
           refreshControl={
-            <RefreshControl
-              refreshing={refreshing}
-              onRefresh={onRefresh}
-              colors={['#8B5CF6']}
-              tintColor="#8B5CF6"
-            />
+            <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
           }
         >
-          {loads.map(load => (
-            <LoadCard
-              key={load._id}
-              load={load}
-            />
-          ))}
+          {trips.map((trip) => {
+            const loadForMap = convertTripToLoadForMap(trip);
+            const hasMap = loadForMap !== null && canShowMap(trip);
+
+            return (
+              <View key={trip._id} style={styles.tripCard}>
+                <View style={styles.cardHeader}>
+                  <View style={styles.headerInfo}>
+                    <Text style={styles.tripNumber}>{trip.tripNumber}</Text>
+                    <Text style={styles.tripDate}>
+                      Started: {formatDate(trip.actualStartDate || trip.plannedStartDate)}
+                    </Text>
+                  </View>
+                  <View style={[styles.statusBadge, { backgroundColor: getStatusColor(trip.status) }]}>
+                    <Text style={styles.statusText}>{trip.status || 'Active'}</Text>
+                  </View>
+                </View>
+
+                {trip.truck && (
+                  <View style={styles.infoRow}>
+                    <Text style={styles.infoLabel}>Truck:</Text>
+                    <Text style={styles.infoValue}>
+                      {trip.truck.plateNumber || trip.truck.internalId || 'N/A'}
+                    </Text>
+                  </View>
+                )}
+
+                {trip.trailer && (
+                  <View style={styles.infoRow}>
+                    <Text style={styles.infoLabel}>Trailer:</Text>
+                    <Text style={styles.infoValue}>
+                      {trip.trailer.plateNumber || trip.trailer.trailerNumber || 'N/A'}
+                    </Text>
+                  </View>
+                )}
+
+                {trip.orders && trip.orders.length > 0 && (
+                  <View style={styles.ordersSection}>
+                    <Text style={styles.ordersTitle}>
+                      Orders ({trip.orders.length}):
+                    </Text>
+                    {trip.orders.map((order, index) => (
+                      <View key={order._id || index} style={styles.orderItem}>
+                        <Text style={styles.orderNumber}>{order.orderNumber}</Text>
+                        {order.customerOrderNo && (
+                          <Text style={styles.customerOrderNo}>
+                            Customer Order: {order.customerOrderNo}
+                          </Text>
+                        )}
+                        {order.customer?.name && (
+                          <Text style={styles.customerName}>Customer: {order.customer.name}</Text>
+                        )}
+                        <View style={styles.locationRow}>
+                          <Text style={styles.locationLabel}>Pickup: </Text>
+                          <Text style={styles.locationValue}>
+                            {formatAddress(order.pickupLocation)}
+                          </Text>
+                        </View>
+                        <View style={styles.locationRow}>
+                          <Text style={styles.locationLabel}>Delivery: </Text>
+                          <Text style={styles.locationValue}>
+                            {formatAddress(order.deliveryLocation)}
+                          </Text>
+                        </View>
+                        {order.status && (
+                          <View style={styles.orderStatusRow}>
+                            <Text style={styles.orderStatusLabel}>Status: </Text>
+                            <Text style={[styles.orderStatusValue, {
+                              color: order.status === 'in-delivery' ? '#3498db' :
+                                     order.status === 'completed' ? '#2ecc71' :
+                                     '#95a5a6'
+                            }]}>
+                              {order.status}
+                            </Text>
+                          </View>
+                        )}
+                      </View>
+                    ))}
+                  </View>
+                )}
+
+                {trip.notes && (
+                  <View style={styles.notesSection}>
+                    <Text style={styles.notesLabel}>Notes:</Text>
+                    <Text style={styles.notesText}>{trip.notes}</Text>
+                  </View>
+                )}
+
+                <View style={styles.buttonContainer}>
+                  {hasMap && (
+                    <TouchableOpacity
+                      style={styles.mapButton}
+                      onPress={() => {
+                        setSelectedTripForMap(trip);
+                        setMapModalVisible(true);
+                      }}
+                    >
+                      <Text style={styles.mapButtonText}>View Map</Text>
+                    </TouchableOpacity>
+                  )}
+                  <TouchableOpacity
+                    style={styles.completeButton}
+                    onPress={() => handleCompleteTrip(trip._id)}
+                  >
+                    <Text style={styles.completeButtonText}>Complete Trip</Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
+            );
+          })}
         </ScrollView>
       )}
 
       {/* Map Modal */}
-      {selectedLoadForMap && (
-        <MapViewWithLiveTracking
-          visible={mapModalVisible}
-          onClose={() => {
-            setMapModalVisible(false);
-            setSelectedLoadForMap(null);
-          }}
-          load={selectedLoadForMap}
-        />
-      )}
+      {selectedTripForMap && (() => {
+        const loadForMap = convertTripToLoadForMap(selectedTripForMap);
+        if (!loadForMap) return null;
+        
+        return (
+          <MapViewWithLiveTracking
+            visible={mapModalVisible}
+            onClose={() => {
+              setMapModalVisible(false);
+              setSelectedTripForMap(null);
+            }}
+            load={loadForMap}
+          />
+        );
+      })()}
     </SafeAreaView>
   );
 };
 
-export default ActiveTrips;
-
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#f5f6fa"
-  },
-  header: {
-    backgroundColor: "#8B5CF6",
-    paddingBottom: 20
-  },
-  headerContent: {
-    paddingHorizontal: 20,
-    paddingTop: 20
-  },
-  titleContainer: {
-    flexDirection: "row",
-    alignItems: "center",
-    marginBottom: 8
-  },
-  headerIcon: {
-    fontSize: 32,
-    marginRight: 12
-  },
-  headerTitle: {
-    fontSize: 28,
-    fontWeight: "bold",
-    color: "#ffffff"
-  },
-  headerSubtitle: {
-    fontSize: 16,
-    color: "#e8d8ff",
-    marginBottom: 16
-  },
-  statsContainer: {
-    flexDirection: "row",
-    gap: 24
-  },
-  statItem: {
-    flexDirection: "row",
-    alignItems: "center"
-  },
-  statDot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    marginRight: 8
-  },
-  statText: {
-    fontSize: 14,
-    color: "#e8d8ff"
-  },
-  scrollView: {
-    flex: 1
-  },
-  scrollContent: {
-    paddingHorizontal: 20,
-    paddingVertical: 16
-  },
-  tripCard: {
-    backgroundColor: "#ffffff",
-    borderRadius: 16,
-    marginBottom: 20,
-    padding: 20,
-    shadowColor: "#000",
-    shadowOffset: {
-      width: 0,
-      height: 4
-    },
-    shadowOpacity: 0.1,
-    shadowRadius: 8,
-    elevation: 5,
-    borderWidth: 1,
-    borderColor: "#f1f2f6"
-  },
-  cardHeader: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "flex-start",
-    marginBottom: 20
-  },
-  headerInfo: {
-    flex: 1,
-    marginRight: 12
-  },
-  routeText: {
-    fontSize: 18,
-    fontWeight: "700",
-    color: "#2c3e50",
-    marginBottom: 6
-  },
-  currentLocationContainer: {
-    flexDirection: "row",
-    alignItems: "center"
-  },
-  locationIcon: {
-    fontSize: 14,
-    marginRight: 6
-  },
-  currentLocationText: {
-    fontSize: 14,
-    color: "#7f8c8d"
-  },
-  statusBadge: {
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 20
-  },
-  statusText: {
-    fontSize: 12,
-    fontWeight: "700",
-    color: "#ffffff"
-  },
-  detailsGrid: {
-    flexDirection: "row",
-    marginBottom: 20
-  },
-  detailSection: {
-    flex: 1,
-    gap: 16
-  },
-  detailItem: {
-    flexDirection: "row",
-    alignItems: "flex-start"
-  },
-  detailIcon: {
-    fontSize: 20,
-    marginRight: 12,
-    marginTop: 2
-  },
-  detailContent: {
-    flex: 1
-  },
-  detailTitle: {
-    fontSize: 16,
-    fontWeight: "600",
-    color: "#2c3e50",
-    marginBottom: 2
-  },
-  detailSubtext: {
-    fontSize: 13,
-    color: "#7f8c8d",
-    lineHeight: 18
-  },
-  progressSection: {
-    backgroundColor: "#f8f9fa",
-    borderRadius: 12,
-    padding: 16,
-    marginBottom: 20
-  },
-  progressHeader: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    marginBottom: 12
-  },
-  progressLabel: {
-    fontSize: 14,
-    fontWeight: "600",
-    color: "#34495e"
-  },
-  progressMiles: {
-    fontSize: 14,
-    fontWeight: "700",
-    color: "#2c3e50"
-  },
-  progressBar: {
-    height: 8,
-    backgroundColor: "#ecf0f1",
-    borderRadius: 4,
-    marginBottom: 8
-  },
-  progressFill: {
-    height: "100%",
-    backgroundColor: "#3498db",
-    borderRadius: 4
-  },
-  progressPercentage: {
-    fontSize: 13,
-    fontWeight: "600",
-    color: "#3498db",
-    textAlign: "center"
-  },
-  buttonContainer: {
-    flexDirection: "row",
-    gap: 8,
-    alignItems: "stretch",
-    justifyContent: "space-between",
-  },
-  primaryButton: {
-    backgroundColor: "#3498db",
-    paddingVertical: 14,
-    paddingHorizontal: 12,
-    borderRadius: 10,
-    alignItems: "center",
-    justifyContent: "center",
-    flex: 1,
-    minWidth: 0,
-  },
-  primaryButtonText: {
-    color: "#ffffff",
-    fontSize: 12,
-    fontWeight: "700",
-    textAlign: "center",
-  },
-  deliveredButton: {
-    backgroundColor: "#f39c12",
-    paddingVertical: 14,
-    paddingHorizontal: 12,
-    borderRadius: 10,
-    alignItems: "center",
-    justifyContent: "center",
-    flex: 1,
-    minWidth: 0,
-  },
-  deliveredButtonText: {
-    color: "#ffffff",
-    fontSize: 12,
-    fontWeight: "700",
-    textAlign: "center",
-  },
-  completeButton: {
-    backgroundColor: "#27ae60",
-    paddingVertical: 14,
-    paddingHorizontal: 12,
-    borderRadius: 10,
-    alignItems: "center",
-    justifyContent: "center",
-    flex: 1,
-    minWidth: 0,
-  },
-  completeButtonText: {
-    color: "#ffffff",
-    fontSize: 12,
-    fontWeight: "700",
-    textAlign: "center",
-  },
-  secondaryButton: {
-    backgroundColor: "#f1f2f6",
-    paddingVertical: 12,
-    paddingHorizontal: 16,
-    borderRadius: 10,
-    alignItems: "center"
-  },
-  secondaryButtonText: {
-    color: "#2c3e50",
-    fontSize: 14,
-    fontWeight: "700"
-  },
-  mapContainer: {
-    backgroundColor: "#f8f9fa",
-    borderRadius: 12,
-    padding: 16,
-    marginTop: 20
-  },
-  mapHeader: {
-    flexDirection: "row",
-    alignItems: "center",
-    marginBottom: 16
-  },
-  mapIcon: {
-    fontSize: 20,
-    marginRight: 8
-  },
-  mapTitle: {
-    fontSize: 16,
-    fontWeight: "600",
-    color: "#2c3e50"
-  },
-  routeContainer: {
-    paddingLeft: 8
-  },
-  routePoint: {
-    flexDirection: "row",
-    alignItems: "flex-start"
-  },
-  routeDot: {
-    width: 12,
-    height: 12,
-    borderRadius: 6,
-    marginTop: 4,
-    marginRight: 12
-  },
-  routeInfo: {
-    flex: 1,
-    marginBottom: 8
-  },
-  routeLocationText: {
-    fontSize: 15,
-    fontWeight: "600",
-    color: "#2c3e50",
-    marginBottom: 2
-  },
-  routeAddressText: {
-    fontSize: 13,
-    color: "#7f8c8d",
-    lineHeight: 18
-  },
-  routeLine: {
-    width: 2,
-    height: 20,
-    backgroundColor: "#ddd",
-    marginLeft: 5,
-    marginVertical: 4
+    backgroundColor: '#f5f5f5',
   },
   loadingContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    padding: 40,
   },
   loadingText: {
-    marginTop: 12,
-    fontSize: 16,
-    color: "#6B7280",
+    marginTop: 10,
+    color: '#666',
+  },
+  header: {
+    backgroundColor: '#fff',
+    padding: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: '#e5e5e5',
+  },
+  headerContent: {
+    alignItems: 'center',
+  },
+  headerTitle: {
+    fontSize: 24,
+    fontWeight: 'bold',
+    color: '#333',
+    marginBottom: 4,
+  },
+  headerSubtitle: {
+    fontSize: 14,
+    color: '#666',
+    marginBottom: 12,
+  },
+  statsContainer: {
+    flexDirection: 'row',
+    gap: 16,
+  },
+  statItem: {
+    alignItems: 'center',
+  },
+  statNumber: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: '#2563eb',
+  },
+  statLabel: {
+    fontSize: 12,
+    color: '#666',
   },
   emptyContainer: {
     flex: 1,
@@ -899,100 +584,180 @@ const styles = StyleSheet.create({
     marginBottom: 16,
   },
   emptyText: {
-    fontSize: 20,
-    fontWeight: 'bold',
-    color: "#2c3e50",
+    fontSize: 18,
+    fontWeight: '600',
+    color: '#333',
     marginBottom: 8,
   },
   emptySubtext: {
     fontSize: 14,
-    color: "#7f8c8d",
+    color: '#666',
     textAlign: 'center',
   },
-  loadIdText: {
+  scrollView: {
+    flex: 1,
+  },
+  tripCard: {
+    backgroundColor: '#fff',
+    margin: 12,
+    padding: 16,
+    borderRadius: 12,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  cardHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+    marginBottom: 12,
+  },
+  headerInfo: {
+    flex: 1,
+  },
+  tripNumber: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#2563eb',
+    marginBottom: 4,
+  },
+  tripDate: {
     fontSize: 12,
-    color: "#7f8c8d",
+    color: '#666',
+  },
+  statusBadge: {
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 12,
+  },
+  statusText: {
+    color: '#fff',
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  infoRow: {
+    flexDirection: 'row',
+    marginBottom: 8,
+  },
+  infoLabel: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#333',
+    width: 80,
+  },
+  infoValue: {
+    fontSize: 14,
+    color: '#666',
+    flex: 1,
+  },
+  ordersSection: {
+    marginTop: 12,
+    paddingTop: 12,
+    borderTopWidth: 1,
+    borderTopColor: '#e5e5e5',
+  },
+  ordersTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#333',
+    marginBottom: 8,
+  },
+  orderItem: {
+    backgroundColor: '#f9f9f9',
+    padding: 12,
+    borderRadius: 8,
+    marginBottom: 8,
+  },
+  orderNumber: {
+    fontSize: 15,
+    fontWeight: '600',
+    color: '#2563eb',
+    marginBottom: 4,
+  },
+  customerOrderNo: {
+    fontSize: 12,
+    color: '#666',
+    marginBottom: 4,
+  },
+  customerName: {
+    fontSize: 12,
+    color: '#666',
+    marginBottom: 4,
+  },
+  locationRow: {
+    flexDirection: 'row',
+    marginBottom: 4,
+  },
+  locationLabel: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#333',
+  },
+  locationValue: {
+    fontSize: 12,
+    color: '#666',
+    flex: 1,
+  },
+  orderStatusRow: {
+    flexDirection: 'row',
     marginTop: 4,
   },
+  orderStatusLabel: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#333',
+  },
+  orderStatusValue: {
+    fontSize: 12,
+    fontWeight: '600',
+  },
   notesSection: {
-    backgroundColor: "#f8f9fa",
-    borderRadius: 8,
-    padding: 12,
-    marginBottom: 16,
+    marginTop: 12,
+    paddingTop: 12,
+    borderTopWidth: 1,
+    borderTopColor: '#e5e5e5',
   },
   notesLabel: {
     fontSize: 14,
-    fontWeight: "600",
-    color: "#34495e",
+    fontWeight: '600',
+    color: '#333',
     marginBottom: 4,
   },
   notesText: {
-    fontSize: 13,
-    color: "#7f8c8d",
-    lineHeight: 18,
+    fontSize: 14,
+    color: '#666',
   },
-  documentsSection: {
-    backgroundColor: "#f8f9fa",
-    borderRadius: 12,
-    padding: 16,
-    marginBottom: 16,
-    borderWidth: 1,
-    borderColor: "#e9ecef"
+  buttonContainer: {
+    flexDirection: 'row',
+    gap: 8,
+    marginTop: 12,
   },
-  documentsSectionHeader: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    marginBottom: 12
+  mapButton: {
+    flex: 1,
+    backgroundColor: '#3498db',
+    padding: 14,
+    borderRadius: 8,
+    alignItems: 'center',
   },
-  documentsLabel: {
-    fontSize: 15,
-    fontWeight: "700",
-    color: "#2c3e50"
+  mapButtonText: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: '600',
   },
-  documentsBadge: {
-    backgroundColor: "#27ae60",
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: 12,
-    minWidth: 28,
-    alignItems: "center"
+  completeButton: {
+    flex: 1,
+    backgroundColor: '#2ecc71',
+    padding: 14,
+    borderRadius: 8,
+    alignItems: 'center',
   },
-  documentsBadgeText: {
-    fontSize: 12,
-    fontWeight: "700",
-    color: "#ffffff"
+  completeButtonText: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: '600',
   },
-  documentsGrid: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    gap: 10
-  },
-  documentCard: {
-    backgroundColor: "#ffffff",
-    borderRadius: 10,
-    padding: 12,
-    width: "48%",
-    alignItems: "center",
-    borderWidth: 1,
-    borderColor: "#dee2e6",
-    shadowColor: "#000",
-    shadowOffset: {
-      width: 0,
-      height: 2
-    },
-    shadowOpacity: 0.05,
-    shadowRadius: 4,
-    elevation: 2
-  },
-  documentIcon: {
-    fontSize: 32,
-    marginBottom: 8
-  },
-  documentName: {
-    fontSize: 12,
-    fontWeight: "600",
-    color: "#495057",
-    textAlign: "center",
-    lineHeight: 16
-  }})
+});
+
+export default ActiveTrips;

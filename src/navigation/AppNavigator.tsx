@@ -7,6 +7,7 @@ import { View, Text, StyleSheet, ActivityIndicator } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { NavigationProp } from '@react-navigation/native';
 import { authManager } from '../types/AuthManager';
+import { apiService } from '../services/api/apiService';
 
 // Import screens
 import DashboardScreen from '../screens/dashboard/DashboardScreen';
@@ -212,7 +213,9 @@ function MainTabNavigator({ onLogout, navigation }: MainTabNavigatorProps) {
                     <MainTab.Screen name="HOS" component={HosScreen} />
                     <MainTab.Screen name="AssetIncidents" component={AssetIncidentsScreen} />
                     <MainTab.Screen name="Documents" component={DocumentsScreen} />
-                    <MainTab.Screen name="Settings" component={SettingsScreen} />
+                    <MainTab.Screen name="Settings">
+                        {(props) => <SettingsScreen {...props} onLogout={onLogout} />}
+                    </MainTab.Screen>
                     <MainTab.Screen name="LoadMap" component={LoadMapScreen} />
                     <MainTab.Screen name="Transfer" component={TransferScreen} />
                     <MainTab.Screen name="Fuel" component={FuelScreen} />
@@ -238,9 +241,44 @@ export default function AppNavigator() {
         userData: null
     });
 
+    // Handle logout - defined before useEffect so it can be referenced
+    const handleLogout = async (): Promise<void> => {
+        try {
+            // Clear auth data
+            await AuthService.clearAuth();
+            // Also logout from authManager
+            await authManager.logout();
+            
+            // Update auth state - this will trigger re-render and show login screen
+            setAuthState({
+                isAuthenticated: false,
+                isLoading: false,
+                userData: null
+            });
+        } catch (error) {
+            console.error('Error during logout:', error);
+            // Still update state to show login screen even if clearing fails
+            setAuthState({
+                isAuthenticated: false,
+                isLoading: false,
+                userData: null
+            });
+        }
+    };
+
     // Check authentication status on app start
     useEffect(() => {
         checkInitialAuthState();
+        
+        // Set up token expiration callback for API service
+        apiService.setOnTokenExpired(() => {
+            handleLogout();
+        });
+        
+        // Cleanup on unmount
+        return () => {
+            apiService.setOnTokenExpired(() => {});
+        };
     }, []);
 
     const checkInitialAuthState = async (): Promise<void> => {
@@ -302,18 +340,6 @@ export default function AppNavigator() {
             isAuthenticated: true,
             isLoading: false,
             userData: userData
-        });
-    };
-
-    // Handle logout
-    const handleLogout = async (): Promise<void> => {
-        await AuthService.clearAuth();
-        // Also logout from authManager
-        await authManager.logout();
-        setAuthState({
-            isAuthenticated: false,
-            isLoading: false,
-            userData: null
         });
     };
 

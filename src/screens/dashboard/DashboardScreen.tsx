@@ -90,12 +90,12 @@ export default function DashboardScreen() {
         try {
             setLoading(true);
             
-            // Fetch profile and loads in parallel
+            // Fetch profile and trips in parallel
             const [profileRes, activeRes, pendingRes, completedRes] = await Promise.allSettled([
                 apiService.getProfile(),
-                apiService.getActiveLoads(),
-                apiService.getPendingLoads(),
-                apiService.getCompletedLoads(),
+                apiService.getActiveTrips(),
+                apiService.getPendingTrips(),
+                apiService.getCompletedTrips(),
             ]);
 
             // Update profile
@@ -126,15 +126,15 @@ export default function DashboardScreen() {
             // Update statistics
             const newStats: LoadStats = {
                 active: activeRes.status === 'fulfilled' && activeRes.value.success 
-                    ? activeRes.value.data?.count || activeRes.value.data?.loads?.length || 0 
+                    ? activeRes.value.data?.count || activeRes.value.data?.data?.length || 0 
                     : 0,
                 pending: pendingRes.status === 'fulfilled' && pendingRes.value.success 
-                    ? pendingRes.value.data?.count || pendingRes.value.data?.loads?.length || 0 
+                    ? pendingRes.value.data?.count || pendingRes.value.data?.data?.length || 0 
                     : 0,
                 completed: completedRes.status === 'fulfilled' && completedRes.value.success 
-                    ? completedRes.value.data?.count || completedRes.value.data?.loads?.length || 0 
+                    ? completedRes.value.data?.count || completedRes.value.data?.data?.length || 0 
                     : 0,
-                totalMiles: 0, // Calculate from completed loads if needed
+                totalMiles: 0, // Calculate from completed trips if needed
             };
             setStats(newStats);
 
