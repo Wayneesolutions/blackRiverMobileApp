@@ -95,7 +95,8 @@ const getFallbackIPs = () => {
     const possibleIPs = [
         // Add common server IPs first (prioritize these)
         '192.168.31.247', // Current server IP
-        '192.168.31.161', // Alternative server IP
+        '192.168.31.247', // Alternative server IP (updated)
+        '192.168.31.161', // Old IP (kept for fallback)
         '192.168.1.17',
         '192.168.1.16',
         '192.168.0.16',

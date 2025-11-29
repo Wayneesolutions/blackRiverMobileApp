@@ -11,8 +11,8 @@ const environments = {
 // Environment configurations
 const envConfigs = {
   development: {  
-    API_BASE_URL: 'http://192.168.31.161:3000/api/v1',
-    SOCKET_URL: 'http://192.168.31.161:3000',
+    API_BASE_URL: 'http://192.168.31.247:3000/api/v1',
+    SOCKET_URL: 'http://192.168.31.247:3000',
     NODE_ENV: 'development',
     DB_NAME: 'blackriver',
   },

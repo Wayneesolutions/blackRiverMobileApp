@@ -153,15 +153,35 @@ export default function LoginScreen({ navigation, onAuthSuccess }: Props) {
 
       } else {
         // Handle API error
-        const errorMessage = response.error || "Login failed. Please try again.";
+        let errorMessage = response.error || "Login failed. Please try again.";
 
-        logger.userAction('Login Failed', {
-          email,
-          error: errorMessage,
-          statusCode: response.statusCode
-        }, 'LoginScreen');
+        // If it's a network/connection error, format it better
+        if (response.statusCode === 0 && errorMessage.includes('Unable to connect')) {
+          // Format the detailed error message for better readability
+          const lines = errorMessage.split('\n');
+          const title = lines[0] || 'Connection Error';
+          const details = lines.slice(1).join('\n');
+          
+          logger.userAction('Login Failed - Network Error', {
+            email,
+            error: errorMessage,
+            statusCode: response.statusCode
+          }, 'LoginScreen');
 
-        Alert.alert("Login Failed", errorMessage, [{ text: "OK" }]);
+          Alert.alert(
+            title,
+            details || "Unable to connect to server. Please check:\n• Backend server is running\n• Device and server on same Wi-Fi\n• Firewall allows port 3000",
+            [{ text: "OK" }]
+          );
+        } else {
+          logger.userAction('Login Failed', {
+            email,
+            error: errorMessage,
+            statusCode: response.statusCode
+          }, 'LoginScreen');
+
+          Alert.alert("Login Failed", errorMessage, [{ text: "OK" }]);
+        }
       }
 
     } catch (error: unknown) {

@@ -483,19 +483,25 @@ class ApiService {
                 });
 
                 let errorMessage = 'Network error occurred';
+                let detailedMessage = '';
 
                 if (error.name === 'AbortError') {
                     errorMessage = 'Request timed out. Please check your connection.';
+                    detailedMessage = `Connection to ${baseUrl} timed out after 15 seconds.`;
                 } else if (error.message?.includes('Network request failed') || 
                           error.message?.includes('fetch')) {
-                    errorMessage = 'Unable to connect. Please check your internet connection.';
+                    errorMessage = 'Unable to connect to server.';
+                    detailedMessage = `Cannot reach ${baseUrl}.\n\nPossible causes:\n• Backend server not running\n• Wrong IP address\n• Device and server on different networks\n• Firewall blocking connection\n\nTroubleshooting:\n1. Verify backend is running: http://192.168.31.161:3000\n2. Check if device and server are on same Wi-Fi\n3. Try accessing ${baseUrl}/health in phone browser\n4. Check Windows Firewall allows port 3000`;
                 } else if (error.message?.includes('ECONNREFUSED')) {
                     errorMessage = 'Server is not available.';
+                    detailedMessage = `Connection refused by ${baseUrl}. Server might not be running.`;
+                } else {
+                    detailedMessage = `Error connecting to ${baseUrl}: ${error.message || error.name}`;
                 }
 
                 lastError = {
                     success: false,
-                    error: errorMessage,
+                    error: detailedMessage || errorMessage,
                     statusCode: 0,
                 };
 
@@ -503,14 +509,22 @@ class ApiService {
             }
         }
 
-        // All endpoints failed
+        // All endpoints failed - provide detailed error message
         logger.error('All endpoints failed', {
             requestId,
             totalAttempts: endpointsToTry.length,
             lastError: lastError.error,
+            triedEndpoints: endpointsToTry,
         });
 
-        return lastError;
+        // Create a more helpful error message
+        const errorDetails = `Unable to connect to server.\n\nTried connecting to:\n${endpointsToTry.map((ep, idx) => `• ${ep}`).join('\n')}\n\nPossible issues:\n1. Backend server is not running\n2. Wrong IP address (current: 192.168.31.161)\n3. Device and server not on same Wi-Fi network\n4. Firewall blocking port 3000\n\nTo fix:\n• Check backend is running on port 3000\n• Verify IP address: Open http://192.168.31.161:3000 in phone browser\n• Ensure device and server are on same network\n• Check Windows Firewall allows port 3000`;
+
+        return {
+            success: false,
+            error: errorDetails,
+            statusCode: 0,
+        };
     }
 
     // Auth endpoints
@@ -604,6 +618,12 @@ class ApiService {
     async completeTrip(tripId: string): Promise<ApiResponse> {
         return this.request(`/driver/trips/${tripId}/complete`, {
             method: 'POST'
+        }, true);
+    }
+
+    async getTripDocumentSignedUrl(tripId: string, documentId: string, disposition: 'inline' | 'attachment' = 'inline'): Promise<ApiResponse<{ url: string; expiresIn: number }>> {
+        return this.request(`/driver/trips/${tripId}/documents/${documentId}/signed-url?disposition=${disposition}`, {
+            method: 'GET'
         }, true);
     }
 

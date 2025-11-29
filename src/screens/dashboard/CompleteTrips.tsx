@@ -38,10 +38,10 @@ interface Trip {
     orderNumber: string;
     customerOrderNo?: string;
     status?: string;
-    customer?: {
-      name?: string;
-      email?: string;
-    };
+  customer?: {
+    name?: string;
+    email?: string;
+  };
     pickupLocation?: {
       place?: string;
       placeId?: {
@@ -68,6 +68,16 @@ interface Trip {
   actualStartDate?: string;
   actualEndDate?: string;
   notes?: string;
+  documents?: Array<{
+    _id?: string;
+    fileUrl: string;
+    fileName: string;
+    fileSize?: number;
+    mimeType?: string;
+    uploadedBy?: any;
+    uploadedAt?: string;
+    description?: string;
+  }>;
 }
 
 const CompleteTrips = () => {
@@ -143,9 +153,9 @@ const CompleteTrips = () => {
 
   return (
     <SafeAreaView style={styles.container}>
-      <ScrollView
-        style={styles.scrollView}
-        refreshControl={
+        <ScrollView
+          style={styles.scrollView}
+          refreshControl={
           <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
         }
       >
@@ -162,12 +172,12 @@ const CompleteTrips = () => {
                   <Text style={styles.tripNumber}>{trip.tripNumber}</Text>
                   <Text style={styles.tripDate}>
                     Completed: {formatDate(trip.actualEndDate || trip.plannedEndDate)}
-                  </Text>
-                </View>
+                    </Text>
+                  </View>
                 <View style={styles.statusBadge}>
                   <Text style={styles.statusText}>Completed</Text>
+                  </View>
                 </View>
-              </View>
 
               {trip.truck && (
                 <View style={styles.infoRow}>
@@ -175,7 +185,7 @@ const CompleteTrips = () => {
                   <Text style={styles.infoValue}>
                     {trip.truck.plateNumber || trip.truck.internalId || 'N/A'}
                   </Text>
-                </View>
+                      </View>
               )}
 
               {trip.trailer && (
@@ -184,15 +194,15 @@ const CompleteTrips = () => {
                   <Text style={styles.infoValue}>
                     {trip.trailer.plateNumber || trip.trailer.trailerNumber || 'N/A'}
                   </Text>
-                </View>
-              )}
+                      </View>
+                    )}
 
               <View style={styles.infoRow}>
                 <Text style={styles.infoLabel}>Started:</Text>
                 <Text style={styles.infoValue}>
                   {formatDate(trip.actualStartDate || trip.plannedStartDate)}
                 </Text>
-              </View>
+                    </View>
 
               {trip.orders && trip.orders.length > 0 && (
                 <View style={styles.ordersSection}>
@@ -221,22 +231,22 @@ const CompleteTrips = () => {
                         <Text style={styles.locationValue}>
                           {formatAddress(order.deliveryLocation)}
                         </Text>
-                      </View>
                     </View>
+                  </View>
                   ))}
-                </View>
-              )}
+                  </View>
+                )}
 
               {trip.notes && (
                 <View style={styles.notesSection}>
                   <Text style={styles.notesLabel}>Notes:</Text>
                   <Text style={styles.notesText}>{trip.notes}</Text>
-                </View>
-              )}
-            </View>
+                  </View>
+                )}
+              </View>
           ))
         )}
-      </ScrollView>
+        </ScrollView>
     </SafeAreaView>
   );
 };

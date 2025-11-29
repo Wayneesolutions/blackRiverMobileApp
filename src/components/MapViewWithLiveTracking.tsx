@@ -624,15 +624,9 @@ const MapViewWithLiveTracking: React.FC<MapViewWithLiveTrackingProps> = ({
     }
 
     if (multipleDropOffs && wayPoints.length > 0) {
-      // Sort waypoints: pickup first (if not already added), then others
-      const sortedWaypoints = [...wayPoints].sort((a, b) => {
-        // If pickup is already in coords, don't prioritize it
-        if (a.pickup === true && pickup) return 1;
-        if (b.pickup === true && pickup) return -1;
-        return 0;
-      });
-      
-      sortedWaypoints.forEach((waypoint) => {
+      // Use waypoints in the order they were provided (already optimized by convertTripToLoadForMap)
+      // Order: All pickups first, then all deliveries (maintaining order within each group)
+      wayPoints.forEach((waypoint) => {
         // Skip if this waypoint is the pickup and we already added it
         if (waypoint.pickup === true && pickup && 
             parseCoordinate(waypoint.address?.latitude) === pickupLat &&
