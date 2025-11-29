@@ -9,7 +9,9 @@ import {
   ActivityIndicator,
   RefreshControl,
   Alert,
+  Linking,
 } from "react-native";
+import { Ionicons } from '@expo/vector-icons';
 import { apiService } from '../../services/api/apiService';
 import { logger } from '../../utils/loggerHelper';
 
@@ -140,6 +142,13 @@ const CompleteTrips = () => {
     }
   };
 
+  const formatFileSize = (bytes?: number): string => {
+    if (!bytes || bytes === 0) return 'Unknown size';
+    if (bytes < 1024) return bytes + ' B';
+    if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(2) + ' KB';
+    return (bytes / (1024 * 1024)).toFixed(2) + ' MB';
+  };
+
   if (loading && !refreshing) {
     return (
       <SafeAreaView style={styles.container}>
@@ -243,6 +252,69 @@ const CompleteTrips = () => {
                   <Text style={styles.notesText}>{trip.notes}</Text>
                   </View>
                 )}
+
+              {/* Documents */}
+              {trip.documents && trip.documents.length > 0 && (
+                <View style={styles.documentsSection}>
+                  <Text style={styles.documentsTitle}>
+                    Documents ({trip.documents.length}):
+                  </Text>
+                  {trip.documents.map((doc, index) => (
+                    <TouchableOpacity
+                      key={doc._id || index}
+                      style={styles.documentItem}
+                      onPress={async () => {
+                        if (!doc._id || !trip._id) {
+                          Alert.alert('Error', 'Document information is missing.');
+                          return;
+                        }
+
+                        try {
+                          // Fetch signed URL before opening
+                          const response = await apiService.getTripDocumentSignedUrl(trip._id, doc._id, 'inline');
+                          if (response?.success && response?.data?.url) {
+                            await Linking.openURL(response.data.url);
+                          } else {
+                            // Fallback to original URL
+                            if (doc.fileUrl) {
+                              await Linking.openURL(doc.fileUrl);
+                            } else {
+                              Alert.alert('Error', 'Unable to get document URL.');
+                            }
+                          }
+                        } catch (error: any) {
+                          console.error('Error opening document:', error);
+                          // Fallback to original URL
+                          if (doc.fileUrl) {
+                            Linking.openURL(doc.fileUrl).catch(() => {
+                              Alert.alert('Error', 'Unable to open document. Please try again.');
+                            });
+                          } else {
+                            Alert.alert('Error', 'Unable to open document. Please try again.');
+                          }
+                        }
+                      }}
+                    >
+                      <Ionicons name="document-text" size={20} color="#2563eb" />
+                      <View style={styles.documentInfo}>
+                        <Text style={styles.documentName} numberOfLines={1}>
+                          {doc.fileName}
+                        </Text>
+                        {doc.description && (
+                          <Text style={styles.documentDescription} numberOfLines={1}>
+                            {doc.description}
+                          </Text>
+                        )}
+                        <Text style={styles.documentMeta}>
+                          {doc.fileSize ? formatFileSize(doc.fileSize) : 'Unknown size'}
+                          {doc.uploadedAt && ` • ${new Date(doc.uploadedAt).toLocaleDateString()}`}
+                        </Text>
+                      </View>
+                      <Ionicons name="download-outline" size={20} color="#2563eb" />
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              )}
               </View>
           ))
         )}
@@ -402,6 +474,46 @@ const styles = StyleSheet.create({
   notesText: {
     fontSize: 14,
     color: '#666',
+  },
+  documentsSection: {
+    marginTop: 12,
+    paddingTop: 12,
+    borderTopWidth: 1,
+    borderTopColor: '#e5e5e5',
+  },
+  documentsTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#333',
+    marginBottom: 8,
+  },
+  documentItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#f9f9f9',
+    padding: 12,
+    borderRadius: 8,
+    marginBottom: 8,
+    gap: 12,
+  },
+  documentInfo: {
+    flex: 1,
+    minWidth: 0,
+  },
+  documentName: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#2563eb',
+    marginBottom: 4,
+  },
+  documentDescription: {
+    fontSize: 12,
+    color: '#666',
+    marginBottom: 4,
+  },
+  documentMeta: {
+    fontSize: 11,
+    color: '#999',
   },
 });
 

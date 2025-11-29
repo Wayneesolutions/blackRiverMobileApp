@@ -1,1115 +1,619 @@
-
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect } from "react";
 import {
-    View,
-    Text,
-    TextInput,
-    TouchableOpacity,
-    ScrollView,
-    StyleSheet,
-    SafeAreaView,
-    StatusBar,
-    Dimensions,
-} from 'react-native';
-import { useNavigation, useFocusEffect } from '@react-navigation/native';
+  View,
+  Text,
+  StyleSheet,
+  ScrollView,
+  TouchableOpacity,
+  SafeAreaView,
+  ActivityIndicator,
+  RefreshControl,
+  Alert,
+  Linking,
+} from "react-native";
+import { Ionicons } from '@expo/vector-icons';
+import { useNavigation, useRoute } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
-
-const { width: screenWidth } = Dimensions.get('window');
-
-// Types
-type RootStackParamList = {
-    Dashboard: undefined;
-    MainTabs: { screen?: string };
-    TripDetails: { trip: ActiveTripItem };
-};
+import { RootStackParamList } from '../../navigation/AppNavigator';
+import { apiService } from '../../services/api/apiService';
+import { logger } from '../../utils/loggerHelper';
 
 type NavigationProp = NativeStackNavigationProp<RootStackParamList>;
 
-interface ActiveTripItem {
-    id: string;
-    tripId: string;
-    vehicle: {
-        name: string;
-        serialNo: string;
+interface Trip {
+  _id: string;
+  tripNumber: string;
+  status: string;
+  driver?: {
+    _id: string;
+    name: string;
+  };
+  truck?: {
+    _id: string;
+    plateNumber?: string;
+    internalId?: string;
+    make?: string;
+    model?: string;
+  };
+  trailer?: {
+    _id: string;
+    plateNumber?: string;
+    trailerNumber?: string;
+  };
+  orders?: Array<{
+    _id: string;
+    orderNumber: string;
+    customerOrderNo?: string;
+    status?: string;
+    customer?: {
+      name?: string;
+      email?: string;
     };
-    trailer?: {
-        name: string;
-        serialNo: string;
-    } | null;
-    shipment: {
-        id: string;
-        description: string;
-    };
-    route: {
-        origin: string;
-        destination: string;
-        distance: string;
-        estimatedTime: string;
-    };
-    status: string;
-    statusColor: string;
-    progress: number; // 0-100
-    driver: {
-        name: string;
-        id: string;
-    };
-    startTime: string;
-    estimatedArrival: string;
-    currentLocation: string;
-    nextCheckpoint: string;
-    checkpointDistance: string;
-    inspection: {
-        hasDefects: boolean;
-        defectCount: number;
-        inspectionType: string;
-        location: string;
-        remarks: string;
-        completedAt: string;
-    };
-}
-
-// Static Data for Active Trips
-const STATIC_ACTIVE_TRIPS: ActiveTripItem[] = [
-    {
-        id: '1',
-        tripId: 'TR000001',
-        vehicle: {
-            name: 'Freightliner Cascadia',
-            serialNo: 'FL-2023-001'
-        },
-        trailer: {
-            name: 'Utility Dry Van',
-            serialNo: 'UV-2023-045'
-        },
-        shipment: {
-            id: 'SHP001',
-            description: 'Electronics Equipment - Mixed Cargo'
-        },
-        route: {
-            origin: 'Los Angeles, CA',
-            destination: 'Phoenix, AZ',
-            distance: '372 miles',
-            estimatedTime: '5h 45m'
-        },
-        status: 'On Route',
-        statusColor: '#10B981',
-        progress: 65,
-        driver: {
-            name: 'John Martinez',
-            id: 'DR001'
-        },
-        startTime: '6:30 AM',
-        estimatedArrival: '1:15 PM',
-        currentLocation: 'I-10 Near Blythe, CA',
-        nextCheckpoint: 'Phoenix Distribution Center',
-        checkpointDistance: '128 miles',
-        inspection: {
-            hasDefects: false,
-            defectCount: 0,
-            inspectionType: 'Pre-Trip',
-            location: 'Los Angeles Terminal',
-            remarks: 'All systems operational. Vehicle in excellent condition.',
-            completedAt: new Date(Date.now() - 6 * 60 * 60 * 1000).toISOString()
-        }
-    },
-    {
-        id: '2',
-        tripId: 'TR000002',
-        vehicle: {
-            name: 'Peterbilt 579',
-            serialNo: 'PB-2022-087'
-        },
-        trailer: {
-            name: 'Great Dane Reefer',
-            serialNo: 'GD-2023-112'
-        },
-        shipment: {
-            id: 'SHP002',
-            description: 'Fresh Produce - Temperature Controlled'
-        },
-        route: {
-            origin: 'Salinas, CA',
-            destination: 'Seattle, WA',
-            distance: '845 miles',
-            estimatedTime: '12h 30m'
-        },
-        status: 'Loading',
-        statusColor: '#F59E0B',
-        progress: 15,
-        driver: {
-            name: 'Sarah Johnson',
-            id: 'DR002'
-        },
-        startTime: '5:00 AM',
-        estimatedArrival: '8:30 PM',
-        currentLocation: 'Salinas Cold Storage',
-        nextCheckpoint: 'Sacramento Checkpoint',
-        checkpointDistance: '98 miles',
-        inspection: {
-            hasDefects: true,
-            defectCount: 2,
-            inspectionType: 'Pre-Trip',
-            location: 'Salinas Terminal',
-            remarks: 'Minor tire wear on trailer axle 2. Refrigeration unit serviced.',
-            completedAt: new Date(Date.now() - 3 * 60 * 60 * 1000).toISOString()
-        }
-    },
-    {
-        id: '3',
-        tripId: 'TR000003',
-        vehicle: {
-            name: 'Volvo VNL 760',
-            serialNo: 'VV-2023-034'
-        },
-        trailer: null,
-        shipment: {
-            id: 'SHP003',
-            description: 'Construction Materials - Steel Beams'
-        },
-        route: {
-            origin: 'Houston, TX',
-            destination: 'Dallas, TX',
-            distance: '242 miles',
-            estimatedTime: '3h 50m'
-        },
-        status: 'Near Destination',
-        statusColor: '#059669',
-        progress: 92,
-        driver: {
-            name: 'Mike Thompson',
-            id: 'DR003'
-        },
-        startTime: '8:15 AM',
-        estimatedArrival: '12:30 PM',
-        currentLocation: 'I-45 Near Corsicana',
-        nextCheckpoint: 'Dallas Construction Site',
-        checkpointDistance: '18 miles',
-        inspection: {
-            hasDefects: false,
-            defectCount: 0,
-            inspectionType: 'Pre-Trip',
-            location: 'Houston Yard',
-            remarks: 'Vehicle and load securing chains inspected. All safety protocols met.',
-            completedAt: new Date(Date.now() - 5 * 60 * 60 * 1000).toISOString()
-        }
-    },
-    {
-        id: '4',
-        tripId: 'TR000004',
-        vehicle: {
-            name: 'Kenworth T880',
-            serialNo: 'KW-2023-156'
-        },
-        trailer: {
-            name: 'Fontaine Flatbed',
-            serialNo: 'FF-2022-203'
-        },
-        shipment: {
-            id: 'SHP004',
-            description: 'Heavy Machinery - Excavator Transport'
-        },
-        route: {
-            origin: 'Denver, CO',
-            destination: 'Las Vegas, NV',
-            distance: '756 miles',
-            estimatedTime: '11h 15m'
-        },
-        status: 'Maintenance Required',
-        statusColor: '#EF4444',
-        progress: 8,
-        driver: {
-            name: 'Robert Chen',
-            id: 'DR004'
-        },
-        startTime: '4:45 AM',
-        estimatedArrival: '7:00 PM',
-        currentLocation: 'Denver Service Center',
-        nextCheckpoint: 'Grand Junction, CO',
-        checkpointDistance: '245 miles',
-        inspection: {
-            hasDefects: true,
-            defectCount: 3,
-            inspectionType: 'Pre-Trip',
-            location: 'Denver Terminal',
-            remarks: 'Air brake system needs adjustment. Hydraulic leak in trailer. DOT inspection overdue.',
-            completedAt: new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString()
-        }
-    },
-    {
-        id: '5',
-        tripId: 'TR000005',
-        vehicle: {
-            name: 'Mack Anthem',
-            serialNo: 'MA-2023-089'
-        },
-        trailer: {
-            name: 'Wabash DuraPlate',
-            serialNo: 'WD-2023-078'
-        },
-        shipment: {
-            id: 'SHP005',
-            description: 'Retail Goods - Mixed Pallets'
-        },
-        route: {
-            origin: 'Atlanta, GA',
-            destination: 'Miami, FL',
-            distance: '662 miles',
-            estimatedTime: '9h 45m'
-        },
-        status: 'On Route',
-        statusColor: '#10B981',
-        progress: 45,
-        driver: {
-            name: 'Lisa Rodriguez',
-            id: 'DR005'
-        },
-        startTime: '7:00 AM',
-        estimatedArrival: '6:30 PM',
-        currentLocation: 'I-75 Near Gainesville, FL',
-        nextCheckpoint: 'Ocala Rest Stop',
-        checkpointDistance: '67 miles',
-        inspection: {
-            hasDefects: false,
-            defectCount: 0,
-            inspectionType: 'Pre-Trip',
-            location: 'Atlanta Hub',
-            remarks: 'Excellent vehicle condition. Load properly secured and documented.',
-            completedAt: new Date(Date.now() - 7 * 60 * 60 * 1000).toISOString()
-        }
-    },
-    {
-        id: '6',
-        tripId: 'TR000006',
-        vehicle: {
-            name: 'International LT',
-            serialNo: 'IN-2022-145'
-        },
-        trailer: {
-            name: 'Timpte Hopper',
-            serialNo: 'TH-2023-091'
-        },
-        shipment: {
-            id: 'SHP006',
-            description: 'Agricultural Feed - Grain Transport'
-        },
-        route: {
-            origin: 'Omaha, NE',
-            destination: 'Kansas City, MO',
-            distance: '185 miles',
-            estimatedTime: '2h 55m'
-        },
-        status: 'Departed',
-        statusColor: '#8B5CF6',
-        progress: 35,
-        driver: {
-            name: 'David Wilson',
-            id: 'DR006'
-        },
-        startTime: '9:30 AM',
-        estimatedArrival: '1:15 PM',
-        currentLocation: 'US-34 Near Villisca, IA',
-        nextCheckpoint: 'Kansas City Terminal',
-        checkpointDistance: '89 miles',
-        inspection: {
-            hasDefects: true,
-            defectCount: 1,
-            inspectionType: 'Pre-Trip',
-            location: 'Omaha Grain Facility',
-            remarks: 'Minor hydraulic seal replacement needed on trailer gate mechanism.',
-            completedAt: new Date(Date.now() - 4 * 60 * 60 * 1000).toISOString()
-        }
-    },
-    {
-        id: '7',
-        tripId: 'TR000007',
-        vehicle: {
-            name: 'Western Star 5700XE',
-            serialNo: 'WS-2023-067'
-        },
-        trailer: null,
-        shipment: {
-            id: 'SHP007',
-            description: 'Fuel Transport - Diesel Delivery'
-        },
-        route: {
-            origin: 'Bakersfield, CA',
-            destination: 'Fresno, CA',
-            distance: '112 miles',
-            estimatedTime: '1h 45m'
-        },
-        status: 'Preparing',
-        statusColor: '#F59E0B',
-        progress: 5,
-        driver: {
-            name: 'Carlos Mendoza',
-            id: 'DR007'
-        },
-        startTime: '11:00 AM',
-        estimatedArrival: '1:30 PM',
-        currentLocation: 'Bakersfield Fuel Terminal',
-        nextCheckpoint: 'Fresno Delivery Point',
-        checkpointDistance: '112 miles',
-        inspection: {
-            hasDefects: false,
-            defectCount: 0,
-            inspectionType: 'Hazmat Pre-Trip',
-            location: 'Bakersfield Terminal',
-            remarks: 'Hazmat certification current. Tank integrity verified. Safety equipment checked.',
-            completedAt: new Date(Date.now() - 1 * 60 * 60 * 1000).toISOString()
-        }
-    },
-    {
-        id: '8',
-        tripId: 'TR000008',
-        vehicle: {
-            name: 'Freightliner Columbia',
-            serialNo: 'FL-2022-198'
-        },
-        trailer: {
-            name: 'Hyundai Container',
-            serialNo: 'HC-2023-134'
-        },
-        shipment: {
-            id: 'SHP008',
-            description: 'Import Containers - Mixed Goods'
-        },
-        route: {
-            origin: 'Long Beach, CA',
-            destination: 'Las Vegas, NV',
-            distance: '270 miles',
-            estimatedTime: '4h 20m'
-        },
-        status: 'On Route',
-        statusColor: '#10B981',
-        progress: 78,
-        driver: {
-            name: 'Jennifer Kim',
-            id: 'DR008'
-        },
-        startTime: '6:00 AM',
-        estimatedArrival: '11:45 AM',
-        currentLocation: 'I-15 Near Barstow, CA',
-        nextCheckpoint: 'Las Vegas Distribution',
-        checkpointDistance: '48 miles',
-        inspection: {
-            hasDefects: false,
-            defectCount: 0,
-            inspectionType: 'Pre-Trip',
-            location: 'Long Beach Port',
-            remarks: 'Container seals verified. Customs documentation complete.',
-            completedAt: new Date(Date.now() - 8 * 60 * 60 * 1000).toISOString()
-        }
-    }
-];
-
-interface CreatedTrip {
-    id: string;
-    tripId: string;
-    vehicle: {
-        name: string;
-        serialNo: string;
-        status: string;
-        location: string;
-    };
-    trailer?: {
-        name: string;
-        serialNo: string;
-        status: string;
-        location: string;
-    } | null;
-    shipment: {
-        id: string;
-        name: string;
-        serialNo: string;
-        status: string;
-        location: string;
-    };
-    inspection: {
-        hasDefects: boolean;
-        defectCount: number;
-        inspectionType: string;
-        location: string;
-        remarks: string;
-        completedAt: string;
-        defects: string[];
-    };
-    createdAt: string;
-}
-
-// Mock storage service - replace with your actual storage solution
-class TripStorageService {
-    private static trips: CreatedTrip[] = [];
-    private static tripCounter = 1;
-
-    static addTrip(tripData: Omit<CreatedTrip, 'id' | 'tripId' | 'createdAt'>): CreatedTrip {
-        const newTrip: CreatedTrip = {
-            ...tripData,
-            id: Date.now().toString(),
-            tripId: `TR${String(this.tripCounter).padStart(6, '0')}`,
-            createdAt: new Date().toISOString(),
+    pickupLocation?: {
+      place?: string;
+      latitude?: string | number;
+      longitude?: string | number;
+      placeId?: {
+        name?: string;
+        currentLocation?: {
+          address?: string;
+          latitude?: string | number;
+          longitude?: string | number;
         };
-        this.tripCounter++;
-        this.trips.push(newTrip);
-        return newTrip;
-    }
-
-    static getTrips(): CreatedTrip[] {
-        return this.trips;
-    }
-
-    static getTripById(id: string): CreatedTrip | undefined {
-        return this.trips.find(trip => trip.id === id);
-    }
-
-    static updateTripProgress(tripId: string, progress: number, status: string): void {
-        const trip = this.trips.find(t => t.id === tripId);
-        if (trip) {
-            // Update would go here - for now we'll simulate progress
-        }
-    }
+      };
+    };
+    deliveryLocation?: {
+      place?: string;
+      latitude?: string | number;
+      longitude?: string | number;
+      placeId?: {
+        name?: string;
+        currentLocation?: {
+          address?: string;
+          latitude?: string | number;
+          longitude?: string | number;
+        };
+      };
+    };
+    pickupDate?: string;
+    deliveryDate?: string;
+  }>;
+  plannedStartDate?: string;
+  plannedEndDate?: string;
+  actualStartDate?: string;
+  actualEndDate?: string;
+  notes?: string;
+  documents?: Array<{
+    _id?: string;
+    fileUrl: string;
+    fileName: string;
+    fileSize?: number;
+    mimeType?: string;
+    uploadedBy?: any;
+    uploadedAt?: string;
+    description?: string;
+  }>;
 }
 
-// Back Button Component
-const BackButton = ({ onPress }: { onPress: () => void }) => (
-    <TouchableOpacity style={styles.backButton} onPress={onPress}>
-        <Text style={styles.backButtonText}>← Back</Text>
-    </TouchableOpacity>
-);
+const TripInfoScreen = () => {
+  const [trips, setTrips] = useState<Trip[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+  const navigation = useNavigation<NavigationProp>();
+  const route = useRoute();
 
-// Progress Bar Component
-const ProgressBar = ({ progress }: { progress: number }) => (
-    <View style={styles.progressBarContainer}>
-        <View style={styles.progressBarBackground}>
-            <View style={[styles.progressBarFill, { width: `${progress}%` }]} />
-        </View>
-        <Text style={styles.progressText}>{progress}%</Text>
-    </View>
-);
+  useEffect(() => {
+    fetchActiveTrips();
+  }, []);
 
-// Inspection Status Component
-const InspectionStatus = ({ inspection }: { inspection: ActiveTripItem['inspection'] }) => (
-    <View style={styles.inspectionSection}>
-        <View style={styles.inspectionHeader}>
-            <Text style={styles.inspectionTitle}>Inspection Status</Text>
-            <View style={[
-                styles.inspectionBadge,
-                { backgroundColor: inspection.hasDefects ? '#FEE2E2' : '#D1FAE5' }
-            ]}>
-                <Text style={[
-                    styles.inspectionBadgeText,
-                    { color: inspection.hasDefects ? '#DC2626' : '#059669' }
-                ]}>
-                    {inspection.hasDefects ? `${inspection.defectCount} Defects` : 'No Defects'}
-                </Text>
-            </View>
-        </View>
+  const fetchActiveTrips = async () => {
+    try {
+      setLoading(true);
+      const response = await apiService.getActiveTrips();
+      
+      if (response.success && response.data) {
+        const tripsData = response.data.data || response.data || [];
+        setTrips(Array.isArray(tripsData) ? tripsData : []);
+        logger.info('Active trips fetched for TripInfo', { count: tripsData.length });
+      } else {
+        logger.warn('Failed to fetch active trips', { error: response.error });
+        setTrips([]);
+      }
+    } catch (error) {
+      logger.error('Error fetching active trips', error);
+      setTrips([]);
+      Alert.alert('Error', 'Failed to load active trips. Please try again.');
+    } finally {
+      setLoading(false);
+      setRefreshing(false);
+    }
+  };
 
-        <View style={styles.inspectionDetails}>
-            <View style={styles.inspectionRow}>
-                <Text style={styles.inspectionLabel}>Type:</Text>
-                <Text style={styles.inspectionValue}>{inspection.inspectionType}</Text>
-            </View>
-            {inspection.location && (
-                <View style={styles.inspectionRow}>
-                    <Text style={styles.inspectionLabel}>Location:</Text>
-                    <Text style={styles.inspectionValue}>{inspection.location}</Text>
-                </View>
-            )}
-            {inspection.remarks && (
-                <View style={styles.inspectionRow}>
-                    <Text style={styles.inspectionLabel}>Remarks:</Text>
-                    <Text style={styles.inspectionValue} numberOfLines={2}>{inspection.remarks}</Text>
-                </View>
-            )}
-            <View style={styles.inspectionRow}>
-                <Text style={styles.inspectionLabel}>Completed:</Text>
-                <Text style={styles.inspectionValue}>
-                    {new Date(inspection.completedAt).toLocaleString()}
-                </Text>
-            </View>
-        </View>
-    </View>
-);
+  const onRefresh = () => {
+    setRefreshing(true);
+    fetchActiveTrips();
+  };
 
-// Trip Card Component
-const TripCard = ({
-    trip,
-    onPress
-}: {
-    trip: ActiveTripItem;
-    onPress: () => void;
-}) => (
-    <TouchableOpacity style={styles.tripCard} onPress={onPress}>
-        <View style={styles.tripCardHeader}>
-            <View style={styles.tripIdSection}>
-                <Text style={styles.tripId}>Trip {trip.tripId}</Text>
-                <View style={[styles.statusBadge, { backgroundColor: trip.statusColor + '20' }]}>
-                    <Text style={[styles.statusBadgeText, { color: trip.statusColor }]}>
-                        {trip.status}
-                    </Text>
-                </View>
-            </View>
-        </View>
+  const formatAddress = (location: any) => {
+    if (!location) return 'N/A';
+    if (location.place) return location.place;
+    if (location.placeId?.name) return location.placeId.name;
+    if (location.placeId?.currentLocation?.address) return location.placeId.currentLocation.address;
+    return 'Unknown Location';
+  };
 
-        <View style={styles.tripCardContent}>
-            {/* Vehicle & Trailer Info */}
-            <View style={styles.vehicleSection}>
-                <Text style={styles.vehicleText}>
-                    {trip.vehicle.name} ({trip.vehicle.serialNo})
-                </Text>
-                {trip.trailer && (
-                    <Text style={styles.trailerText}>
-                        + {trip.trailer.name} ({trip.trailer.serialNo})
-                    </Text>
-                )}
-            </View>
+  const formatDate = (dateString?: string) => {
+    if (!dateString) return 'N/A';
+    try {
+      const date = new Date(dateString);
+      return date.toLocaleDateString('en-US', {
+        year: 'numeric',
+        month: 'short',
+        day: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit',
+      });
+    } catch {
+      return dateString;
+    }
+  };
 
-            {/* Route Info */}
-            <View style={styles.routeSection}>
-                <View style={styles.routeRow}>
-                    <Text style={styles.routeLabel}>From:</Text>
-                    <Text style={styles.routeValue}>{trip.route.origin}</Text>
-                </View>
-                <View style={styles.routeRow}>
-                    <Text style={styles.routeLabel}>To:</Text>
-                    <Text style={styles.routeValue}>{trip.route.destination}</Text>
-                </View>
-                <View style={styles.routeRow}>
-                    <Text style={styles.routeLabel}>Distance:</Text>
-                    <Text style={styles.routeValue}>{trip.route.distance}</Text>
-                </View>
-            </View>
+  const formatFileSize = (bytes?: number): string => {
+    if (!bytes || bytes === 0) return 'Unknown size';
+    if (bytes < 1024) return bytes + ' B';
+    if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(2) + ' KB';
+    return (bytes / (1024 * 1024)).toFixed(2) + ' MB';
+  };
 
-            {/* Progress */}
-            <ProgressBar progress={trip.progress} />
+  const getStatusColor = (status: string) => {
+    switch (status?.toLowerCase()) {
+      case "in-progress": return "#27ae60";
+      case "in-delivery": return "#3498db";
+      case "completed": return "#2ecc71";
+      case "planned": return "#95a5a6";
+      default: return "#95a5a6";
+    }
+  };
 
-            {/* Driver & Time Info */}
-            <View style={styles.bottomSection}>
-                <View style={styles.driverInfo}>
-                    <Text style={styles.driverLabel}>Driver:</Text>
-                    <Text style={styles.driverName}>{trip.driver.name}</Text>
-                </View>
-                <View style={styles.timeInfo}>
-                    <Text style={styles.timeLabel}>ETA:</Text>
-                    <Text style={styles.timeValue}>{trip.estimatedArrival}</Text>
-                </View>
-            </View>
-
-            {/* Current Location */}
-            <View style={styles.locationSection}>
-                <Text style={styles.locationLabel}>Current Location:</Text>
-                <Text style={styles.locationValue}>{trip.currentLocation}</Text>
-            </View>
-
-            {/* Next Checkpoint */}
-            <View style={styles.checkpointSection}>
-                <Text style={styles.checkpointLabel}>Next Checkpoint:</Text>
-                <Text style={styles.checkpointValue}>
-                    {trip.nextCheckpoint} ({trip.checkpointDistance})
-                </Text>
-            </View>
-
-            {/* Inspection Status */}
-            <InspectionStatus inspection={trip.inspection} />
-        </View>
-    </TouchableOpacity>
-);
-
-// Search Component
-const SearchBar = ({
-    searchQuery,
-    setSearchQuery,
-    placeholder
-}: {
-    searchQuery: string;
-    setSearchQuery: (query: string) => void;
-    placeholder: string;
-}) => (
-    <View style={styles.searchCard}>
-        <TextInput
-            style={styles.searchInput}
-            placeholder={placeholder}
-            value={searchQuery}
-            onChangeText={setSearchQuery}
-            placeholderTextColor="#9CA3AF"
-        />
-        <Text style={styles.searchIcon}>🔍</Text>
-    </View>
-);
-
-// Main Component
-const ActiveTripsScreen = () => {
-    const navigation = useNavigation<NavigationProp>();
-    const [searchQuery, setSearchQuery] = useState<string>("");
-    const [activeTrips, setActiveTrips] = useState<ActiveTripItem[]>(STATIC_ACTIVE_TRIPS);
-    const [filteredTrips, setFilteredTrips] = useState<ActiveTripItem[]>(STATIC_ACTIVE_TRIPS);
-
-    // Load trips when screen is focused
-    useFocusEffect(
-        React.useCallback(() => {
-            // Using static data now, but keeping the structure for future API integration
-            setActiveTrips(STATIC_ACTIVE_TRIPS);
-            setFilteredTrips(STATIC_ACTIVE_TRIPS);
-        }, [])
-    );
-
-    // Filter trips based on search query
-    useEffect(() => {
-        if (searchQuery.trim() === "") {
-            setFilteredTrips(activeTrips);
-        } else {
-            const filtered = activeTrips.filter(
-                (trip) =>
-                    trip.tripId.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                    trip.vehicle.serialNo.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                    trip.driver.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                    trip.route.origin.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                    trip.route.destination.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                    trip.status.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                    trip.inspection.inspectionType.toLowerCase().includes(searchQuery.toLowerCase())
-            );
-            setFilteredTrips(filtered);
-        }
-    }, [searchQuery, activeTrips]);
-
-    const handleBack = () => {
-        // navigation.navigate('MainTabs', { screen: 'Dashboard' });
-        console.log('Back to Dashboard');
-    };
-
-    const handleTripPress = (trip: ActiveTripItem) => {
-        console.log('Trip selected:', trip.tripId);
-        // You can implement navigation to a detailed trip view here
-        // navigation.navigate('TripDetails', { trip });
-    };
-
-    // Get status count for header
-    const getStatusCounts = () => {
-        const counts = {
-            total: activeTrips.length,
-            onRoute: activeTrips.filter(trip => trip.status === 'On Route').length,
-            loading: activeTrips.filter(trip => trip.status === 'Loading' || trip.status === 'Preparing').length,
-            delayed: activeTrips.filter(trip => trip.status === 'Maintenance Required').length,
-            withDefects: activeTrips.filter(trip => trip.inspection.hasDefects).length,
-        };
-        return counts;
-    };
-
-    const statusCounts = getStatusCounts();
-
+  if (loading && !refreshing) {
     return (
-
-        <SafeAreaView style={styles.container}>
-            <ScrollView
-                style={styles.scrollContainer}
-                contentContainerStyle={styles.scrollContent}
-                showsVerticalScrollIndicator={false}
-            >
-
-                <StatusBar barStyle="dark-content" backgroundColor="#FFFFFF" />
-
-                <View style={styles.mainContainer}>
-                    {/* Header */}
-                    <View style={styles.header}>
-
-                        <Text style={styles.headerTitle}>Active Trips</Text>
-                        <View style={styles.headerSpacer} />
-                    </View>
-
-                    {/* Stats Cards */}
-                    <View style={styles.statsContainer}>
-                        <View style={styles.statCard}>
-                            <Text style={styles.statNumber}>{statusCounts.total}</Text>
-                            <Text style={styles.statLabel}>Total Active</Text>
-                        </View>
-                        <View style={styles.statCard}>
-                            <Text style={[styles.statNumber, { color: '#10B981' }]}>{statusCounts.onRoute}</Text>
-                            <Text style={styles.statLabel}>On Route</Text>
-                        </View>
-                        <View style={styles.statCard}>
-                            <Text style={[styles.statNumber, { color: '#F59E0B' }]}>{statusCounts.loading}</Text>
-                            <Text style={styles.statLabel}>Loading</Text>
-                        </View>
-                        <View style={styles.statCard}>
-                            <Text style={[styles.statNumber, { color: '#EF4444' }]}>{statusCounts.withDefects}</Text>
-                            <Text style={styles.statLabel}>With Defects</Text>
-                        </View>
-                    </View>
-
-                    {/* Search */}
-                    <SearchBar
-                        searchQuery={searchQuery}
-                        setSearchQuery={setSearchQuery}
-                        placeholder="Search trips by ID, vehicle, inspection..."
-                    />
-
-                    {/* Results Header */}
-                    <View style={styles.resultsHeader}>
-                        <Text style={styles.resultsTitle}>
-                            {searchQuery ? `Results (${filteredTrips.length})` : `All Active Trips`}
-                        </Text>
-                    </View>
-
-                    {/* Trip List */}
-                    <ScrollView
-                        style={styles.scrollContainer}
-                        showsVerticalScrollIndicator={false}
-                        contentContainerStyle={styles.scrollContent}
-                    >
-                        {filteredTrips.length > 0 ? (
-                            filteredTrips.map((trip) => (
-                                <TripCard
-                                    key={trip.id}
-                                    trip={trip}
-                                    onPress={() => handleTripPress(trip)}
-                                />
-                            ))
-                        ) : (
-                            <View style={styles.emptyState}>
-                                <Text style={styles.emptyStateText}>
-                                    {activeTrips.length === 0 ? 'No trips created yet' : 'No trips found'}
-                                </Text>
-                                <Text style={styles.emptyStateSubtext}>
-                                    {activeTrips.length === 0
-                                        ? 'Create your first trip to see it here'
-                                        : 'Try adjusting your search terms'
-                                    }
-                                </Text>
-                            </View>
-                        )}
-                    </ScrollView>
-                </View>
-            </ScrollView>
-        </SafeAreaView>
-
+      <SafeAreaView style={styles.container}>
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="large" color="#2563eb" />
+          <Text style={styles.loadingText}>Loading trip information...</Text>
+        </View>
+      </SafeAreaView>
     );
+  }
+
+  return (
+    <SafeAreaView style={styles.container}>
+      <View style={styles.header}>
+        <View style={styles.headerContent}>
+          <Text style={styles.headerTitle}>Trip Information</Text>
+          <Text style={styles.headerSubtitle}>View your active trip details</Text>
+          <View style={styles.statsContainer}>
+            <View style={styles.statItem}>
+              <Text style={styles.statNumber}>{trips.length}</Text>
+              <Text style={styles.statLabel}>Active Trips</Text>
+            </View>
+          </View>
+        </View>
+      </View>
+
+      {trips.length === 0 ? (
+        <View style={styles.emptyContainer}>
+          <Text style={styles.emptyIcon}>🚛</Text>
+          <Text style={styles.emptyText}>No Active Trips</Text>
+          <Text style={styles.emptySubtext}>You don't have any active trips at the moment</Text>
+        </View>
+      ) : (
+        <ScrollView
+          style={styles.scrollView}
+          refreshControl={
+            <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
+          }
+        >
+          {trips.map((trip) => (
+            <View key={trip._id} style={styles.tripCard}>
+              <View style={styles.cardHeader}>
+                <View style={styles.headerInfo}>
+                  <Text style={styles.tripNumber}>{trip.tripNumber}</Text>
+                  <Text style={styles.tripDate}>
+                    Started: {formatDate(trip.actualStartDate || trip.plannedStartDate)}
+                  </Text>
+                </View>
+                <View style={[styles.statusBadge, { backgroundColor: getStatusColor(trip.status) }]}>
+                  <Text style={styles.statusText}>{trip.status || 'Active'}</Text>
+                </View>
+              </View>
+
+              {trip.truck && (
+                <View style={styles.infoRow}>
+                  <Text style={styles.infoLabel}>Truck:</Text>
+                  <Text style={styles.infoValue}>
+                    {trip.truck.plateNumber || trip.truck.internalId || 'N/A'}
+                  </Text>
+                </View>
+              )}
+
+              {trip.trailer && (
+                <View style={styles.infoRow}>
+                  <Text style={styles.infoLabel}>Trailer:</Text>
+                  <Text style={styles.infoValue}>
+                    {trip.trailer.plateNumber || trip.trailer.trailerNumber || 'N/A'}
+                  </Text>
+                </View>
+              )}
+
+              {trip.orders && trip.orders.length > 0 && (
+                <View style={styles.ordersSection}>
+                  <Text style={styles.ordersTitle}>
+                    Orders ({trip.orders.length}):
+                  </Text>
+                  {trip.orders.map((order, index) => (
+                    <View key={order._id || index} style={styles.orderItem}>
+                      <Text style={styles.orderNumber}>{order.orderNumber}</Text>
+                      {order.customerOrderNo && (
+                        <Text style={styles.customerOrderNo}>
+                          Customer Order: {order.customerOrderNo}
+                        </Text>
+                      )}
+                      {order.customer?.name && (
+                        <Text style={styles.customerName}>Customer: {order.customer.name}</Text>
+                      )}
+                      <View style={styles.locationRow}>
+                        <Text style={styles.locationLabel}>Pickup: </Text>
+                        <Text style={styles.locationValue}>
+                          {formatAddress(order.pickupLocation)}
+                        </Text>
+                      </View>
+                      <View style={styles.locationRow}>
+                        <Text style={styles.locationLabel}>Delivery: </Text>
+                        <Text style={styles.locationValue}>
+                          {formatAddress(order.deliveryLocation)}
+                        </Text>
+                      </View>
+                      {order.status && (
+                        <View style={styles.orderStatusRow}>
+                          <Text style={styles.orderStatusLabel}>Status: </Text>
+                          <Text style={[styles.orderStatusValue, {
+                            color: order.status === 'in-delivery' ? '#3498db' :
+                                   order.status === 'completed' ? '#2ecc71' :
+                                   '#95a5a6'
+                          }]}>
+                            {order.status}
+                          </Text>
+                        </View>
+                      )}
+                    </View>
+                  ))}
+                </View>
+              )}
+
+              {trip.notes && (
+                <View style={styles.notesSection}>
+                  <Text style={styles.notesLabel}>Notes:</Text>
+                  <Text style={styles.notesText}>{trip.notes}</Text>
+                </View>
+              )}
+
+              {/* Documents */}
+              {trip.documents && trip.documents.length > 0 && (
+                <View style={styles.documentsSection}>
+                  <Text style={styles.documentsTitle}>
+                    Documents ({trip.documents.length}):
+                  </Text>
+                  {trip.documents.map((doc, index) => (
+                    <TouchableOpacity
+                      key={doc._id || index}
+                      style={styles.documentItem}
+                      onPress={async () => {
+                        if (!doc._id || !trip._id) {
+                          Alert.alert('Error', 'Document information is missing.');
+                          return;
+                        }
+
+                        try {
+                          // Fetch signed URL before opening
+                          const response = await apiService.getTripDocumentSignedUrl(trip._id, doc._id, 'inline');
+                          if (response?.success && response?.data?.url) {
+                            await Linking.openURL(response.data.url);
+                          } else {
+                            // Fallback to original URL
+                            if (doc.fileUrl) {
+                              await Linking.openURL(doc.fileUrl);
+                            } else {
+                              Alert.alert('Error', 'Unable to get document URL.');
+                            }
+                          }
+                        } catch (error: any) {
+                          console.error('Error opening document:', error);
+                          // Fallback to original URL
+                          if (doc.fileUrl) {
+                            Linking.openURL(doc.fileUrl).catch(() => {
+                              Alert.alert('Error', 'Unable to open document. Please try again.');
+                            });
+                          } else {
+                            Alert.alert('Error', 'Unable to open document. Please try again.');
+                          }
+                        }
+                      }}
+                    >
+                      <Ionicons name="document-text" size={20} color="#2563eb" />
+                      <View style={styles.documentInfo}>
+                        <Text style={styles.documentName} numberOfLines={1}>
+                          {doc.fileName}
+                        </Text>
+                        {doc.description && (
+                          <Text style={styles.documentDescription} numberOfLines={1}>
+                            {doc.description}
+                          </Text>
+                        )}
+                        <Text style={styles.documentMeta}>
+                          {doc.fileSize ? formatFileSize(doc.fileSize) : 'Unknown size'}
+                          {doc.uploadedAt && ` • ${new Date(doc.uploadedAt).toLocaleDateString()}`}
+                        </Text>
+                      </View>
+                      <Ionicons name="download-outline" size={20} color="#2563eb" />
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              )}
+            </View>
+          ))}
+        </ScrollView>
+      )}
+    </SafeAreaView>
+  );
 };
 
 const styles = StyleSheet.create({
-
-    container: {
-        flex: 1,
-        backgroundColor: '#F8FAFC',
-    },
-    scrollContainer: {
-        flex: 1,
-    },
-    scrollContent: {
-        paddingBottom: 40, // Add padding to account for footer
-    },
-    mainContainer: {
-        flex: 1,
-        paddingHorizontal: 16,
-        paddingBottom: 20,
-    },
-    header: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        paddingVertical: 8,
-        marginBottom: 16,
-        marginTop: 10
-    },
-    headerTitle: {
-        fontSize: 24,
-        fontWeight: '600',
-        color: '#111827',
-        flex: 1,
-        textAlign: 'left',
-    },
-    headerSpacer: {
-        width: 50,
-    },
-    backButton: {
-        alignSelf: 'flex-start',
-        paddingVertical: 8,
-        paddingHorizontal: 4,
-    },
-    backButtonText: {
-        fontSize: 16,
-        color: '#8B5CF6',
-        fontWeight: '500',
-    },
-    statsContainer: {
-        flexDirection: 'row',
-        marginBottom: 16,
-        gap: 8,
-    },
-    statCard: {
-        flex: 1,
-        backgroundColor: '#FFFFFF',
-        padding: 12,
-        borderRadius: 8,
-        alignItems: 'center',
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 1 },
-        shadowOpacity: 0.05,
-        shadowRadius: 2,
-        elevation: 2,
-    },
-    resultsTitle: {
-        fontSize: 16,
-        fontWeight: '600',
-        color: '#374151',
-    },
-    tripCard: {
-        backgroundColor: '#FFFFFF',
-        borderRadius: 12,
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.1,
-        shadowRadius: 4,
-        elevation: 3,
-        overflow: 'hidden',
-    },
-    tripCardHeader: {
-        backgroundColor: '#F9FAFB',
-        padding: 12,
-        borderBottomWidth: 1,
-        borderBottomColor: '#E5E7EB',
-    },
-    tripIdSection: {
-        flexDirection: 'row',
-        justifyContent: 'space-between',
-        alignItems: 'center',
-    },
-    tripId: {
-        fontSize: 16,
-        fontWeight: '600',
-        color: '#111827',
-    },
-    statusBadge: {
-        paddingHorizontal: 8,
-        paddingVertical: 4,
-        borderRadius: 12,
-    },
-    statusBadgeText: {
-        fontSize: 12,
-        fontWeight: '500',
-    },
-    tripCardContent: {
-        padding: 16,
-        gap: 12,
-    },
-    vehicleSection: {
-        gap: 4,
-    },
-    vehicleText: {
-        fontSize: 14,
-        fontWeight: '500',
-        color: '#111827',
-    },
-    trailerText: {
-        fontSize: 12,
-        color: '#6B7280',
-    },
-    routeSection: {
-        gap: 4,
-    },
-    routeRow: {
-        flexDirection: 'row',
-        alignItems: 'center',
-    },
-    routeLabel: {
-        fontSize: 12,
-        color: '#6B7280',
-        width: 60,
-    },
-    routeValue: {
-        fontSize: 12,
-        color: '#111827',
-        flex: 1,
-        fontWeight: '500',
-    },
-    progressBarContainer: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        gap: 8,
-    },
-    progressBarBackground: {
-        flex: 1,
-        height: 6,
-        backgroundColor: '#E5E7EB',
-        borderRadius: 3,
-        overflow: 'hidden',
-    },
-    progressBarFill: {
-        height: '100%',
-        backgroundColor: '#8B5CF6',
-        borderRadius: 3,
-    },
-    progressText: {
-        fontSize: 12,
-        fontWeight: '500',
-        color: '#8B5CF6',
-        minWidth: 35,
-        textAlign: 'right',
-    },
-    bottomSection: {
-        flexDirection: 'row',
-        justifyContent: 'space-between',
-        alignItems: 'center',
-    },
-    driverInfo: {
-        flex: 1,
-    },
-    driverLabel: {
-        fontSize: 11,
-        color: '#6B7280',
-    },
-    driverName: {
-        fontSize: 13,
-        fontWeight: '500',
-        color: '#111827',
-    },
-    timeInfo: {
-        alignItems: 'flex-end',
-    },
-    timeLabel: {
-        fontSize: 11,
-        color: '#6B7280',
-    },
-    timeValue: {
-        fontSize: 13,
-        fontWeight: '500',
-        color: '#10B981',
-    },
-    locationSection: {
-        backgroundColor: '#F3F4F6',
-        padding: 8,
-        borderRadius: 6,
-        marginTop: 4,
-    },
-    locationLabel: {
-        fontSize: 11,
-        color: '#6B7280',
-        marginBottom: 2,
-    },
-    locationValue: {
-        fontSize: 12,
-        fontWeight: '500',
-        color: '#111827',
-    },
-    checkpointSection: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        justifyContent: 'space-between',
-        paddingTop: 8,
-        borderTopWidth: 1,
-        borderTopColor: '#E5E7EB',
-    },
-    checkpointLabel: {
-        fontSize: 11,
-        color: '#6B7280',
-    },
-    checkpointValue: {
-        fontSize: 12,
-        fontWeight: '500',
-        color: '#8B5CF6',
-    },
-    statNumber: {
-        fontSize: 20,
-        fontWeight: "bold",
-        color: "#111827",
-        marginBottom: 4,
-    },
-    statLabel: {
-        fontSize: 13,
-        color: "#6B7280",
-    },
-    resultsHeader: {
-        marginTop: 16,
-        marginBottom: 8,
-        paddingHorizontal: 4,
-    },
-
-    searchCard: {
-        flexDirection: "row",
-        alignItems: "center",
-        backgroundColor: "#fff",
-        borderRadius: 8,
-        paddingHorizontal: 12,
-        paddingVertical: 8,
-        marginBottom: 12,
-        shadowColor: "#000",
-        shadowOpacity: 0.1,
-        shadowRadius: 4,
-        elevation: 2,
-    },
-    searchInput: {
-        flex: 1,
-        fontSize: 16,
-        color: "#111827",
-        paddingVertical: 4,
-    },
-    searchIcon: {
-        fontSize: 18,
-        marginLeft: 8,
-        color: "#6B7280",
-    },
-    inspectionSection: {
-        backgroundColor: '#F8FAFC',
-        borderRadius: 8,
-        padding: 12,
-        marginTop: 8,
-        borderWidth: 1,
-        borderColor: '#E5E7EB',
-    },
-    inspectionHeader: {
-        flexDirection: 'row',
-        justifyContent: 'space-between',
-        alignItems: 'center',
-        marginBottom: 8,
-    },
-    inspectionTitle: {
-        fontSize: 13,
-        fontWeight: '600',
-        color: '#374151',
-    },
-    inspectionBadge: {
-        paddingHorizontal: 8,
-        paddingVertical: 3,
-        borderRadius: 10,
-    },
-    inspectionBadgeText: {
-        fontSize: 11,
-        fontWeight: '600',
-    },
-    inspectionDetails: {
-        gap: 4,
-    },
-    inspectionRow: {
-        flexDirection: 'row',
-        alignItems: 'flex-start',
-    },
-    inspectionLabel: {
-        fontSize: 11,
-        color: '#6B7280',
-        width: 70,
-        flexShrink: 0,
-    },
-    inspectionValue: {
-        fontSize: 11,
-        color: '#111827',
-        flex: 1,
-        fontWeight: '500',
-    },
-    emptyState: {
-        alignItems: 'center',
-        justifyContent: 'center',
-        paddingVertical: 60,
-    },
-    emptyStateText: {
-        fontSize: 18,
-        fontWeight: '500',
-        color: '#6B7280',
-        marginBottom: 8,
-    },
-    emptyStateSubtext: {
-        fontSize: 14,
-        color: '#9CA3AF',
-    },
+  container: {
+    flex: 1,
+    backgroundColor: '#f5f5f5',
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  loadingText: {
+    marginTop: 10,
+    color: '#666',
+  },
+  header: {
+    backgroundColor: '#fff',
+    padding: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: '#e5e5e5',
+  },
+  headerContent: {
+    alignItems: 'center',
+  },
+  headerTitle: {
+    fontSize: 24,
+    fontWeight: 'bold',
+    color: '#333',
+    marginBottom: 4,
+  },
+  headerSubtitle: {
+    fontSize: 14,
+    color: '#666',
+    marginBottom: 12,
+  },
+  statsContainer: {
+    flexDirection: 'row',
+    gap: 16,
+  },
+  statItem: {
+    alignItems: 'center',
+  },
+  statNumber: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: '#2563eb',
+  },
+  statLabel: {
+    fontSize: 12,
+    color: '#666',
+  },
+  emptyContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 40,
+  },
+  emptyIcon: {
+    fontSize: 64,
+    marginBottom: 16,
+  },
+  emptyText: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: '#333',
+    marginBottom: 8,
+  },
+  emptySubtext: {
+    fontSize: 14,
+    color: '#666',
+    textAlign: 'center',
+  },
+  scrollView: {
+    flex: 1,
+  },
+  tripCard: {
+    backgroundColor: '#fff',
+    margin: 12,
+    padding: 16,
+    borderRadius: 12,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  cardHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+    marginBottom: 12,
+  },
+  headerInfo: {
+    flex: 1,
+  },
+  tripNumber: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#2563eb',
+    marginBottom: 4,
+  },
+  tripDate: {
+    fontSize: 12,
+    color: '#666',
+  },
+  statusBadge: {
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 12,
+  },
+  statusText: {
+    color: '#fff',
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  infoRow: {
+    flexDirection: 'row',
+    marginBottom: 8,
+  },
+  infoLabel: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#333',
+    width: 80,
+  },
+  infoValue: {
+    fontSize: 14,
+    color: '#666',
+    flex: 1,
+  },
+  ordersSection: {
+    marginTop: 12,
+    paddingTop: 12,
+    borderTopWidth: 1,
+    borderTopColor: '#e5e5e5',
+  },
+  ordersTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#333',
+    marginBottom: 8,
+  },
+  orderItem: {
+    backgroundColor: '#f9f9f9',
+    padding: 12,
+    borderRadius: 8,
+    marginBottom: 8,
+  },
+  orderNumber: {
+    fontSize: 15,
+    fontWeight: '600',
+    color: '#2563eb',
+    marginBottom: 4,
+  },
+  customerOrderNo: {
+    fontSize: 12,
+    color: '#666',
+    marginBottom: 4,
+  },
+  customerName: {
+    fontSize: 12,
+    color: '#666',
+    marginBottom: 4,
+  },
+  locationRow: {
+    flexDirection: 'row',
+    marginBottom: 4,
+  },
+  locationLabel: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#333',
+  },
+  locationValue: {
+    fontSize: 12,
+    color: '#666',
+    flex: 1,
+  },
+  orderStatusRow: {
+    flexDirection: 'row',
+    marginTop: 4,
+  },
+  orderStatusLabel: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#333',
+  },
+  orderStatusValue: {
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  notesSection: {
+    marginTop: 12,
+    paddingTop: 12,
+    borderTopWidth: 1,
+    borderTopColor: '#e5e5e5',
+  },
+  notesLabel: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#333',
+    marginBottom: 4,
+  },
+  notesText: {
+    fontSize: 14,
+    color: '#666',
+  },
+  documentsSection: {
+    marginTop: 12,
+    paddingTop: 12,
+    borderTopWidth: 1,
+    borderTopColor: '#e5e5e5',
+  },
+  documentsTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#333',
+    marginBottom: 8,
+  },
+  documentItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#f9f9f9',
+    padding: 12,
+    borderRadius: 8,
+    marginBottom: 8,
+    gap: 12,
+  },
+  documentInfo: {
+    flex: 1,
+    minWidth: 0,
+  },
+  documentName: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#2563eb',
+    marginBottom: 4,
+  },
+  documentDescription: {
+    fontSize: 12,
+    color: '#666',
+    marginBottom: 4,
+  },
+  documentMeta: {
+    fontSize: 11,
+    color: '#999',
+  },
 });
 
-// Export the storage service for use in other screens
-export { TripStorageService };
-export default ActiveTripsScreen;
+export default TripInfoScreen;

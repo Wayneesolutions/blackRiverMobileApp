@@ -323,7 +323,7 @@ export default function DashboardScreen() {
                                     <Image source={activeTrip} style={styles.taskIcon} />
                                 </View>
                                 <View style={styles.taskContent}>
-                                    <Text style={styles.taskText}>Active Loads</Text>
+                                    <Text style={styles.taskText}>Active Trips</Text>
                                     <Text style={styles.taskCount}>{stats.active}</Text>
                                 </View>
                             </TouchableOpacity>
@@ -336,7 +336,7 @@ export default function DashboardScreen() {
                                     <Image source={completeTrip} style={styles.taskIcon} />
                                 </View>
                                 <View style={styles.taskContent}>
-                                    <Text style={styles.taskText}>Completed Loads</Text>
+                                    <Text style={styles.taskText}>Completed Trips</Text>
                                     <Text style={styles.taskCount}>{stats.completed}</Text>
                                 </View>
                             </TouchableOpacity>
@@ -349,7 +349,7 @@ export default function DashboardScreen() {
                                     <Image source={pendingTrip} style={styles.taskIcon} />
                                 </View>
                                 <View style={styles.taskContent}>
-                                    <Text style={styles.taskText}>Pending Loads</Text>
+                                    <Text style={styles.taskText}>Pending Trips</Text>
                                     <Text style={styles.taskCount}>{stats.pending}</Text>
                                 </View>
                             </TouchableOpacity>
