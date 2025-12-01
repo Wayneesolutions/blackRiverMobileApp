@@ -7,6 +7,8 @@ import Constants from 'expo-constants';
 import AppNavigator from './src/navigation/AppNavigator';
 import ErrorBoundary from './src/components/ErrorBoundary';
 import Logger from './src/utils/Logger';
+// IMPORTANT: Import crash reporter early to initialize global handlers
+import './src/utils/crashReporter';
 
 export default function App() {
   // Log app initialization

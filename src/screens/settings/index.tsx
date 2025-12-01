@@ -660,7 +660,33 @@ const SettingsScreen = ({ route, navigation: navProp, onLogout }: SettingsScreen
               <Ionicons name="chevron-forward" size={20} color="#999" />
             </View>
           </TouchableOpacity>
+        </View>
 
+        {/* Debug Section */}
+        <Text style={styles.sectionTitle}>Debug</Text>
+        <View style={styles.actionsSection}>
+          <TouchableOpacity 
+            style={styles.actionBtn} 
+            onPress={() => navigation.navigate('CrashLogs' as never)}
+            activeOpacity={0.7}
+          >
+            <View style={styles.actionContent}>
+              <View style={styles.actionIconContainer}>
+                <Ionicons name="bug" size={24} color="#F59E0B" />
+              </View>
+              <View style={styles.actionTextContainer}>
+                <Text style={styles.actionTitle}>View Crash Logs</Text>
+                <Text style={styles.actionSubtitle}>
+                  View app crash logs and errors
+                </Text>
+              </View>
+              <Ionicons name="chevron-forward" size={20} color="#999" />
+            </View>
+          </TouchableOpacity>
+        </View>
+
+        {/* Logout Section */}
+        <View style={styles.actionsSection}>
           <TouchableOpacity 
             style={[styles.actionBtn, styles.logoutBtn]} 
             onPress={handleLogout}

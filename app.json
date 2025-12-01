@@ -36,6 +36,9 @@
       "minSdkVersion": 24,
       "targetSdkVersion": 34,
       "compileSdkVersion": 34,
+      "config": {
+        "googleMapsApiKey": "AIzaSyCv8vuE1jOgt-F6Szqvfn1DPrQdbPn5aEI"
+      },
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#FFFFFF"
@@ -68,7 +71,10 @@
               "scheme": "com.blackriverlogistics.app"
             }
           ],
-          "category": ["BROWSABLE", "DEFAULT"]
+          "category": [
+            "BROWSABLE",
+            "DEFAULT"
+          ]
         }
       ]
     },
@@ -82,12 +88,13 @@
       "description": "Driver Mobile App for Black River Logistics"
     },
     "extra": {
-      "eas": {
-        "projectId": "2f9de5f5-ceeb-4539-88bd-1c37b25d2865"
-      },
       "apiBaseUrl": "https://portal.logistiqinnovations.ca/api/v1",
-      "socketUrl": "https://portal.logistiqinnovations.ca"
+      "socketUrl": "https://portal.logistiqinnovations.ca",
+      "googleMapsApiKey": "AIzaSyCv8vuE1jOgt-F6Szqvfn1DPrQdbPn5aEI",
+      "eas": {
+        "projectId": "eefbaad4-f3ce-4c75-b527-dec8ec9e5f67"
+      }
     },
-    "owner": "krishnadas7"
+    "owner": "sanuexpo7"
   }
 }

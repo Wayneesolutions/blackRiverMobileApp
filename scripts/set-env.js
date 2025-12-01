@@ -14,12 +14,18 @@ const envConfigs = {
     API_BASE_URL: 'http://192.168.31.247:3000/api/v1',
     SOCKET_URL: 'http://192.168.31.247:3000',
     NODE_ENV: 'development',
+    GOOGLE_MAPS_API_KEY: 'AIzaSyCv8vuE1jOgt-F6Szqvfn1DPrQdbPn5aEI',
+    MAPTILER_API_KEY: '8Jkvb8O2usYHm8CJfp4t',
+    STADIA_API_KEY: '1234567890',
     DB_NAME: 'blackriver',
   },
   staging: {
     API_BASE_URL: 'https://staging-api.blackriver.com/api/v1',
     SOCKET_URL: 'https://staging-api.blackriver.com',
     NODE_ENV: 'staging',
+    GOOGLE_MAPS_API_KEY: 'AIzaSyCv8vuE1jOgt-F6Szqvfn1DPrQdbPn5aEI',
+    MAPTILER_API_KEY: '8Jkvb8O2usYHm8CJfp4t',
+    STADIA_API_KEY: '1234567890',
     DB_NAME: 'blackriver-staging',
   },
   production: {
@@ -27,6 +33,9 @@ const envConfigs = {
     SOCKET_URL: 'https://portal.logistiqinnovations.ca',
     NODE_ENV: 'production',
     DB_NAME: 'blackriver-prod',
+    GOOGLE_MAPS_API_KEY: 'AIzaSyCv8vuE1jOgt-F6Szqvfn1DPrQdbPn5aEI',
+    MAPTILER_API_KEY: '8Jkvb8O2usYHm8CJfp4t',
+    STADIA_API_KEY: 'YOUR_STADIA_API_KEY',
   },
 };
 

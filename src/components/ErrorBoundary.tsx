@@ -1,6 +1,7 @@
 import React, { Component, ErrorInfo, ReactNode } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity } from 'react-native';
 import Logger from '../utils/Logger';
+import { crashReporter } from '../utils/crashReporter';
 
 interface Props {
   children: ReactNode;
@@ -32,7 +33,20 @@ class ErrorBoundary extends Component<Props, State> {
   }
 
   componentDidCatch(error: Error, errorInfo: ErrorInfo) {
-    // Log error details
+    // CRITICAL: Log synchronously first (survives app termination)
+    console.error('💥💥💥 ERROR BOUNDARY CAUGHT ERROR 💥💥💥');
+    console.error('Error:', error.name, '-', error.message);
+    console.error('Stack:', error.stack);
+    console.error('Component Stack:', errorInfo.componentStack);
+    console.error('💥💥💥 ERROR BOUNDARY END 💥💥💥');
+
+    // Log to crash reporter (synchronous first, then async)
+    crashReporter.logCrashSync(error, 'ErrorBoundary', {
+      componentStack: errorInfo.componentStack,
+      errorInfo: errorInfo.toString()
+    });
+
+    // Also log via Logger
     Logger.error('React Error Boundary caught an error', {
       error: {
         name: error.name,

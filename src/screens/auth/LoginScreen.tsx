@@ -153,10 +153,33 @@ export default function LoginScreen({ navigation, onAuthSuccess }: Props) {
 
       } else {
         // Handle API error
-        let errorMessage = response.error || "Login failed. Please try again.";
+        let errorMessage = "Login failed. Please try again.";
+        let alertTitle = "Login Failed";
+        
+        // Check if backend returned a specific error message
+        const backendResponse = response.data as any;
+        if (backendResponse && typeof backendResponse === 'object') {
+          // Backend returns: { success: false, message: "..." }
+          if (backendResponse.message) {
+            errorMessage = backendResponse.message;
+          } else if (backendResponse.error) {
+            errorMessage = backendResponse.error;
+          }
+        } else if (response.error) {
+          errorMessage = response.error;
+        }
 
-        // If it's a network/connection error, format it better
-        if (response.statusCode === 0 && errorMessage.includes('Unable to connect')) {
+        // Check status code to determine error type
+        const statusCode = response.statusCode || 0;
+
+        // Network/Connection errors (statusCode 0 or network-related errors)
+        if (statusCode === 0 || 
+            errorMessage.includes('Unable to connect') || 
+            errorMessage.includes('Network request failed') ||
+            errorMessage.includes('ECONNREFUSED') ||
+            errorMessage.includes('timeout')) {
+          alertTitle = "Connection Error";
+          
           // Format the detailed error message for better readability
           const lines = errorMessage.split('\n');
           const title = lines[0] || 'Connection Error';
@@ -165,7 +188,7 @@ export default function LoginScreen({ navigation, onAuthSuccess }: Props) {
           logger.userAction('Login Failed - Network Error', {
             email,
             error: errorMessage,
-            statusCode: response.statusCode
+            statusCode: statusCode
           }, 'LoginScreen');
 
           Alert.alert(
@@ -173,14 +196,50 @@ export default function LoginScreen({ navigation, onAuthSuccess }: Props) {
             details || "Unable to connect to server. Please check:\n• Backend server is running\n• Device and server on same Wi-Fi\n• Firewall allows port 3000",
             [{ text: "OK" }]
           );
-        } else {
+        } 
+        // Invalid credentials (401, 404, 400 from backend)
+        else if (statusCode === 401 || statusCode === 404 || statusCode === 400) {
+          // Backend returns specific messages:
+          // 404: "Driver not found"
+          // 401: "Invalid credentials"
+          // 400: "Invalid email or password"
+          
+          // Use the backend message if available, otherwise show generic invalid credentials
+          if (!errorMessage || errorMessage.includes('Login failed') || errorMessage.includes('Request failed')) {
+            errorMessage = "Invalid email or password. Please check your credentials and try again.";
+          }
+          
+          alertTitle = "Invalid Credentials";
+          
+          logger.userAction('Login Failed - Invalid Credentials', {
+            email,
+            error: errorMessage,
+            statusCode: statusCode
+          }, 'LoginScreen');
+
+          Alert.alert(alertTitle, errorMessage, [{ text: "OK" }]);
+        }
+        // Account inactive or access denied (403)
+        else if (statusCode === 403) {
+          alertTitle = "Access Denied";
+          
+          logger.userAction('Login Failed - Access Denied', {
+            email,
+            error: errorMessage,
+            statusCode: statusCode
+          }, 'LoginScreen');
+
+          Alert.alert(alertTitle, errorMessage, [{ text: "OK" }]);
+        }
+        // Other errors
+        else {
           logger.userAction('Login Failed', {
             email,
             error: errorMessage,
-            statusCode: response.statusCode
+            statusCode: statusCode
           }, 'LoginScreen');
 
-          Alert.alert("Login Failed", errorMessage, [{ text: "OK" }]);
+          Alert.alert(alertTitle, errorMessage, [{ text: "OK" }]);
         }
       }
 

@@ -15,6 +15,9 @@ let ENV_API_BASE_URL: string | undefined;
 let ENV_SOCKET_URL: string | undefined;
 let ENV_NODE_ENV: string | undefined;
 let ENV_DB_NAME: string | undefined;
+let ENV_GOOGLE_MAPS_API_KEY: string | undefined;
+let ENV_MAPTILER_API_KEY: string | undefined;
+let ENV_STADIA_API_KEY: string | undefined;
 
 try {
   const envModule = require('@env');
@@ -22,6 +25,9 @@ try {
   ENV_SOCKET_URL = envModule.SOCKET_URL;
   ENV_NODE_ENV = envModule.NODE_ENV;
   ENV_DB_NAME = envModule.DB_NAME;
+  ENV_GOOGLE_MAPS_API_KEY = envModule.GOOGLE_MAPS_API_KEY;
+  ENV_MAPTILER_API_KEY = envModule.MAPTILER_API_KEY;
+  ENV_STADIA_API_KEY = envModule.STADIA_API_KEY;
 } catch (e) {
   // @env not available, use process.env (from EAS build env vars)
   console.log('⚠️ @env module not available, using process.env');
@@ -29,6 +35,9 @@ try {
   ENV_SOCKET_URL = process.env.SOCKET_URL;
   ENV_NODE_ENV = process.env.NODE_ENV;
   ENV_DB_NAME = process.env.DB_NAME;
+  ENV_GOOGLE_MAPS_API_KEY = process.env.GOOGLE_MAPS_API_KEY;
+  ENV_MAPTILER_API_KEY = process.env.MAPTILER_API_KEY;
+  ENV_STADIA_API_KEY = process.env.STADIA_API_KEY;
 }
 
 // Debug: Log imported .env values
@@ -49,6 +58,9 @@ interface Config {
     SOCKET_URL: string;
     NODE_ENV: string;
     DB_NAME: string;
+    GOOGLE_MAPS_API_KEY?: string;
+    MAPTILER_API_KEY?: string;
+    STADIA_API_KEY?: string;
 }
 
 
@@ -257,6 +269,9 @@ let API_BASE_URL: string = getDefaultBaseURL();
 let SOCKET_URL: string = getDefaultSocketURL();
 let NODE_ENV: string = (ENV_NODE_ENV && ENV_NODE_ENV !== 'undefined') ? ENV_NODE_ENV : 'development';
 let DB_NAME: string = (ENV_DB_NAME && ENV_DB_NAME !== 'undefined') ? ENV_DB_NAME : 'blackriver';
+let GOOGLE_MAPS_API_KEY: string | undefined = ENV_GOOGLE_MAPS_API_KEY || Constants.expoConfig?.extra?.googleMapsApiKey;
+let MAPTILER_API_KEY: string | undefined = ENV_MAPTILER_API_KEY;
+let STADIA_API_KEY: string | undefined = ENV_STADIA_API_KEY;
 let IS_DEV: boolean = NODE_ENV === 'development';
 let IS_PROD: boolean = NODE_ENV === 'production';
 let API_ENDPOINTS: string[] = [API_BASE_URL];
@@ -474,6 +489,9 @@ export const getConfig = async (): Promise<Config> => {
         SOCKET_URL: SOCKET_URL,      // Use global variable (respects .env)
         NODE_ENV: NODE_ENV,
         DB_NAME: DB_NAME,
+        GOOGLE_MAPS_API_KEY: GOOGLE_MAPS_API_KEY,
+        MAPTILER_API_KEY: MAPTILER_API_KEY,
+        STADIA_API_KEY: STADIA_API_KEY,
     };
 };
 
@@ -491,6 +509,9 @@ export {
     SOCKET_URL,
     NODE_ENV,
     DB_NAME,
+    GOOGLE_MAPS_API_KEY,
+    MAPTILER_API_KEY,
+    STADIA_API_KEY,
     IS_DEV,
     IS_PROD,
     API_ENDPOINTS,
@@ -504,6 +525,9 @@ export const useConfig = () => {
         SOCKET_URL,
         NODE_ENV,
         DB_NAME,
+        GOOGLE_MAPS_API_KEY,
+        MAPTILER_API_KEY,
+        STADIA_API_KEY,
         IS_DEV,
         IS_PROD,
         API_ENDPOINTS,

@@ -14,7 +14,7 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { socketService, VehicleLocation } from '../services/socket/socketService';
 import { logger } from '../utils/loggerHelper';
-import { API_BASE_URL } from '../config/env';
+import { API_BASE_URL, GOOGLE_MAPS_API_KEY } from '../config/env';
 import { apiService } from '../services/api/apiService';
 
 // Conditionally import react-native-maps only on native platforms
@@ -203,6 +203,8 @@ const MapViewWithLiveTracking: React.FC<MapViewWithLiveTrackingProps> = ({
   const [vehicleLocation, setVehicleLocation] = useState<VehicleLocation | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [mapLoading, setMapLoading] = useState(true);
+  const [mapError, setMapError] = useState<string | null>(null);
   const [showDistanceInfo, setShowDistanceInfo] = useState(true);
   const [forceWarningDemo, setForceWarningDemo] = useState(false);
   const mapRef = useRef<any>(null);
@@ -211,9 +213,9 @@ const MapViewWithLiveTracking: React.FC<MapViewWithLiveTrackingProps> = ({
 
   // Validate load data early
   if (!load) {
-    return (
+  return (
       <Modal visible={visible} animationType="slide" onRequestClose={onClose}>
-        <View style={styles.container}>
+    <View style={styles.container}>
           <View style={styles.header}>
             <TouchableOpacity onPress={onClose} style={styles.closeButton}>
               <Ionicons name="close" size={24} color="#fff" />
@@ -482,6 +484,40 @@ const MapViewWithLiveTracking: React.FC<MapViewWithLiveTrackingProps> = ({
       socketService.offVehicleLocation();
     };
   }, [visible, vehicleId]);
+
+  // Ensure map region is set when modal becomes visible
+  useEffect(() => {
+    if (visible && mapRef.current) {
+      const region = calculateRegion();
+      console.log('🔄 Modal visible, setting map region:', region);
+      if (region && !isNaN(region.latitude) && !isNaN(region.longitude)) {
+        // Small delay to ensure MapView is fully mounted
+        setTimeout(() => {
+          if (mapRef.current) {
+            console.log('📍 Animating map to region:', region);
+            mapRef.current.animateToRegion(region, 500);
+          }
+        }, 100);
+      } else {
+        console.error('❌ Cannot set map region - invalid coordinates:', region);
+      }
+    }
+  }, [visible, load?._id]);
+
+  // Add timeout for map loading
+  useEffect(() => {
+    if (visible && mapLoading) {
+      const timeout = setTimeout(() => {
+        if (mapLoading) {
+          console.warn('⚠️ Map loading timeout - map may not be initializing');
+          setMapError('Map is taking too long to load. Please check your internet connection and API key.');
+          setMapLoading(false);
+        }
+      }, 10000); // 10 second timeout
+
+      return () => clearTimeout(timeout);
+    }
+  }, [visible, mapLoading]);
 
   // Calculate map region to fit all markers
   const calculateRegion = () => {
@@ -952,20 +988,18 @@ const MapViewWithLiveTracking: React.FC<MapViewWithLiveTrackingProps> = ({
       return googleMapsApiKeyRef.current ?? null;
     }
 
-    googleMapsApiKeyRef.current = null;
-
-    try {
-      const response = await apiService.get<{ data?: { googleMapsApiKey?: string } }>('/config', false);
-      const apiKey = response?.data?.data?.googleMapsApiKey;
-      if (apiKey && typeof apiKey === 'string' && apiKey.length > 0) {
-        googleMapsApiKeyRef.current = apiKey;
-        return apiKey;
-      }
-    } catch (apiError) {
-      logger.warn('Failed to fetch Google Maps API key', apiError);
+    // Use frontend Google Maps API key from config/env.ts
+    const frontendApiKey = GOOGLE_MAPS_API_KEY;
+    
+    if (frontendApiKey && typeof frontendApiKey === 'string' && frontendApiKey.length > 0) {
+      console.log('✅ Using frontend Google Maps API key');
+      googleMapsApiKeyRef.current = frontendApiKey;
+      return frontendApiKey;
     }
 
-    return googleMapsApiKeyRef.current;
+    console.warn('⚠️ Frontend Google Maps API key not found in config');
+    googleMapsApiKeyRef.current = null;
+    return null;
   }, []);
 
   const fetchRoutePolyline = useCallback(async () => {
@@ -1057,27 +1091,103 @@ const MapViewWithLiveTracking: React.FC<MapViewWithLiveTrackingProps> = ({
         destinationLng = dropoffLng!;
       }
       
-      const directionsUrl = `https://maps.googleapis.com/maps/api/directions/json?origin=${pickupLat},${pickupLng}&destination=${destinationLat},${destinationLng}&mode=driving${waypointParams.length > 0 ? `&${waypointParams.join('&')}` : ''}&key=${apiKey}`;
+      // Call Directions API through backend to avoid API key restriction issues
+      const origin = `${pickupLat},${pickupLng}`;
+      const destination = `${destinationLat},${destinationLng}`;
+      const waypointsParam = waypointParams.length > 0 
+        ? waypointParams.map(p => p.replace('waypoints=', '')).join('|')
+        : undefined;
 
-      const response = await fetch(directionsUrl);
-      if (!response.ok) {
-        throw new Error(`Directions request failed with status ${response.status}`);
+      console.log('🛣️ Fetching route from Directions API via backend...');
+      console.log('📍 Origin:', origin);
+      console.log('📍 Destination:', destination);
+      
+      // Build query parameters - include frontend API key
+      const queryParams = new URLSearchParams({
+        origin: origin,
+        destination: destination,
+        mode: 'driving',
+        apiKey: GOOGLE_MAPS_API_KEY || '' // Pass frontend API key to backend
+      });
+      
+      if (waypointsParam) {
+        queryParams.append('waypoints', waypointsParam);
+      }
+      
+      // Call backend endpoint
+      const endpoint = `/driver/directions?${queryParams.toString()}`;
+      console.log('🛣️ Calling backend directions endpoint:', endpoint);
+      
+      const response = await apiService.get<any>(endpoint, true);
+      
+      console.log('📦 Backend response structure:', {
+        success: response?.success,
+        hasData: !!response?.data,
+        responseKeys: response ? Object.keys(response) : [],
+        dataKeys: response?.data ? Object.keys(response.data) : [],
+        nestedDataKeys: response?.data?.data ? Object.keys(response.data.data) : []
+      });
+      
+      if (!response || !response.success) {
+        const errorMsg = response?.error_message || response?.message || response?.error || 'Directions request failed';
+        console.error('❌ Directions API error:', errorMsg);
+        throw new Error(`Directions request failed: ${errorMsg}`);
       }
 
-      const data = await response.json();
-      const polyline = data?.routes?.[0]?.overview_polyline?.points;
+      if (!response.data) {
+        console.error('❌ No data in response:', response);
+        throw new Error('Directions API returned no data');
+      }
+
+      // Backend returns: { success: true, data: { status: 'OK', routes: [...] } }
+      // apiService wraps it: { success: true, data: { success: true, data: { status: 'OK', routes: [...] } } }
+      // So we need to check if there's nested data
+      const googleResponse = response.data.data || response.data;
+      
+      console.log('📦 Google Directions response:', {
+        hasStatus: 'status' in googleResponse,
+        status: googleResponse.status,
+        hasRoutes: 'routes' in googleResponse,
+        routesLength: googleResponse.routes?.length
+      });
+      
+      // Check for API errors in the Google response
+      if (googleResponse.status && googleResponse.status !== 'OK') {
+        console.error('❌ Directions API returned error:', googleResponse.status, googleResponse.error_message);
+        throw new Error(`Directions API error: ${googleResponse.status} - ${googleResponse.error_message || 'Unknown error'}`);
+      }
+
+      // Extract polyline from Google Directions API response
+      const polyline = googleResponse?.routes?.[0]?.overview_polyline?.points;
+      
+      console.log('📍 Polyline extracted:', {
+        hasPolyline: !!polyline,
+        polylineLength: polyline?.length,
+        routesCount: googleResponse?.routes?.length,
+        firstRoute: googleResponse?.routes?.[0] ? Object.keys(googleResponse.routes[0]) : []
+      });
 
       if (polyline) {
+        console.log('✅ Route polyline received, decoding...');
         const decoded = decodePolyline(polyline);
         if (decoded.length > 1) {
+          console.log(`✅ Route decoded successfully: ${decoded.length} points`);
           setRoutePath(decoded);
           return;
+        } else {
+          console.warn('⚠️ Decoded polyline has less than 2 points');
         }
+      } else {
+        console.warn('⚠️ No polyline found in Directions API response');
       }
 
+      // Fallback to straight line if Directions API fails
+      console.warn('⚠️ Falling back to straight line route');
       setRoutePath(routeCoordinates.slice());
-    } catch (directionsError) {
+    } catch (directionsError: any) {
+      console.error('❌ Failed to load driving route:', directionsError);
       logger.warn('Failed to load driving route', directionsError);
+      // Fallback to straight line
       setRoutePath(routeCoordinates.slice());
     }
   }, [
@@ -1100,15 +1210,19 @@ const MapViewWithLiveTracking: React.FC<MapViewWithLiveTrackingProps> = ({
     // For multiple dropoffs, we only need pickup and waypoints
     // For single dropoff, we need both pickup and dropoff
     if (pickupLat === null || pickupLng === null) {
+      console.warn('⚠️ No pickup coordinates, using straight line');
       setRoutePath(routeCoordinates.slice());
       return;
     }
 
     if (!multipleDropOffs && (dropoffLat === null || dropoffLng === null)) {
+      console.warn('⚠️ No dropoff coordinates, using straight line');
       setRoutePath(routeCoordinates.slice());
       return;
     }
 
+    // Fetch actual route from Directions API
+    console.log('🛣️ Fetching route with Directions API...');
     fetchRoutePolyline();
   }, [
     visible,
@@ -1465,7 +1579,37 @@ const MapViewWithLiveTracking: React.FC<MapViewWithLiveTrackingProps> = ({
             </View>
           )}
 
-          {loading && (
+          {mapLoading && (
+            <View style={styles.loadingOverlay}>
+              <ActivityIndicator size="large" color="#8B5CF6" />
+              <Text style={styles.loadingText}>Loading map...</Text>
+            </View>
+          )}
+          
+          {mapError && (
+            <View style={styles.errorBanner}>
+              <Ionicons name="alert-circle" size={20} color="#FF6B6B" />
+              <Text style={styles.errorBannerText}>
+                Map Error: {mapError}
+              </Text>
+              <TouchableOpacity 
+                style={styles.errorButton} 
+                onPress={() => {
+                  console.log('🔄 Retrying map load...');
+                  setMapError(null);
+                  setMapLoading(true);
+                  if (mapRef.current) {
+                    const region = calculateRegion();
+                    mapRef.current.animateToRegion(region, 500);
+                  }
+                }}
+              >
+                <Text style={styles.errorButtonText}>Retry</Text>
+              </TouchableOpacity>
+            </View>
+          )}
+
+          {loading && !mapLoading && (
             <View style={styles.loadingOverlay}>
               <ActivityIndicator size="large" color="#8B5CF6" />
               <Text style={styles.loadingText}>Connecting to live tracking...</Text>
@@ -1512,30 +1656,70 @@ const MapViewWithLiveTracking: React.FC<MapViewWithLiveTrackingProps> = ({
           ) : MapView && PROVIDER_GOOGLE ? (() => {
             try {
               const region = calculateRegion();
+              console.log('🗺️ Calculated region:', region);
+              
               // Validate region coordinates
               if (!region || isNaN(region.latitude) || isNaN(region.longitude) || 
                   !isFinite(region.latitude) || !isFinite(region.longitude)) {
-                throw new Error('Invalid map region coordinates');
+                console.error('❌ Invalid region:', region);
+                throw new Error(`Invalid map region coordinates: ${JSON.stringify(region)}`);
               }
+              
+              // Validate delta values
+              if (!region.latitudeDelta || !region.longitudeDelta || 
+                  region.latitudeDelta <= 0 || region.longitudeDelta <= 0) {
+                console.warn('⚠️ Invalid delta values, using defaults');
+                region.latitudeDelta = region.latitudeDelta || 0.05;
+                region.longitudeDelta = region.longitudeDelta || 0.05;
+              }
+              
+              console.log('✅ Valid region, rendering map:', {
+                lat: region.latitude,
+                lng: region.longitude,
+                latDelta: region.latitudeDelta,
+                lngDelta: region.longitudeDelta
+              });
               
               return (
                 <MapView
                   ref={mapRef}
-                  style={styles.map}
+        style={styles.map}
                   provider={PROVIDER_GOOGLE}
+                  region={region}
                   initialRegion={region}
+                  mapType="standard"
                   showsUserLocation={false}
                   showsMyLocationButton={false}
                   showsCompass={true}
+                  showsScale={true}
                   toolbarEnabled={false}
+                  loadingEnabled={true}
+                  loadingIndicatorColor="#666666"
+                  loadingBackgroundColor="#ffffff"
                   onMapReady={() => {
-                    logger.info('Map ready');
-                    setLoading(false);
+                    console.log('✅ Map is ready and loaded');
+                    console.log('📍 Map region:', region);
+                    logger.info('Map ready', { region });
+                    setMapLoading(false);
+                    setMapError(null);
+                    // Don't set loading=false here, let socket connection handle that
                   }}
                   onError={(error: any) => {
+                    console.error('❌ Map error:', error);
+                    console.error('❌ Error details:', JSON.stringify(error, null, 2));
                     logger.error('Map error', error);
-                    setError('Map failed to load. Please try again.');
-                    setLoading(false);
+                    const errorMessage = error?.message || error?.nativeEvent?.message || 'Map failed to load. Please check your Google Maps API key configuration.';
+                    setMapError(errorMessage);
+                    setMapLoading(false);
+                    // Show error but don't block the UI
+                  }}
+                  onLoadStart={() => {
+                    console.log('🔄 Map loading started...');
+                    console.log('📍 Initial region:', region);
+                    setMapLoading(true);
+                  }}
+                  onLoadEnd={() => {
+                    console.log('✅ Map load ended');
                   }}
                 >
             {/* Pickup Marker with Label */}
@@ -1652,7 +1836,7 @@ const MapViewWithLiveTracking: React.FC<MapViewWithLiveTrackingProps> = ({
                           : styles.waypointPointerShadow,
                       ]}
                     />
-                  </View>
+    </View>
                 </Marker>
               );
             })}
@@ -1672,8 +1856,21 @@ const MapViewWithLiveTracking: React.FC<MapViewWithLiveTrackingProps> = ({
             {Polyline && routePath.length >= 2 && (
               <Polyline
                 coordinates={routePath}
-                strokeColor="#8B5CF6"
-                strokeWidth={4}
+                strokeColor="#3b82f6"
+                strokeWidth={5}
+                lineCap="round"
+                lineJoin="round"
+                miterLimit={1}
+              />
+            )}
+            
+            {/* Fallback: Show straight line if route path is not available */}
+            {Polyline && routePath.length < 2 && routeCoordinates.length >= 2 && (
+              <Polyline
+                coordinates={routeCoordinates}
+                strokeColor="#9ca3af"
+                strokeWidth={3}
+                lineDashPattern={[5, 5]}
               />
             )}
 
@@ -2552,100 +2749,16 @@ const WebMapView: React.FC<WebMapViewProps> = ({
 
   // Helper function to get config using apiService to ensure correct base URL
   const getConfig = React.useCallback(async () => {
-    try {
-      // Use apiService to get the config - it handles the base URL correctly
-      console.log('🔍 Fetching Google Maps API key from config endpoint...');
-      
-      // Get base URL - try multiple sources
-      let baseURL = typeof API_BASE_URL !== 'undefined' ? API_BASE_URL : 'http://localhost:3000/api/v1';
-      
-      // On web, try to use window location origin first
-      if (typeof window !== 'undefined') {
-        const origin = window.location.origin;
-        // If we're not on expo.dev, use the origin
-        if (origin && !origin.includes('expo.dev')) {
-          baseURL = `${origin}/api/v1`;
-        }
-      }
-      
-      // Ensure baseURL ends with /api/v1
-      if (!baseURL.endsWith('/api/v1')) {
-        baseURL = baseURL.replace(/\/$/, '') + '/api/v1';
-      }
-      
-      const configUrl = `${baseURL}/config`;
-      
-      console.log('   Using API base URL:', baseURL);
-      console.log('   Config endpoint:', configUrl);
-      
-      // Use apiService's request method which handles auth and errors properly
-      // But for public endpoint, we can use fetch directly with proper CORS headers
-      const response = await fetch(configUrl, {
-        method: 'GET',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        // Add timeout
-        signal: AbortSignal.timeout(10000), // 10 seconds
-      });
-      
-      if (!response.ok) {
-        const errorText = await response.text();
-        console.error(`❌ HTTP error ${response.status}:`, errorText);
-        throw new Error(`HTTP error! status: ${response.status}, statusText: ${response.statusText}`);
-      }
-      
-      const data = await response.json();
-      console.log('✅ Config fetched successfully:', { 
-        hasKey: !!data.data?.googleMapsApiKey,
-        success: data.success 
-      });
-      
-      if (!data.success || !data.data) {
-        throw new Error('Invalid response format from config endpoint');
-      }
-      
-      return data.data || { googleMapsApiKey: '' };
-    } catch (error: any) {
-      console.error('❌ Error fetching config:', error);
-      console.error('   Error type:', error.name);
-      console.error('   Error message:', error.message);
-      
-      // Try fallback: direct fetch with known URL patterns
-      if (typeof window !== 'undefined') {
-        const origin = window.location.origin;
-        const fallbackUrls = [
-          `${origin}/api/v1/config`,
-          'http://localhost:3000/api/v1/config',
-          'http://127.0.0.1:3000/api/v1/config',
-        ];
-        
-        for (const url of fallbackUrls) {
-          try {
-            console.log(`🔄 Trying fallback URL: ${url}`);
-            const response = await fetch(url, { 
-              method: 'GET',
-              headers: { 'Content-Type': 'application/json' },
-              signal: AbortSignal.timeout(3000),
-            });
-            
-            if (response.ok) {
-              const data = await response.json();
-              if (data.success && data.data?.googleMapsApiKey) {
-                console.log('✅ Got API key from fallback URL:', url);
-                return data.data;
-              }
-            }
-          } catch (fallbackError) {
-            // Continue to next fallback
-            continue;
-          }
-        }
-      }
-      
-      // Return empty object to trigger fallback message
-      return { googleMapsApiKey: '' };
+    // Use frontend Google Maps API key from config/env.ts
+    const frontendApiKey = GOOGLE_MAPS_API_KEY;
+    
+    if (frontendApiKey && typeof frontendApiKey === 'string' && frontendApiKey.length > 0) {
+      console.log('✅ Using frontend Google Maps API key');
+      return { googleMapsApiKey: frontendApiKey };
     }
+    
+    console.warn('⚠️ Frontend Google Maps API key not found in config');
+    return { googleMapsApiKey: '' };
   }, []);
 
   // Fetch Google Maps API key and load script
@@ -2658,51 +2771,24 @@ const WebMapView: React.FC<WebMapViewProps> = ({
           return;
         }
 
-        // Fetch API key from backend
-        let apiKey: string | null = null;
-        try {
-          const config = await getConfig();
-          apiKey = config.googleMapsApiKey || null;
-        } catch (configError: any) {
-          console.warn('⚠️ Could not fetch config, trying alternative methods...', configError);
-          
-          // Try to get API key from window location if we're on same origin
-          if (typeof window !== 'undefined') {
-            try {
-              // Try fetching from the same origin
-              const origin = window.location.origin;
-              const altConfigUrl = `${origin}/api/v1/config`;
-              console.log('🔄 Trying alternative config URL:', altConfigUrl);
-              
-              const response = await fetch(altConfigUrl);
-              if (response.ok) {
-                const data = await response.json();
-                apiKey = data.data?.googleMapsApiKey || null;
-                if (apiKey) {
-                  console.log('✅ Got API key from alternative URL');
-                }
-              }
-            } catch (altError) {
-              console.warn('Alternative config fetch also failed:', altError);
-            }
-          }
-        }
+        // Use frontend Google Maps API key from config/env.ts
+        const apiKey = GOOGLE_MAPS_API_KEY;
 
-        if (!apiKey) {
-          console.error('❌ Google Maps API key not found.');
+        if (!apiKey || typeof apiKey !== 'string' || apiKey.length === 0) {
+          console.error('❌ Frontend Google Maps API key not found.');
           console.error('   Please ensure:');
-          console.error('   1. Backend server is running');
-          console.error('   2. Backend .env file has GOOGLE_MAPS_API_KEY set');
-          console.error('   3. /api/v1/config endpoint is accessible');
-          console.error('   4. CORS is properly configured on backend');
+          console.error('   1. GOOGLE_MAPS_API_KEY is set in .env file');
+          console.error('   2. Or googleMapsApiKey is set in app.json extra config');
           console.error('   The map will still display route information without Google Maps.');
           
           // If no API key, set map as "loaded" but it will show a fallback message
           setMapLoaded(true);
           return;
         }
+        
+        console.log('✅ Using frontend Google Maps API key');
 
-        console.log('✅ Google Maps API key retrieved successfully, loading map script...');
+        console.log('✅ Google Maps API key ready, loading map script...');
 
         // Load Google Maps script
         const script = document.createElement('script');
@@ -2733,7 +2819,7 @@ const WebMapView: React.FC<WebMapViewProps> = ({
     if (typeof window !== 'undefined') {
       loadGoogleMaps();
     }
-  }, [getConfig]);
+  }, []); // Removed getConfig dependency since we're using frontend key
 
   // Initialize map when loaded
   React.useEffect(() => {
@@ -3166,4 +3252,3 @@ const WebMapView: React.FC<WebMapViewProps> = ({
 };
 
 export default MapViewWithLiveTracking;
-

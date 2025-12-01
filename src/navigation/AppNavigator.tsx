@@ -34,6 +34,7 @@ import NotificationsScreen from "../screens/notifications/index";
 import HelpScreen from "../screens/help/index";
 import SearchScreen from "../screens/search/index";
 import TripInfoScreen from "../screens/tripInfo/index";
+import CrashLogsScreen from "../screens/settings/CrashLogsScreen";
 
 // Constants for storage keys
 const STORAGE_KEYS = {
@@ -108,6 +109,7 @@ export type RootStackParamList = {
     TripInfo: undefined;
     Search: undefined;
     Trips: undefined;
+    CrashLogs: undefined;
 };
 
 const MainTab = createBottomTabNavigator<MainTabParamList>();
@@ -536,6 +538,16 @@ export default function AppNavigator() {
                 {(props) => (
                     <ScreenWithHeaderFooter
                         component={TripInfoScreen}
+                        navigation={props.navigation}
+                        route={props.route}
+                        onLogout={handleLogout}
+                    />
+                )}
+            </RootStack.Screen>
+            <RootStack.Screen name="CrashLogs">
+                {(props) => (
+                    <ScreenWithHeaderFooter
+                        component={CrashLogsScreen}
                         navigation={props.navigation}
                         route={props.route}
                         onLogout={handleLogout}

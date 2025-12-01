@@ -12,15 +12,53 @@ if (originalResolveRequest) {
   config.resolver = {
     ...config.resolver,
     resolveRequest: (context, moduleName, platform) => {
-      // On web, redirect react-native-maps to a web-compatible stub
+      // On web, redirect react-native-maps and ALL its sub-modules to web stub
+      if (platform === 'web') {
+        // Check if it's react-native-maps or any sub-path
+        if (moduleName === 'react-native-maps' || 
+            moduleName.startsWith('react-native-maps/') ||
+            moduleName.includes('react-native-maps')) {
+          return {
+            filePath: require.resolve('./src/utils/webMapsStub.js'),
+            type: 'sourceFile',
+          };
+        }
+        // Check if the import originated from react-native-maps package
+        const originPath = context.originModulePath || '';
+        if (originPath && (
+          originPath.includes('node_modules/react-native-maps') ||
+          originPath.includes('react-native-maps')
+        )) {
+          return {
+            filePath: require.resolve('./src/utils/webMapsStub.js'),
+            type: 'sourceFile',
+          };
+        }
+        // Handle nested imports from react-native-maps (like MapMarkerNativeComponent)
+        if (moduleName.includes('codegenNativeCommands') && originPath && originPath.includes('react-native-maps')) {
+          return {
+            filePath: require.resolve('./src/utils/webMapsStub.js'),
+            type: 'sourceFile',
+          };
+        }
+      }
+      // For all other cases, use default resolution
+      return originalResolveRequest(context, moduleName, platform);
+    },
+  };
+} else {
+  // Fallback if originalResolveRequest doesn't exist
+  config.resolver = {
+    ...config.resolver,
+    resolveRequest: (context, moduleName, platform) => {
       if (platform === 'web' && moduleName === 'react-native-maps') {
         return {
           filePath: require.resolve('./src/utils/webMapsStub.js'),
           type: 'sourceFile',
         };
       }
-      // For all other cases, use default resolution
-      return originalResolveRequest(context, moduleName, platform);
+      // Use default Metro resolver
+      return context.resolveRequest(context, moduleName, platform);
     },
   };
 }
