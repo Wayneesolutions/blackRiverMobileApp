@@ -22,7 +22,8 @@
         "NSLocationWhenInUseUsageDescription": "This app needs access to your location to show your current position on the map.",
         "NSLocationAlwaysUsageDescription": "This app needs access to your location for live tracking of your trips.",
         "NSPhotoLibraryUsageDescription": "This app needs access to your photos to upload document images.",
-        "NSCameraUsageDescription": "This app needs access to your camera to take photos of documents."
+        "NSCameraUsageDescription": "This app needs access to your camera to take photos of documents.",
+        "ITSAppUsesNonExemptEncryption": false
       },
       "splash": {
         "image": "./assets/splash-icon.png",

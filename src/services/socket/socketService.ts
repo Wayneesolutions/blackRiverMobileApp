@@ -336,6 +336,205 @@ class SocketService {
   getSocket(): Socket | null {
     return this.socket;
   }
+
+  // ==================== CHAT METHODS ====================
+  
+  // Authenticate socket for chat
+  authenticateChat(token: string): Promise<void> {
+    return new Promise((resolve, reject) => {
+      if (!this.socket || !this.isConnected) {
+        reject(new Error('Socket not connected'));
+        return;
+      }
+
+      // Clean token - remove "Bearer " prefix if present
+      let cleanToken = token?.trim();
+      if (cleanToken?.startsWith('Bearer ')) {
+        cleanToken = cleanToken.substring(7).trim();
+      }
+
+      if (!cleanToken) {
+        reject(new Error('No token provided'));
+        return;
+      }
+
+      logger.info('Authenticating socket with token', { 
+        tokenLength: cleanToken.length,
+        tokenPrefix: cleanToken.substring(0, 10) + '...'
+      });
+
+      const timeout = setTimeout(() => {
+        reject(new Error('Authentication timeout'));
+      }, 5000);
+
+      this.socket.emit('authenticate', cleanToken);
+
+      this.socket.once('authenticated', (data) => {
+        clearTimeout(timeout);
+        logger.info('Socket authenticated for chat', data);
+        // Store user ID globally if available
+        if (data?.userId) {
+          // You can store this in a class property if needed
+          logger.info('Authenticated user ID', { userId: data.userId });
+        }
+        resolve();
+      });
+
+      this.socket.once('auth_error', (error) => {
+        clearTimeout(timeout);
+        logger.error('Socket authentication error', { 
+          error,
+          message: error?.message || 'Unknown error'
+        });
+        reject(new Error(error?.message || 'Authentication failed'));
+      });
+    });
+  }
+
+  // Join trip chat room
+  joinTripChat(tripId: string): Promise<void> {
+    return new Promise((resolve, reject) => {
+      if (!this.socket || !this.isConnected) {
+        reject(new Error('Socket not connected'));
+        return;
+      }
+
+      const timeout = setTimeout(() => {
+        reject(new Error('Join trip chat timeout'));
+      }, 5000);
+
+      this.socket.emit('joinTripChat', tripId);
+
+      this.socket.once('joinedTripChat', (data) => {
+        clearTimeout(timeout);
+        logger.info('Joined trip chat', data);
+        resolve();
+      });
+
+      this.socket.once('error', (error) => {
+        clearTimeout(timeout);
+        logger.error('Error joining trip chat', error);
+        reject(new Error(error.message || 'Failed to join trip chat'));
+      });
+    });
+  }
+
+  // Leave trip chat room
+  leaveTripChat(tripId: string): void {
+    if (!this.socket || !this.isConnected) {
+      return;
+    }
+
+    logger.info('Leaving trip chat', { tripId });
+    this.socket.emit('leaveTripChat', tripId);
+  }
+
+  // Send chat message
+  sendChatMessage(data: {
+    tripId: string;
+    message: string;
+    fileUrl?: string;
+    fileName?: string;
+    fileType?: string;
+    fileSize?: number;
+  }): void {
+    if (!this.socket || !this.isConnected) {
+      logger.warn('Cannot send chat message - socket not connected');
+      return;
+    }
+
+    logger.info('Sending chat message', { tripId: data.tripId });
+    this.socket.emit('sendChatMessage', data);
+  }
+
+  // Mark messages as read
+  markMessagesRead(tripId: string): void {
+    if (!this.socket || !this.isConnected) {
+      return;
+    }
+
+    this.socket.emit('markMessagesRead', tripId);
+  }
+
+  // Typing indicator
+  setTyping(tripId: string, isTyping: boolean): void {
+    if (!this.socket || !this.isConnected) {
+      return;
+    }
+
+    this.socket.emit('typing', { tripId, isTyping });
+  }
+
+  // Listen to new messages
+  onNewChatMessage(callback: (message: any) => void): void {
+    if (!this.socket) {
+      return;
+    }
+
+    this.socket.on('newChatMessage', callback);
+  }
+
+  // Remove new message listener
+  offNewChatMessage(callback?: (message: any) => void): void {
+    if (!this.socket) {
+      return;
+    }
+
+    if (callback) {
+      this.socket.off('newChatMessage', callback);
+    } else {
+      this.socket.off('newChatMessage');
+    }
+  }
+
+  // Listen to typing indicator
+  onUserTyping(callback: (data: {
+    userId: string;
+    userName: string;
+    tripId: string;
+    isTyping: boolean;
+  }) => void): void {
+    if (!this.socket) {
+      return;
+    }
+
+    this.socket.on('userTyping', callback);
+  }
+
+  // Remove typing listener
+  offUserTyping(callback?: (data: any) => void): void {
+    if (!this.socket) {
+      return;
+    }
+
+    if (callback) {
+      this.socket.off('userTyping', callback);
+    } else {
+      this.socket.off('userTyping');
+    }
+  }
+
+  // Listen to errors
+  onChatError(callback: (error: { message: string }) => void): void {
+    if (!this.socket) {
+      return;
+    }
+
+    this.socket.on('error', callback);
+  }
+
+  // Remove error listener
+  offChatError(callback?: (error: any) => void): void {
+    if (!this.socket) {
+      return;
+    }
+
+    if (callback) {
+      this.socket.off('error', callback);
+    } else {
+      this.socket.off('error');
+    }
+  }
 }
 
 export const socketService = new SocketService();

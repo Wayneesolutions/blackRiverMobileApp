@@ -685,23 +685,38 @@ const ActiveTrips = () => {
                 )}
 
         <View style={styles.buttonContainer}>
-                  {hasMap && (
+          {/* Chat Button */}
           <TouchableOpacity
-                      style={styles.mapButton}
+            style={styles.chatButton}
             onPress={() => {
-                        setSelectedTripForMap(trip);
-                setMapModalVisible(true);
+              navigation.navigate('TripChat' as never, {
+                tripId: trip._id,
+                tripNumber: trip.tripNumber,
+              } as never);
             }}
+            activeOpacity={0.8}
           >
-                      <Text style={styles.mapButtonText}>View Map</Text>
+            <Ionicons name="chatbubbles" size={16} color="#ffffff" />
+            <Text style={styles.chatButtonText} numberOfLines={1}>Chat</Text>
           </TouchableOpacity>
-                  )}
-              <TouchableOpacity
-                style={styles.completeButton}
-                    onPress={() => handleCompleteTrip(trip._id)}
-              >
-                    <Text style={styles.completeButtonText}>Complete Trip</Text>
-              </TouchableOpacity>
+                  
+          {hasMap && (
+            <TouchableOpacity
+              style={styles.mapButton}
+              onPress={() => {
+                setSelectedTripForMap(trip);
+                setMapModalVisible(true);
+              }}
+            >
+              <Text style={styles.mapButtonText} numberOfLines={1}>View Map</Text>
+            </TouchableOpacity>
+          )}
+          <TouchableOpacity
+            style={styles.completeButton}
+            onPress={() => handleCompleteTrip(trip._id)}
+          >
+            <Text style={styles.completeButtonText} numberOfLines={1}>Complete Trip</Text>
+          </TouchableOpacity>
         </View>
       </View>
     );
@@ -940,29 +955,63 @@ const styles = StyleSheet.create({
     gap: 8,
     marginTop: 12,
   },
+  chatButton: {
+    flex: 1,
+    backgroundColor: '#2563eb',
+    paddingVertical: 12,
+    paddingHorizontal: 6,
+    borderRadius: 8,
+    alignItems: 'center',
+    flexDirection: 'row',
+    justifyContent: 'center',
+    gap: 4,
+    shadowColor: '#2563eb',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.3,
+    shadowRadius: 4,
+    elevation: 3,
+    minHeight: 44,
+  },
+  chatButtonText: {
+    color: '#fff',
+    fontSize: 12,
+    fontWeight: '700',
+    textAlign: 'center',
+    flexShrink: 1,
+  },
   mapButton: {
     flex: 1,
     backgroundColor: '#3498db',
-    padding: 14,
+    paddingVertical: 12,
+    paddingHorizontal: 6,
     borderRadius: 8,
     alignItems: 'center',
+    justifyContent: 'center',
+    minHeight: 44,
   },
   mapButtonText: {
     color: '#fff',
-    fontSize: 16,
+    fontSize: 12,
     fontWeight: '600',
+    textAlign: 'center',
+    flexShrink: 1,
   },
   completeButton: {
     flex: 1,
     backgroundColor: '#2ecc71',
-    padding: 14,
+    paddingVertical: 12,
+    paddingHorizontal: 6,
     borderRadius: 8,
     alignItems: 'center',
+    justifyContent: 'center',
+    minHeight: 44,
   },
   completeButtonText: {
     color: '#fff',
-    fontSize: 16,
+    fontSize: 12,
     fontWeight: '600',
+    textAlign: 'center',
+    flexShrink: 1,
   },
   documentsSection: {
     marginTop: 12,
