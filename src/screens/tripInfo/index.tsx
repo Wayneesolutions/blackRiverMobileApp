@@ -770,7 +770,6 @@ const styles = StyleSheet.create({
     fontSize: 11,
     color: '#999',
   },
-<<<<<<< HEAD
   sectionDivider: {
     marginTop: 12,
     marginBottom: 8,
@@ -796,7 +795,7 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: '#333',
     marginBottom: 6,
-=======
+  },
   chatButtonContainer: {
     marginTop: 16,
     paddingTop: 16,
@@ -825,7 +824,6 @@ const styles = StyleSheet.create({
     fontSize: 17,
     fontWeight: '700',
     letterSpacing: 0.5,
->>>>>>> 33cd248766073f8afa91499461caa17a4d4d632c
   },
 });
 
