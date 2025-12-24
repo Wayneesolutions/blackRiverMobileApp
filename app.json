@@ -59,10 +59,7 @@
         "INTERNET",
         "ACCESS_NETWORK_STATE"
       ],
-      "usesCleartextTraffic": false,
-      "networkSecurityConfig": {
-        "cleartextTrafficPermitted": false
-      },
+      "usesCleartextTraffic": true,
       "intentFilters": [
         {
           "action": "VIEW",

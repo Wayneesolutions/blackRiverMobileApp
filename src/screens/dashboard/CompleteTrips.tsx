@@ -52,6 +52,9 @@ interface Trip {
           address?: string;
         };
       };
+      shipperName?: string;
+      shipperPhone?: string;
+      shipperAddress?: string;
     };
     deliveryLocation?: {
       place?: string;
@@ -61,9 +64,21 @@ interface Trip {
           address?: string;
         };
       };
+      receiverName?: string;
+      receiverPhone?: string;
+      deliveryAddress?: string;
     };
     pickupDate?: string;
     deliveryDate?: string;
+    pickupAppointment?: {
+      type?: string;
+      date?: string;
+      time?: string;
+    };
+    deliveryAppointment?: {
+      date?: string;
+      time?: string;
+    };
   }>;
   plannedStartDate?: string;
   plannedEndDate?: string;
@@ -136,6 +151,33 @@ const CompleteTrips = () => {
         day: 'numeric',
         hour: '2-digit',
         minute: '2-digit',
+      });
+    } catch {
+      return dateString;
+    }
+  };
+
+  const formatTime = (dateString?: string) => {
+    if (!dateString) return 'N/A';
+    try {
+      const date = new Date(dateString);
+      return date.toLocaleTimeString('en-US', {
+        hour: '2-digit',
+        minute: '2-digit',
+      });
+    } catch {
+      return dateString;
+    }
+  };
+
+  const formatDateOnly = (dateString?: string) => {
+    if (!dateString) return 'N/A';
+    try {
+      const date = new Date(dateString);
+      return date.toLocaleDateString('en-US', {
+        year: 'numeric',
+        month: 'short',
+        day: 'numeric',
       });
     } catch {
       return dateString;
@@ -229,19 +271,113 @@ const CompleteTrips = () => {
                       {order.customer?.name && (
                         <Text style={styles.customerName}>Customer: {order.customer.name}</Text>
                       )}
+                      
+                      {/* Shipper Information */}
+                      <View style={styles.sectionDivider}>
+                        <Text style={styles.sectionTitle}>Shipper Information</Text>
+                      </View>
+                      {order.pickupLocation?.shipperName && (
+                        <View style={styles.infoRow}>
+                          <Text style={styles.infoLabel}>Name:</Text>
+                          <Text style={styles.infoValue}>{order.pickupLocation.shipperName}</Text>
+                        </View>
+                      )}
+                      {order.pickupLocation?.shipperPhone && (
+                        <View style={styles.infoRow}>
+                          <Text style={styles.infoLabel}>Phone:</Text>
+                          <Text style={styles.infoValue}>{order.pickupLocation.shipperPhone}</Text>
+                        </View>
+                      )}
                       <View style={styles.locationRow}>
-                        <Text style={styles.locationLabel}>Pickup: </Text>
+                        <Text style={styles.locationLabel}>Address: </Text>
                         <Text style={styles.locationValue}>
-                          {formatAddress(order.pickupLocation)}
+                          {order.pickupLocation?.shipperAddress || formatAddress(order.pickupLocation)}
                         </Text>
                       </View>
+                      
+                      {/* Pickup Appointment Details */}
+                      {(order.pickupAppointment || order.pickupDate) && (
+                        <View style={styles.appointmentSection}>
+                          <Text style={styles.appointmentTitle}>Pickup Appointment Details</Text>
+                          {order.pickupAppointment?.type && (
+                            <View style={styles.infoRow}>
+                              <Text style={styles.infoLabel}>Type:</Text>
+                              <Text style={styles.infoValue}>{order.pickupAppointment.type}</Text>
+                            </View>
+                          )}
+                          <View style={styles.infoRow}>
+                            <Text style={styles.infoLabel}>Date:</Text>
+                            <Text style={styles.infoValue}>
+                              {order.pickupAppointment?.date 
+                                ? formatDateOnly(order.pickupAppointment.date)
+                                : order.pickupDate 
+                                ? formatDateOnly(order.pickupDate)
+                                : 'N/A'}
+                            </Text>
+                          </View>
+                          <View style={styles.infoRow}>
+                            <Text style={styles.infoLabel}>Time:</Text>
+                            <Text style={styles.infoValue}>
+                              {order.pickupAppointment?.time 
+                                ? order.pickupAppointment.time
+                                : order.pickupDate 
+                                ? formatTime(order.pickupDate)
+                                : 'N/A'}
+                            </Text>
+                          </View>
+                        </View>
+                      )}
+
+                      {/* Receiver Information */}
+                      <View style={styles.sectionDivider}>
+                        <Text style={styles.sectionTitle}>Receiver Information</Text>
+                      </View>
+                      {order.deliveryLocation?.receiverName && (
+                        <View style={styles.infoRow}>
+                          <Text style={styles.infoLabel}>Name:</Text>
+                          <Text style={styles.infoValue}>{order.deliveryLocation.receiverName}</Text>
+                        </View>
+                      )}
+                      {order.deliveryLocation?.receiverPhone && (
+                        <View style={styles.infoRow}>
+                          <Text style={styles.infoLabel}>Phone:</Text>
+                          <Text style={styles.infoValue}>{order.deliveryLocation.receiverPhone}</Text>
+                        </View>
+                      )}
                       <View style={styles.locationRow}>
-                        <Text style={styles.locationLabel}>Delivery: </Text>
+                        <Text style={styles.locationLabel}>Address: </Text>
                         <Text style={styles.locationValue}>
-                          {formatAddress(order.deliveryLocation)}
+                          {order.deliveryLocation?.deliveryAddress || formatAddress(order.deliveryLocation)}
                         </Text>
+                      </View>
+                      
+                      {/* Delivery Appointment Details */}
+                      {(order.deliveryAppointment || order.deliveryDate) && (
+                        <View style={styles.appointmentSection}>
+                          <Text style={styles.appointmentTitle}>Delivery Appointment Details</Text>
+                          <View style={styles.infoRow}>
+                            <Text style={styles.infoLabel}>Date:</Text>
+                            <Text style={styles.infoValue}>
+                              {order.deliveryAppointment?.date 
+                                ? formatDateOnly(order.deliveryAppointment.date)
+                                : order.deliveryDate 
+                                ? formatDateOnly(order.deliveryDate)
+                                : 'N/A'}
+                            </Text>
+                          </View>
+                          <View style={styles.infoRow}>
+                            <Text style={styles.infoLabel}>Time:</Text>
+                            <Text style={styles.infoValue}>
+                              {order.deliveryAppointment?.time 
+                                ? order.deliveryAppointment.time
+                                : order.deliveryDate 
+                                ? formatTime(order.deliveryDate)
+                                : 'N/A'}
+                            </Text>
+                          </View>
+                        </View>
+                      )}
                     </View>
-                  </View>
                   ))}
                   </View>
                 )}
@@ -514,6 +650,32 @@ const styles = StyleSheet.create({
   documentMeta: {
     fontSize: 11,
     color: '#999',
+  },
+  sectionDivider: {
+    marginTop: 12,
+    marginBottom: 8,
+    paddingTop: 12,
+    borderTopWidth: 1,
+    borderTopColor: '#e0e0e0',
+  },
+  sectionTitle: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#2563eb',
+    marginBottom: 8,
+  },
+  appointmentSection: {
+    backgroundColor: '#f0f7ff',
+    padding: 10,
+    borderRadius: 6,
+    marginTop: 8,
+    marginBottom: 8,
+  },
+  appointmentTitle: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#333',
+    marginBottom: 6,
   },
 });
 
