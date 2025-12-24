@@ -173,3 +173,12 @@ adb uninstall com.blackriverlogistics.app
 
 
 
+
+
+
+
+
+
+
+
+

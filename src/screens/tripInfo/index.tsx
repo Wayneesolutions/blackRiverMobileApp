@@ -497,6 +497,25 @@ const TripInfoScreen = () => {
                   ))}
                 </View>
               )}
+
+              {/* Chat Button - Always visible at the bottom */}
+              <View style={styles.chatButtonContainer}>
+                <TouchableOpacity
+                  style={styles.chatButton}
+                  onPress={() => {
+                    navigation.navigate('TripChat' as never, {
+                      tripId: trip._id,
+                      tripNumber: trip.tripNumber,
+                    } as never);
+                  }}
+                  activeOpacity={0.8}
+                >
+                  <View style={styles.chatButtonContent}>
+                    <Ionicons name="chatbubbles" size={22} color="#ffffff" />
+                    <Text style={styles.chatButtonText}>Chat with Dispatcher</Text>
+                  </View>
+                </TouchableOpacity>
+              </View>
             </View>
           ))}
         </ScrollView>
@@ -751,6 +770,7 @@ const styles = StyleSheet.create({
     fontSize: 11,
     color: '#999',
   },
+<<<<<<< HEAD
   sectionDivider: {
     marginTop: 12,
     marginBottom: 8,
@@ -776,6 +796,36 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: '#333',
     marginBottom: 6,
+=======
+  chatButtonContainer: {
+    marginTop: 16,
+    paddingTop: 16,
+    borderTopWidth: 2,
+    borderTopColor: '#e5e7eb',
+  },
+  chatButton: {
+    backgroundColor: '#2563eb',
+    borderRadius: 12,
+    shadowColor: '#2563eb',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 5,
+  },
+  chatButtonContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 16,
+    paddingHorizontal: 20,
+    gap: 10,
+  },
+  chatButtonText: {
+    color: '#ffffff',
+    fontSize: 17,
+    fontWeight: '700',
+    letterSpacing: 0.5,
+>>>>>>> 33cd248766073f8afa91499461caa17a4d4d632c
   },
 });
 
