@@ -413,8 +413,13 @@ class ApiService {
                         const message = responseData?.message || responseData?.error || '';
                         const lowerMessage = message.toLowerCase();
                         
-                        // Check if it's a token expiration/invalid token error
-                        if (lowerMessage.includes('token has expired') || 
+                        // For login endpoint, 401 always means invalid credentials (not token issue)
+                        // Don't call handleTokenExpiration for login attempts
+                        if (endpoint.includes('/login')) {
+                            errorMessage = message || 'Invalid credentials';
+                        }
+                        // For other endpoints, check if it's a token expiration/invalid token error
+                        else if (lowerMessage.includes('token has expired') || 
                             lowerMessage.includes('token expired') ||
                             lowerMessage.includes('no token provided') ||
                             lowerMessage.includes('invalid token') ||
@@ -467,9 +472,25 @@ class ApiService {
                     statusCode: response.status,
                 };
 
-                // Don't try other endpoints for client errors (4xx) except 401, 403, 404
+                // Return immediately for 404 errors (Driver not found, etc.) - no point trying other endpoints
+                if (response.status === 404) {
+                    return lastError;
+                }
+
+                // Return immediately for 401 errors on login endpoint (Invalid credentials)
+                // Login endpoint doesn't require auth, so 401 always means invalid credentials
+                if (response.status === 401 && endpoint.includes('/login')) {
+                    return lastError;
+                }
+
+                // Return immediately for 400 errors (Bad request) - no point trying other endpoints
+                if (response.status === 400) {
+                    return lastError;
+                }
+
+                // Don't try other endpoints for client errors (4xx) except 401 (token issues), 403, 502, 503, 504
                 if (response.status >= 400 && response.status < 500 && 
-                    ![401, 403, 404, 502, 503, 504].includes(response.status)) {
+                    ![401, 403, 502, 503, 504].includes(response.status)) {
                     return lastError;
                 }
 

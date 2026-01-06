@@ -8,7 +8,6 @@ import {
   TouchableOpacity,
   KeyboardAvoidingView,
   Platform,
-  Alert,
   Image,
   ActivityIndicator,
 } from "react-native";
@@ -96,11 +95,8 @@ export default function LoginScreen({ navigation, onAuthSuccess }: Props) {
           error: "Request timeout after 30 seconds"
         }, 'LoginScreen');
 
-        Alert.alert(
-          "Connection Timeout",
-          "The request took too long. Please check your internet connection and try again.",
-          [{ text: "OK" }]
-        );
+        // Show timeout error on email field
+        setErrors({ email: "Connection timeout. Please check your internet connection and try again." });
       }
     }, 30000); // 30 second timeout
 
@@ -152,12 +148,13 @@ export default function LoginScreen({ navigation, onAuthSuccess }: Props) {
         onAuthSuccess(driver);
 
       } else {
-        // Handle API error
-        let errorMessage = "Login failed. Please try again.";
-        let alertTitle = "Login Failed";
+        // Handle API error - show inline errors below input fields
+        const newErrors: LoginErrors = {};
         
         // Check if backend returned a specific error message
         const backendResponse = response.data as any;
+        let errorMessage = "";
+        
         if (backendResponse && typeof backendResponse === 'object') {
           // Backend returns: { success: false, message: "..." }
           if (backendResponse.message) {
@@ -172,44 +169,13 @@ export default function LoginScreen({ navigation, onAuthSuccess }: Props) {
         // Check status code to determine error type
         const statusCode = response.statusCode || 0;
 
-        // Network/Connection errors (statusCode 0 or network-related errors)
-        if (statusCode === 0 || 
-            errorMessage.includes('Unable to connect') || 
-            errorMessage.includes('Network request failed') ||
-            errorMessage.includes('ECONNREFUSED') ||
-            errorMessage.includes('timeout')) {
-          alertTitle = "Connection Error";
-          
-          // Format the detailed error message for better readability
-          const lines = errorMessage.split('\n');
-          const title = lines[0] || 'Connection Error';
-          const details = lines.slice(1).join('\n');
-          
-          logger.userAction('Login Failed - Network Error', {
-            email,
-            error: errorMessage,
-            statusCode: statusCode
-          }, 'LoginScreen');
-
-          Alert.alert(
-            title,
-            details || "Unable to connect to server. Please check:\n• Backend server is running\n• Device and server on same Wi-Fi\n• Firewall allows port 3000",
-            [{ text: "OK" }]
-          );
-        } 
-        // Invalid credentials (401, 404, 400 from backend)
-        else if (statusCode === 401 || statusCode === 404 || statusCode === 400) {
+        // Invalid credentials (401, 404, 400 from backend) - check these FIRST before network errors
+        // This ensures we show the actual error message (e.g., "Driver not found") instead of generic network error
+        if (statusCode === 401 || statusCode === 404 || statusCode === 400) {
           // Backend returns specific messages:
-          // 404: "Driver not found"
-          // 401: "Invalid credentials"
+          // 404: "Driver not found" - means email doesn't exist
+          // 401: "Invalid credentials" - means password is wrong
           // 400: "Invalid email or password"
-          
-          // Use the backend message if available, otherwise show generic invalid credentials
-          if (!errorMessage || errorMessage.includes('Login failed') || errorMessage.includes('Request failed')) {
-            errorMessage = "Invalid email or password. Please check your credentials and try again.";
-          }
-          
-          alertTitle = "Invalid Credentials";
           
           logger.userAction('Login Failed - Invalid Credentials', {
             email,
@@ -217,19 +183,50 @@ export default function LoginScreen({ navigation, onAuthSuccess }: Props) {
             statusCode: statusCode
           }, 'LoginScreen');
 
-          Alert.alert(alertTitle, errorMessage, [{ text: "OK" }]);
+          // Determine if it's email or password error based on backend message
+          if (errorMessage.toLowerCase().includes('driver not found') || 
+              errorMessage.toLowerCase().includes('not found') ||
+              statusCode === 404) {
+            // Email doesn't exist - show specific error message
+            newErrors.email = errorMessage || `Driver not found with this email: ${email}. Please check your email and try again.`;
+          } else if (errorMessage.toLowerCase().includes('invalid credentials') ||
+                     errorMessage.toLowerCase().includes('password') ||
+                     statusCode === 401) {
+            // Password is wrong
+            newErrors.password = errorMessage || "Incorrect password. Please check and try again.";
+          } else {
+            // Generic error - show on both fields
+            newErrors.email = errorMessage || "Incorrect email address or password.";
+            newErrors.password = errorMessage || "Incorrect email address or password.";
+          }
+        }
+        // Network/Connection errors (statusCode 0 or network-related errors)
+        // Only show network error if it's NOT a 404/401/400 (those are handled above)
+        else if (statusCode === 0 || 
+            (errorMessage.includes('Unable to connect') && statusCode !== 404) || 
+            errorMessage.includes('Network request failed') ||
+            errorMessage.includes('ECONNREFUSED') ||
+            errorMessage.includes('timeout')) {
+          
+          logger.userAction('Login Failed - Network Error', {
+            email,
+            error: errorMessage,
+            statusCode: statusCode
+          }, 'LoginScreen');
+
+          // Show network error on email field
+          newErrors.email = "Unable to connect to server. Please check your internet connection.";
         }
         // Account inactive or access denied (403)
         else if (statusCode === 403) {
-          alertTitle = "Access Denied";
-          
           logger.userAction('Login Failed - Access Denied', {
             email,
             error: errorMessage,
             statusCode: statusCode
           }, 'LoginScreen');
 
-          Alert.alert(alertTitle, errorMessage, [{ text: "OK" }]);
+          // Show access denied error on email field
+          newErrors.email = errorMessage || "Your account is not active or you don't have access. Please contact administrator.";
         }
         // Other errors
         else {
@@ -239,8 +236,12 @@ export default function LoginScreen({ navigation, onAuthSuccess }: Props) {
             statusCode: statusCode
           }, 'LoginScreen');
 
-          Alert.alert(alertTitle, errorMessage, [{ text: "OK" }]);
+          // Show generic error on email field
+          newErrors.email = errorMessage || "Login failed. Please try again.";
         }
+
+        // Set the errors to display below input fields
+        setErrors(newErrors);
       }
 
     } catch (error: unknown) {
@@ -279,7 +280,10 @@ export default function LoginScreen({ navigation, onAuthSuccess }: Props) {
         );
       }
 
-      Alert.alert("Connection Error", errorMessage, [{ text: "OK" }]);
+      // Show error on email field instead of Alert
+      const newErrors: LoginErrors = {};
+      newErrors.email = errorMessage;
+      setErrors(newErrors);
     } finally {
       setIsLoading(false);
       loginTimer(); // Complete the timer

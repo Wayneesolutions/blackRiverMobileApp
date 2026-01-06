@@ -429,9 +429,10 @@ class SocketService {
     this.socket.emit('leaveTripChat', tripId);
   }
 
-  // Send chat message
+  // Send chat message (supports both tripId and orderId)
   sendChatMessage(data: {
-    tripId: string;
+    tripId?: string;
+    orderId?: string;
     message: string;
     fileUrl?: string;
     fileName?: string;
@@ -443,8 +444,14 @@ class SocketService {
       return;
     }
 
-    logger.info('Sending chat message', { tripId: data.tripId });
-    this.socket.emit('sendChatMessage', data);
+    // Use orderId if available, fallback to tripId
+    const chatId = data.orderId || data.tripId;
+    logger.info('Sending chat message', { tripId: data.tripId, orderId: data.orderId, chatId });
+    this.socket.emit('sendChatMessage', {
+      ...data,
+      tripId: chatId, // Backend expects tripId but will check for orders first
+      orderId: data.orderId || chatId,
+    });
   }
 
   // Mark messages as read

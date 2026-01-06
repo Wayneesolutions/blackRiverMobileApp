@@ -25,7 +25,15 @@ import { logger } from '../../utils/loggerHelper';
 const TripChatScreen = () => {
   const navigation = useNavigation();
   const route = useRoute();
-  const { tripId, tripNumber } = route.params as { tripId: string; tripNumber: string };
+  // Support both tripId and orderId (since we're using orders now, tripId is actually orderId)
+  const { tripId, orderId, tripNumber, orderNumber } = route.params as { 
+    tripId?: string; 
+    orderId?: string; 
+    tripNumber?: string; 
+    orderNumber?: string; 
+  };
+  const chatId = orderId || tripId || ''; // Use orderId if available, fallback to tripId
+  const displayNumber = orderNumber || tripNumber || '';
 
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [newMessage, setNewMessage] = useState('');
@@ -41,7 +49,7 @@ const TripChatScreen = () => {
   const normalizeMessage = (message: any): ChatMessage => {
     return {
       _id: message._id || message.id || '',
-      tripId: message.tripId || tripId,
+      tripId: message.tripId || message.orderId || chatId,
       senderId: {
         _id: message.senderId?._id || message.senderId || message.sender?._id || '',
         name: message.senderId?.name || message.sender?.name || message.senderName || '',
@@ -64,8 +72,8 @@ const TripChatScreen = () => {
   const loadMessages = async () => {
     try {
       setLoading(true);
-      logger.info('Loading messages for trip', { tripId });
-      const response = await chatService.getTripChatMessages(tripId, 1, 100);
+      logger.info('Loading messages for trip/order', { tripId: chatId });
+      const response = await chatService.getTripChatMessages(chatId, 1, 100);
       
       logger.info('Messages API response', { 
         success: response.success,
@@ -178,14 +186,14 @@ const TripChatScreen = () => {
         // Authenticate socket for chat
         await socketService.authenticateChat(token);
 
-        // Join trip chat room
-        await socketService.joinTripChat(tripId);
+        // Join trip/order chat room (tripId is actually orderId now)
+        await socketService.joinTripChat(chatId);
 
         // Load messages
         await loadMessages();
 
         // Mark messages as read
-        await chatService.markMessagesAsRead(tripId);
+        await chatService.markMessagesAsRead(chatId);
       } catch (error: any) {
         logger.error('Error initializing chat', error);
         Alert.alert('Error', error.message || 'Failed to initialize chat');
@@ -241,7 +249,7 @@ const TripChatScreen = () => {
         // Mark as read if it's not from current user
         const senderId = normalizedMessage.senderId._id || normalizedMessage.senderId;
         if (senderId !== currentUserIdRef.current) {
-          chatService.markMessagesAsRead(tripId);
+          chatService.markMessagesAsRead(chatId);
         }
       } catch (error) {
         logger.error('Error handling new message', error);
@@ -294,7 +302,7 @@ const TripChatScreen = () => {
       // If file is selected, use HTTP API
       if (selectedFile) {
         const response = await chatService.sendChatMessage(
-          tripId,
+          chatId,
           newMessage,
           selectedFile.uri,
           selectedFile.name,
@@ -311,7 +319,7 @@ const TripChatScreen = () => {
         // Create optimistic message for immediate UI update
         const optimisticMessage: ChatMessage = {
           _id: `temp-${Date.now()}`,
-          tripId,
+          tripId: chatId,
           senderId: {
             _id: currentUserIdRef.current || '',
             name: '',
@@ -330,9 +338,10 @@ const TripChatScreen = () => {
         setNewMessage('');
         scrollToBottom();
 
-        // Send via socket
+        // Send via socket (tripId is actually orderId now, backend will handle it)
         socketService.sendChatMessage({
-          tripId,
+          tripId: chatId,
+          orderId: chatId, // Also send orderId for clarity
           message: newMessage,
         });
 
@@ -420,7 +429,7 @@ const TripChatScreen = () => {
           </TouchableOpacity>
           <View style={styles.headerInfo}>
             <Text style={styles.headerTitle}>Chat</Text>
-            <Text style={styles.headerSubtitle}>{tripNumber}</Text>
+            <Text style={styles.headerSubtitle}>{displayNumber}</Text>
           </View>
         </View>
 
