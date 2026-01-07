@@ -648,6 +648,12 @@ class ApiService {
         }, true);
     }
 
+    async getOrderAttachmentSignedUrl(orderId: string, attachmentId: string, disposition: 'inline' | 'attachment' = 'inline'): Promise<ApiResponse<{ url: string; expiresIn: number }>> {
+        return this.request(`/driver/orders/${orderId}/attachments/${attachmentId}/signed-url?disposition=${disposition}`, {
+            method: 'GET'
+        }, true);
+    }
+
     async getNotifications(): Promise<ApiResponse> {
         return this.request('/driver/notifications', { method: 'GET' }, true);
     }

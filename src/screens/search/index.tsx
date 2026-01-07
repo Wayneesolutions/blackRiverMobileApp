@@ -75,15 +75,6 @@ const searchablePages: SearchablePage[] = [
   },
   {
     id: '5',
-    name: 'Documents',
-    description: 'Manage licenses, permits, and documentation',
-    icon: 'document-text-outline',
-    route: 'Documents',
-    category: 'Compliance',
-    keywords: ['documents', 'license', 'permit', 'paperwork', 'compliance']
-  },
-  {
-    id: '6',
     name: 'Load Map',
     description: 'View routes and navigation maps',
     icon: 'map-outline',
@@ -96,7 +87,6 @@ const searchablePages: SearchablePage[] = [
 const recentSearches: string[] = [
   'Active loads',
   'Load map',
-  'Documents',
   'Completed loads'
 ];
 
@@ -117,13 +107,6 @@ const quickActions: QuickAction[] = [
   },
   {
     id: 'qa3',
-    name: 'Documents',
-    icon: 'document-text',
-    route: 'Documents',
-    color: '#10B981'
-  },
-  {
-    id: 'qa4',
     name: 'Settings',
     icon: 'settings',
     route: 'Settings',
@@ -232,7 +215,7 @@ export default function SearchScreen({ navigation }: Props) {
       <View style={styles.section}>
         <Text style={styles.sectionTitle}>All Pages</Text>
         {/* Group by category */}
-        {['Load Management', 'Navigation', 'Compliance', 'Account'].map(category => {
+        {['Load Management', 'Navigation', 'Account'].map(category => {
           const categoryPages = searchablePages.filter(page => page.category === category);
           if (categoryPages.length === 0) return null;
 
@@ -437,7 +420,7 @@ export default function SearchScreen({ navigation }: Props) {
             <View style={styles.section}>
               <Text style={styles.sectionTitle}>All Pages</Text>
               {/* Group by category */}
-              {['Main', 'Trip Management', 'Fleet Management', 'Compliance', 'Operations', 'Navigation', 'Communication', 'Support', 'Safety', 'Account'].map(category => {
+              {['Load Management', 'Navigation', 'Account'].map(category => {
                 const categoryPages = searchablePages.filter(page => page.category === category);
                 if (categoryPages.length === 0) return null;
 

@@ -38,6 +38,28 @@ interface Trip {
     internalId?: string;
     make?: string;
     model?: string;
+    yard?: {
+      yardName?: string;
+      yardCode?: string;
+      address?: string;
+      city?: string;
+      stateProvince?: string;
+      coordinates?: {
+        latitude?: number | string;
+        longitude?: number | string;
+      };
+    };
+  };
+  yardLocation?: {
+    yardName?: string;
+    yardCode?: string;
+    address?: string;
+    city?: string;
+    stateProvince?: string;
+    coordinates?: {
+      latitude?: number | string;
+      longitude?: number | string;
+    };
   };
   trailer?: {
     _id: string;
@@ -65,9 +87,6 @@ interface Trip {
           longitude?: string | number;
         };
       };
-      shipperName?: string;
-      shipperPhone?: string;
-      shipperAddress?: string;
     };
     deliveryLocation?: {
       place?: string;
@@ -81,10 +100,61 @@ interface Trip {
           longitude?: string | number;
         };
       };
-      receiverName?: string;
-      receiverPhone?: string;
-      deliveryAddress?: string;
     };
+    shipper?: {
+      name?: string;
+      phone?: string;
+      email?: string;
+      address?: string;
+      unit?: string;
+      country?: string;
+      province?: string;
+      city?: string;
+      postalCode?: string;
+      primaryPhone?: string;
+      secondaryPhone?: string;
+      contact?: string;
+      store?: string;
+      type?: string;
+    };
+    receiver?: {
+      name?: string;
+      phone?: string;
+      address?: string;
+      contact?: string;
+    };
+    stops?: Array<{
+      stop?: number;
+      shipper?: string;
+      date?: string;
+      endDate?: string;
+      appointment?: string;
+      pickUpNumber?: string;
+      contact?: string;
+      skids?: string;
+      cases?: string;
+      weight?: string;
+      uom?: string;
+      temperature?: string;
+      address?: string;
+      ltl?: boolean;
+    }>;
+    receiverStops?: Array<{
+      stop?: number;
+      receiver?: string;
+      date?: string;
+      endDate?: string;
+      appointment?: string;
+      dropOffNumber?: string;
+      contact?: string;
+      skids?: string;
+      cases?: string;
+      weight?: string;
+      uom?: string;
+      temperature?: string;
+      address?: string;
+      ltl?: boolean;
+    }>;
     pickupDate?: string;
     deliveryDate?: string;
     pickupAppointment?: {
@@ -95,6 +165,27 @@ interface Trip {
     deliveryAppointment?: {
       date?: string;
       time?: string;
+    };
+    pickupAppointmentDetails?: {
+      type?: string;
+      date?: string;
+      time?: string;
+      startDate?: string;
+      startTime?: string;
+      endDate?: string;
+      endTime?: string;
+      specialInstructions?: string;
+      gatePass?: string;
+    };
+    deliveryAppointmentDetails?: {
+      type?: string;
+      date?: string;
+      time?: string;
+      startDate?: string;
+      startTime?: string;
+      endDate?: string;
+      endTime?: string;
+      unloadingInstructions?: string;
     };
   }>;
   plannedStartDate?: string;
@@ -218,12 +309,13 @@ const convertTripToLoadForMap = (trip: Trip) => {
         _id: trip.truck._id,
         internalId: trip.truck.internalId || trip.truck.plateNumber || '',
         plateNumber: trip.truck.plateNumber,
+        trackingKey: (trip.truck as any).trackingKey, // Include trackingKey for vehicle tracking
       } : undefined,
     };
   }
 
-  // Build optimized waypoints from orders (maintain pickup -> delivery order for each order)
-  // For multiple orders: Pickup Order 1 -> Pickup Order 2 -> ... -> Delivery Order 1 -> Delivery Order 2 -> ...
+  // Build optimized waypoints from orders including multiple stops
+  // For multiple orders: All Pickups (main + stops) -> All Deliveries (main + receiverStops)
   const wayPoints: Array<{
     address: {
       place: string;
@@ -234,7 +326,49 @@ const convertTripToLoadForMap = (trip: Trip) => {
     dropOff?: boolean;
     orderId?: string;
     orderNumber?: string;
+    stopNumber?: number;
+    stopType?: 'main' | 'additional';
   }> = [];
+
+  // Helper to parse coordinates from stop address
+  const getStopCoords = (stop: any, order: any) => {
+    if (!stop) return { lat: null, lng: null };
+    
+    // Try address field first (if address is an object with lat/lng)
+    if (stop.address && typeof stop.address === 'object') {
+      const lat = parseCoord(stop.address.latitude || stop.address.lat);
+      const lng = parseCoord(stop.address.longitude || stop.address.lng);
+      if (lat !== null && lng !== null) return { lat, lng };
+    }
+    
+    // Try latitude/longitude directly on stop
+    const lat = parseCoord(stop.latitude || stop.lat);
+    const lng = parseCoord(stop.longitude || stop.lng);
+    if (lat !== null && lng !== null) return { lat, lng };
+    
+    // If no coordinates, try to use main pickup/delivery location as fallback
+    // For pickup stops, use main pickup location
+    // For delivery stops, use main delivery location
+    if (stop.address && typeof stop.address === 'string') {
+      // Try to match with main locations
+      if (order.pickupLocation) {
+        const pickupCoords = getLocationCoords(order.pickupLocation);
+        if (pickupCoords.lat !== null && pickupCoords.lng !== null) {
+          console.warn(`⚠️ Stop "${stop.address}" missing coordinates, using main pickup location as fallback`);
+          return pickupCoords;
+        }
+      }
+      if (order.deliveryLocation) {
+        const deliveryCoords = getLocationCoords(order.deliveryLocation);
+        if (deliveryCoords.lat !== null && deliveryCoords.lng !== null) {
+          console.warn(`⚠️ Stop "${stop.address}" missing coordinates, using main delivery location as fallback`);
+          return deliveryCoords;
+        }
+      }
+    }
+    
+    return { lat: null, lng: null };
+  };
 
   // First, collect all pickups and deliveries with their order info
   const allLocations: Array<{
@@ -248,18 +382,19 @@ const convertTripToLoadForMap = (trip: Trip) => {
     orderId: string;
     orderNumber: string;
     index: number;
+    stopNumber?: number;
+    stopType: 'main' | 'additional';
   }> = [];
 
   trip.orders.forEach((order, orderIndex) => {
+    // Main pickup location
     const pickupLoc = order.pickupLocation;
-    const deliveryLoc = order.deliveryLocation;
     const pickupCoords = getLocationCoords(pickupLoc);
-    const deliveryCoords = getLocationCoords(deliveryLoc);
 
     if (pickupCoords.lat !== null && pickupCoords.lng !== null) {
       allLocations.push({
         address: {
-          place: pickupLoc?.place || pickupLoc?.placeId?.name || `Pickup ${orderIndex + 1}`,
+          place: pickupLoc?.place || pickupLoc?.placeId?.name || order.shipper?.address || `Pickup ${orderIndex + 1}`,
           latitude: pickupCoords.lat,
           longitude: pickupCoords.lng,
         },
@@ -268,13 +403,71 @@ const convertTripToLoadForMap = (trip: Trip) => {
         orderId: order._id,
         orderNumber: order.orderNumber || `Order ${orderIndex + 1}`,
         index: orderIndex,
+        stopType: 'main',
       });
     }
+
+    // Additional pickup stops
+    if (order.stops && Array.isArray(order.stops) && order.stops.length > 0) {
+      console.log(`📍 Order ${order.orderNumber || orderIndex + 1} - Found ${order.stops.length} pickup stops:`, order.stops);
+      order.stops.forEach((stop: any, stopIndex: number) => {
+        const stopCoords = getStopCoords(stop, order);
+        console.log(`  🛑 Pickup Stop ${stopIndex + 1}:`, {
+          stop: stop.stop,
+          address: stop.address,
+          shipper: stop.shipper,
+          coords: stopCoords,
+          stopData: stop
+        });
+        if (stopCoords.lat !== null && stopCoords.lng !== null) {
+          allLocations.push({
+            address: {
+              place: stop.address || stop.shipper || `Pickup Stop ${stop.stop || stopIndex + 1}`,
+              latitude: stopCoords.lat,
+              longitude: stopCoords.lng,
+            },
+            pickup: true,
+            dropOff: false,
+            orderId: order._id,
+            orderNumber: order.orderNumber || `Order ${orderIndex + 1}`,
+            index: orderIndex,
+            stopNumber: stop.stop || stopIndex + 1,
+            stopType: 'additional',
+          });
+          console.log(`  ✅ Added pickup stop ${stop.stop || stopIndex + 1} to waypoints`);
+        } else {
+          console.warn(`  ⚠️ Pickup stop ${stopIndex + 1} missing coordinates - address: "${stop.address}"`);
+          // Still add the stop with a warning, but use main pickup location as fallback
+          const fallbackCoords = getLocationCoords(order.pickupLocation);
+          if (fallbackCoords.lat !== null && fallbackCoords.lng !== null) {
+            console.log(`  📍 Using main pickup location as fallback for stop ${stopIndex + 1}`);
+            allLocations.push({
+              address: {
+                place: stop.address || stop.shipper || `Pickup Stop ${stop.stop || stopIndex + 1}`,
+                latitude: fallbackCoords.lat,
+                longitude: fallbackCoords.lng,
+              },
+              pickup: true,
+              dropOff: false,
+              orderId: order._id,
+              orderNumber: order.orderNumber || `Order ${orderIndex + 1}`,
+              index: orderIndex,
+              stopNumber: stop.stop || stopIndex + 1,
+              stopType: 'additional',
+            });
+          }
+        }
+      });
+    }
+
+    // Main delivery location
+    const deliveryLoc = order.deliveryLocation;
+    const deliveryCoords = getLocationCoords(deliveryLoc);
 
     if (deliveryCoords.lat !== null && deliveryCoords.lng !== null) {
       allLocations.push({
         address: {
-          place: deliveryLoc?.place || deliveryLoc?.placeId?.name || `Delivery ${orderIndex + 1}`,
+          place: deliveryLoc?.place || deliveryLoc?.placeId?.name || order.receiver?.address || `Delivery ${orderIndex + 1}`,
           latitude: deliveryCoords.lat,
           longitude: deliveryCoords.lng,
         },
@@ -283,6 +476,60 @@ const convertTripToLoadForMap = (trip: Trip) => {
         orderId: order._id,
         orderNumber: order.orderNumber || `Order ${orderIndex + 1}`,
         index: orderIndex,
+        stopType: 'main',
+      });
+    }
+
+    // Additional delivery stops (receiverStops)
+    if (order.receiverStops && Array.isArray(order.receiverStops) && order.receiverStops.length > 0) {
+      console.log(`📍 Order ${order.orderNumber || orderIndex + 1} - Found ${order.receiverStops.length} delivery stops:`, order.receiverStops);
+      order.receiverStops.forEach((stop: any, stopIndex: number) => {
+        const stopCoords = getStopCoords(stop, order);
+        console.log(`  🛑 Delivery Stop ${stopIndex + 1}:`, {
+          stop: stop.stop,
+          address: stop.address,
+          receiver: stop.receiver,
+          coords: stopCoords,
+          stopData: stop
+        });
+        if (stopCoords.lat !== null && stopCoords.lng !== null) {
+          allLocations.push({
+            address: {
+              place: stop.address || stop.receiver || `Delivery Stop ${stop.stop || stopIndex + 1}`,
+              latitude: stopCoords.lat,
+              longitude: stopCoords.lng,
+            },
+            pickup: false,
+            dropOff: true,
+            orderId: order._id,
+            orderNumber: order.orderNumber || `Order ${orderIndex + 1}`,
+            index: orderIndex,
+            stopNumber: stop.stop || stopIndex + 1,
+            stopType: 'additional',
+          });
+          console.log(`  ✅ Added delivery stop ${stop.stop || stopIndex + 1} to waypoints`);
+        } else {
+          console.warn(`  ⚠️ Delivery stop ${stopIndex + 1} missing coordinates - address: "${stop.address}"`);
+          // Still add the stop with a warning, but use main delivery location as fallback
+          const fallbackCoords = getLocationCoords(order.deliveryLocation);
+          if (fallbackCoords.lat !== null && fallbackCoords.lng !== null) {
+            console.log(`  📍 Using main delivery location as fallback for stop ${stopIndex + 1}`);
+            allLocations.push({
+              address: {
+                place: stop.address || stop.receiver || `Delivery Stop ${stop.stop || stopIndex + 1}`,
+                latitude: fallbackCoords.lat,
+                longitude: fallbackCoords.lng,
+              },
+              pickup: false,
+              dropOff: true,
+              orderId: order._id,
+              orderNumber: order.orderNumber || `Order ${orderIndex + 1}`,
+              index: orderIndex,
+              stopNumber: stop.stop || stopIndex + 1,
+              stopType: 'additional',
+            });
+          }
+        }
       });
     }
   });
@@ -295,7 +542,7 @@ const convertTripToLoadForMap = (trip: Trip) => {
   ];
 
   sortedLocations.forEach((loc) => {
-    wayPoints.push({
+    const waypoint = {
       address: {
         place: loc.address.place,
         latitude: loc.address.latitude,
@@ -305,7 +552,47 @@ const convertTripToLoadForMap = (trip: Trip) => {
       dropOff: loc.dropOff,
       orderId: loc.orderId,
       orderNumber: loc.orderNumber,
+      stopNumber: loc.stopNumber,
+      stopType: loc.stopType,
+    };
+    console.log('📌 Adding waypoint to array:', {
+      place: waypoint.address.place,
+      latitude: waypoint.address.latitude,
+      longitude: waypoint.address.longitude,
+      stopNumber: waypoint.stopNumber,
+      stopType: waypoint.stopType,
+      isPickup: waypoint.pickup,
+      isDropoff: waypoint.dropOff,
     });
+    wayPoints.push(waypoint);
+  });
+  
+  console.log('📋 Final wayPoints array:', {
+    total: wayPoints.length,
+    waypoints: wayPoints.map(wp => ({
+      place: wp.address.place,
+      lat: wp.address.latitude,
+      lng: wp.address.longitude,
+      stopNumber: wp.stopNumber,
+      stopType: wp.stopType,
+    }))
+  });
+
+  // Log final waypoints with stops
+  const stopsCount = wayPoints.filter(wp => wp.stopType === 'additional').length;
+  console.log('🗺️ Final waypoints summary:', {
+    total: wayPoints.length,
+    main: wayPoints.filter(wp => wp.stopType === 'main').length,
+    additional: stopsCount,
+    pickupStops: wayPoints.filter(wp => wp.pickup && wp.stopType === 'additional').length,
+    deliveryStops: wayPoints.filter(wp => wp.dropOff && wp.stopType === 'additional').length,
+    waypoints: wayPoints.map(wp => ({
+      place: wp.address.place,
+      stopNumber: wp.stopNumber,
+      stopType: wp.stopType,
+      pickup: wp.pickup,
+      dropOff: wp.dropOff
+    }))
   });
 
   // Get first pickup and last delivery for selectPickup/selectDropOff
@@ -316,6 +603,31 @@ const convertTripToLoadForMap = (trip: Trip) => {
   const dropoff = lastDelivery ? trip.orders.find(o => o._id === lastDelivery.orderId)?.deliveryLocation : trip.orders[trip.orders.length - 1]?.deliveryLocation;
   const pickupCoords = getLocationCoords(pickup);
   const dropoffCoords = getLocationCoords(dropoff);
+
+  // Get yard location from trip (either from yardLocation or truck.yard)
+  let yardLocation = trip.yardLocation;
+  if (!yardLocation && trip.truck?.yard?.coordinates) {
+    const yard = trip.truck.yard;
+    if (yard.coordinates?.latitude && yard.coordinates?.longitude) {
+      yardLocation = {
+        yardName: yard.yardName || 'Yard',
+        yardCode: yard.yardCode || '',
+        address: yard.address || '',
+        city: yard.city || '',
+        stateProvince: yard.stateProvince || '',
+        coordinates: {
+          latitude: parseFloat(String(yard.coordinates.latitude)) || null,
+          longitude: parseFloat(String(yard.coordinates.longitude)) || null,
+        }
+      };
+    }
+  }
+
+  console.log('🏭 Yard location for trip:', {
+    hasYardLocation: !!yardLocation,
+    yardName: yardLocation?.yardName,
+    coordinates: yardLocation?.coordinates
+  });
 
   return {
     _id: trip._id,
@@ -332,21 +644,68 @@ const convertTripToLoadForMap = (trip: Trip) => {
         latitude: dropoffCoords.lat !== null ? dropoffCoords.lat : undefined,
         longitude: dropoffCoords.lng !== null ? dropoffCoords.lng : undefined,
       },
-      wayPoints: wayPoints.filter(wp => wp.address.latitude !== null && wp.address.longitude !== null).map(wp => ({
-        address: {
-          place: wp.address.place,
-          latitude: wp.address.latitude !== null ? wp.address.latitude : undefined,
-          longitude: wp.address.longitude !== null ? wp.address.longitude : undefined,
-        },
-        pickup: wp.pickup,
-        dropOff: wp.dropOff,
-      })),
+      wayPoints: (() => {
+        const filtered = wayPoints.filter(wp => {
+          const hasValidCoords = wp.address.latitude !== null && wp.address.longitude !== null;
+          if (!hasValidCoords) {
+            console.warn('⚠️ Filtering out waypoint with invalid coordinates:', {
+              place: wp.address.place,
+              latitude: wp.address.latitude,
+              longitude: wp.address.longitude,
+              stopNumber: wp.stopNumber,
+              stopType: wp.stopType,
+            });
+          }
+          return hasValidCoords;
+        });
+        
+        const mapped = filtered.map(wp => {
+          const result = {
+            address: {
+              place: wp.address.place,
+              latitude: wp.address.latitude !== null ? wp.address.latitude : undefined,
+              longitude: wp.address.longitude !== null ? wp.address.longitude : undefined,
+            },
+            pickup: wp.pickup,
+            dropOff: wp.dropOff,
+            stopNumber: wp.stopNumber,
+            stopType: wp.stopType,
+          };
+          console.log('✅ Mapped waypoint for map:', {
+            place: result.address.place,
+            lat: result.address.latitude,
+            lng: result.address.longitude,
+            stopNumber: result.stopNumber,
+            stopType: result.stopType,
+            isPickup: result.pickup,
+            isDropoff: result.dropOff,
+          });
+          return result;
+        });
+        
+        console.log('📤 Returning waypoints to map component:', {
+          total: wayPoints.length,
+          filtered: filtered.length,
+          mapped: mapped.length,
+          waypoints: mapped.map(wp => ({
+            place: wp.address.place,
+            lat: wp.address.latitude,
+            lng: wp.address.longitude,
+            stopNumber: wp.stopNumber,
+            stopType: wp.stopType,
+          }))
+        });
+        
+        return mapped;
+      })(),
     },
     vehicle: trip.truck ? {
       _id: trip.truck._id,
       internalId: trip.truck.internalId || trip.truck.plateNumber || '',
       plateNumber: trip.truck.plateNumber,
+      trackingKey: (trip.truck as any).trackingKey, // Include trackingKey for vehicle tracking
     } : undefined,
+    yardLocation: yardLocation, // Include yard location for starting point
   };
 };
 
@@ -403,19 +762,25 @@ const ActiveTrips = () => {
             try {
               const response = await apiService.completeTrip(tripId);
               if (response.success) {
-                Alert.alert(
-                  'Success',
-                  'Trip marked as completed',
-                  [
-                    {
-                      text: 'OK',
-                      onPress: () => {
-                        navigation.navigate('MainTabs', { screen: 'Dashboard' });
-                      },
-                    },
-                  ]
-                );
+                // Refresh active trips list immediately
                 fetchActiveTrips();
+                
+                // Small delay to ensure backend has processed the completion
+                setTimeout(() => {
+                  Alert.alert(
+                    'Success',
+                    'Trip marked as completed',
+                    [
+                      {
+                        text: 'OK',
+                        onPress: () => {
+                          // Navigate to Dashboard - it will auto-refresh on focus
+                          navigation.navigate('MainTabs', { screen: 'Dashboard' });
+                        },
+                      },
+                    ]
+                  );
+                }, 800);
               } else {
                 Alert.alert('Error', response.error || response.message || 'Failed to complete trip');
               }
@@ -632,24 +997,92 @@ const ActiveTrips = () => {
                         <View style={styles.sectionDivider}>
                           <Text style={styles.sectionTitle}>Shipper Information</Text>
                         </View>
-                        {order.pickupLocation?.shipperName && (
+                        {order.shipper?.name && (
                           <View style={styles.infoRow}>
                             <Text style={styles.infoLabel}>Name:</Text>
-                            <Text style={styles.infoValue}>{order.pickupLocation.shipperName}</Text>
+                            <Text style={styles.infoValue}>{order.shipper.name}</Text>
                           </View>
                         )}
-                        {order.pickupLocation?.shipperPhone && (
+                        {order.shipper?.phone && (
                           <View style={styles.infoRow}>
                             <Text style={styles.infoLabel}>Phone:</Text>
-                            <Text style={styles.infoValue}>{order.pickupLocation.shipperPhone}</Text>
+                            <Text style={styles.infoValue}>{order.shipper.phone}</Text>
+                          </View>
+                        )}
+                        {order.shipper?.contact && (
+                          <View style={styles.infoRow}>
+                            <Text style={styles.infoLabel}>Contact:</Text>
+                            <Text style={styles.infoValue}>{order.shipper.contact}</Text>
                           </View>
                         )}
                         <View style={styles.locationRow}>
                           <Text style={styles.locationLabel}>Address: </Text>
                           <Text style={styles.locationValue}>
-                            {order.pickupLocation?.shipperAddress || formatAddress(order.pickupLocation)}
+                            {order.shipper?.address || formatAddress(order.pickupLocation) || 'N/A'}
                           </Text>
                         </View>
+                        {order.shipper?.city && order.shipper?.province && (
+                          <View style={styles.infoRow}>
+                            <Text style={styles.infoLabel}>City/Province:</Text>
+                            <Text style={styles.infoValue}>
+                              {order.shipper.city}, {order.shipper.province}
+                            </Text>
+                          </View>
+                        )}
+                        {order.shipper?.postalCode && (
+                          <View style={styles.infoRow}>
+                            <Text style={styles.infoLabel}>Postal Code:</Text>
+                            <Text style={styles.infoValue}>{order.shipper.postalCode}</Text>
+                          </View>
+                        )}
+                        
+                        {/* Multiple Pickup Stops */}
+                        {order.stops && order.stops.length > 0 && (
+                          <View style={styles.stopsSection}>
+                            <Text style={styles.stopsTitle}>Additional Pickup Stops ({order.stops.length}):</Text>
+                            {order.stops.map((stop: any, stopIndex: number) => (
+                              <View key={stopIndex} style={styles.stopItem}>
+                                <Text style={styles.stopNumber}>Stop {stop.stop || stopIndex + 1}</Text>
+                                {stop.shipper && (
+                                  <View style={styles.infoRow}>
+                                    <Text style={styles.infoLabel}>Shipper:</Text>
+                                    <Text style={styles.infoValue}>{stop.shipper}</Text>
+                                  </View>
+                                )}
+                                {stop.address && (
+                                  <View style={styles.locationRow}>
+                                    <Text style={styles.locationLabel}>Address:</Text>
+                                    <Text style={styles.locationValue}>{stop.address}</Text>
+                                  </View>
+                                )}
+                                {stop.contact && (
+                                  <View style={styles.infoRow}>
+                                    <Text style={styles.infoLabel}>Contact:</Text>
+                                    <Text style={styles.infoValue}>{stop.contact}</Text>
+                                  </View>
+                                )}
+                                {stop.date && (
+                                  <View style={styles.infoRow}>
+                                    <Text style={styles.infoLabel}>Date:</Text>
+                                    <Text style={styles.infoValue}>{stop.date}</Text>
+                                  </View>
+                                )}
+                                {stop.appointment && (
+                                  <View style={styles.infoRow}>
+                                    <Text style={styles.infoLabel}>Appointment:</Text>
+                                    <Text style={styles.infoValue}>{stop.appointment}</Text>
+                                  </View>
+                                )}
+                                {stop.pickUpNumber && (
+                                  <View style={styles.infoRow}>
+                                    <Text style={styles.infoLabel}>Pickup #:</Text>
+                                    <Text style={styles.infoValue}>{stop.pickUpNumber}</Text>
+                                  </View>
+                                )}
+                              </View>
+                            ))}
+                          </View>
+                        )}
                         
                         {/* Pickup Appointment Details */}
                         {(order.pickupAppointment || order.pickupDate) && (
@@ -688,24 +1121,78 @@ const ActiveTrips = () => {
                         <View style={styles.sectionDivider}>
                           <Text style={styles.sectionTitle}>Receiver Information</Text>
                         </View>
-                        {order.deliveryLocation?.receiverName && (
+                        {order.receiver?.name && (
                           <View style={styles.infoRow}>
                             <Text style={styles.infoLabel}>Name:</Text>
-                            <Text style={styles.infoValue}>{order.deliveryLocation.receiverName}</Text>
+                            <Text style={styles.infoValue}>{order.receiver.name}</Text>
                           </View>
                         )}
-                        {order.deliveryLocation?.receiverPhone && (
+                        {order.receiver?.phone && (
                           <View style={styles.infoRow}>
                             <Text style={styles.infoLabel}>Phone:</Text>
-                            <Text style={styles.infoValue}>{order.deliveryLocation.receiverPhone}</Text>
+                            <Text style={styles.infoValue}>{order.receiver.phone}</Text>
+                          </View>
+                        )}
+                        {order.receiver?.contact && (
+                          <View style={styles.infoRow}>
+                            <Text style={styles.infoLabel}>Contact:</Text>
+                            <Text style={styles.infoValue}>{order.receiver.contact}</Text>
                           </View>
                         )}
                         <View style={styles.locationRow}>
                           <Text style={styles.locationLabel}>Address: </Text>
                           <Text style={styles.locationValue}>
-                            {order.deliveryLocation?.deliveryAddress || formatAddress(order.deliveryLocation)}
+                            {order.receiver?.address || formatAddress(order.deliveryLocation) || 'N/A'}
                           </Text>
                         </View>
+                        
+                        {/* Multiple Delivery Stops */}
+                        {order.receiverStops && order.receiverStops.length > 0 && (
+                          <View style={styles.stopsSection}>
+                            <Text style={styles.stopsTitle}>Additional Delivery Stops ({order.receiverStops.length}):</Text>
+                            {order.receiverStops.map((stop: any, stopIndex: number) => (
+                              <View key={stopIndex} style={styles.stopItem}>
+                                <Text style={styles.stopNumber}>Stop {stop.stop || stopIndex + 1}</Text>
+                                {stop.receiver && (
+                                  <View style={styles.infoRow}>
+                                    <Text style={styles.infoLabel}>Receiver:</Text>
+                                    <Text style={styles.infoValue}>{stop.receiver}</Text>
+                                  </View>
+                                )}
+                                {stop.address && (
+                                  <View style={styles.locationRow}>
+                                    <Text style={styles.locationLabel}>Address:</Text>
+                                    <Text style={styles.locationValue}>{stop.address}</Text>
+                                  </View>
+                                )}
+                                {stop.contact && (
+                                  <View style={styles.infoRow}>
+                                    <Text style={styles.infoLabel}>Contact:</Text>
+                                    <Text style={styles.infoValue}>{stop.contact}</Text>
+                                  </View>
+                                )}
+                                {stop.date && (
+                                  <View style={styles.infoRow}>
+                                    <Text style={styles.infoLabel}>Date:</Text>
+                                    <Text style={styles.infoValue}>{stop.date}</Text>
+                                  </View>
+                                )}
+                                {stop.appointment && (
+                                  <View style={styles.infoRow}>
+                                    <Text style={styles.infoLabel}>Appointment:</Text>
+                                    <Text style={styles.infoValue}>{stop.appointment}</Text>
+                                  </View>
+                                )}
+                                {stop.dropOffNumber && (
+                                  <View style={styles.infoRow}>
+                                    <Text style={styles.infoLabel}>Drop-off #:</Text>
+                                    <Text style={styles.infoValue}>{stop.dropOffNumber}</Text>
+                                  </View>
+                                )}
+                              </View>
+                            ))}
+                          </View>
+                        )}
                         
                         {/* Delivery Appointment Details */}
                         {(order.deliveryAppointment || order.deliveryDate) && (
@@ -1214,6 +1701,32 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontWeight: '600',
     color: '#333',
+    marginBottom: 6,
+  },
+  stopsSection: {
+    marginTop: 12,
+    padding: 8,
+    backgroundColor: '#f9f9f9',
+    borderRadius: 6,
+  },
+  stopsTitle: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#333',
+    marginBottom: 8,
+  },
+  stopItem: {
+    marginBottom: 12,
+    padding: 8,
+    backgroundColor: '#fff',
+    borderRadius: 6,
+    borderLeftWidth: 3,
+    borderLeftColor: '#2563eb',
+  },
+  stopNumber: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#2563eb',
     marginBottom: 6,
   },
 });

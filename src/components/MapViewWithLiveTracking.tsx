@@ -21,6 +21,7 @@ import { apiService } from '../services/api/apiService';
 let MapView: any = null;
 let Marker: any = null;
 let Polyline: any = null;
+let UrlTile: any = null;
 let PROVIDER_GOOGLE: any = null;
 
 // Only import on native platforms - Metro will use web stub on web
@@ -30,6 +31,7 @@ try {
     MapView = mapsModule.default;
     Marker = mapsModule.Marker;
     Polyline = mapsModule.Polyline;
+    UrlTile = mapsModule.UrlTile;
     PROVIDER_GOOGLE = mapsModule.PROVIDER_GOOGLE;
   }
 } catch (error) {
@@ -180,6 +182,18 @@ interface MapViewWithLiveTrackingProps {
       _id: string;
       internalId: string;
       plateNumber?: string;
+      trackingKey?: string;
+    };
+    yardLocation?: {
+      yardName?: string;
+      yardCode?: string;
+      address?: string;
+      city?: string;
+      stateProvince?: string;
+      coordinates?: {
+        latitude?: number | string;
+        longitude?: number | string;
+      };
     };
   };
 }
@@ -278,7 +292,16 @@ const MapViewWithLiveTracking: React.FC<MapViewWithLiveTrackingProps> = ({
   }
   
   const dropoff = load.route?.selectDropOff;
-  const vehicleId = load.vehicle?.internalId;
+  // Use trackingKey if available (for Samsara/telematics tracking), otherwise fallback to internalId
+  const vehicleId = load.vehicle?.trackingKey || load.vehicle?.internalId;
+  
+  console.log('🚗 Vehicle tracking info:', {
+    hasVehicle: !!load.vehicle,
+    trackingKey: load.vehicle?.trackingKey,
+    internalId: load.vehicle?.internalId,
+    usingForTracking: vehicleId,
+    vehicleData: load.vehicle
+  });
 
   useEffect(() => {
     if (!visible) {
@@ -368,6 +391,14 @@ const MapViewWithLiveTracking: React.FC<MapViewWithLiveTrackingProps> = ({
           socketService.onVehicleLocation((vehicle: VehicleLocation) => {
             if (!locationReceived) {
               console.log('✅ Socket: Vehicle location updates working');
+              console.log('📍 First vehicle location received:', {
+                vehicleId: vehicle._id,
+                internalId: vehicle.internalId,
+                hasLocation: !!(vehicle.currentLocation?.latitude && vehicle.currentLocation?.longitude),
+                location: vehicle.currentLocation,
+                speed: vehicle.speed,
+                fuelLevel: vehicle.fuelLevel
+              });
               locationReceived = true;
             }
             setVehicleLocation(vehicle);
@@ -452,6 +483,12 @@ const MapViewWithLiveTracking: React.FC<MapViewWithLiveTrackingProps> = ({
           });
           
           // Now join the vehicle room - this will trigger the backend to start sending updates
+          console.log('🚗 Calling joinVehicle with:', {
+            vehicleId,
+            isTrackingKey: load.vehicle?.trackingKey === vehicleId,
+            trackingKey: load.vehicle?.trackingKey,
+            internalId: load.vehicle?.internalId
+          });
           socketService.joinVehicle(vehicleId);
           
           // Clear timeout on cleanup
@@ -522,6 +559,16 @@ const MapViewWithLiveTracking: React.FC<MapViewWithLiveTrackingProps> = ({
   // Calculate map region to fit all markers
   const calculateRegion = () => {
     const coordinates: Array<{ latitude: number; longitude: number }> = [];
+
+    // Add yard location as starting point (if vehicle location is not available)
+    const yardLat = parseCoordinate(load.yardLocation?.coordinates?.latitude);
+    const yardLng = parseCoordinate(load.yardLocation?.coordinates?.longitude);
+    if (yardLat !== null && yardLng !== null) {
+      coordinates.push({
+        latitude: yardLat,
+        longitude: yardLng,
+      });
+    }
 
     // Add pickup location (either from selectPickup or from waypoint with pickup: true)
     const pickupLat = parseCoordinate(pickup?.latitude);
@@ -709,12 +756,30 @@ const MapViewWithLiveTracking: React.FC<MapViewWithLiveTrackingProps> = ({
   // Prepare valid waypoints for rendering (filter out invalid coordinates)
   // Use useMemo to ensure stable array reference - defined early so it can be used in useEffect
   const validWaypoints = useMemo(() => {
-    if (!multipleDropOffs || !wayPoints || wayPoints.length === 0) {
+    // Show waypoints if we have them, regardless of multipleDropOffs flag
+    // This ensures stops are shown even for single orders with additional stops
+    console.log('🔍 Processing waypoints for map:', {
+      hasWayPoints: !!wayPoints,
+      wayPointsLength: wayPoints?.length || 0,
+      wayPoints: wayPoints,
+      multipleDropOffs
+    });
+    
+    if (!wayPoints || wayPoints.length === 0) {
+      console.warn('⚠️ No waypoints provided to map component');
       return [];
     }
 
     const valid = wayPoints
       .map((waypoint, originalIndex) => {
+        console.log(`🔍 Processing waypoint ${originalIndex}:`, {
+          waypoint,
+          hasAddress: !!waypoint.address,
+          address: waypoint.address,
+          stopNumber: (waypoint as any).stopNumber,
+          stopType: (waypoint as any).stopType,
+        });
+        
         // Try multiple ways to get coordinates
         // 1. From waypoint.address.latitude/longitude (most common)
         // 2. From waypoint.latitude/longitude (direct on waypoint)
@@ -722,10 +787,18 @@ const MapViewWithLiveTracking: React.FC<MapViewWithLiveTrackingProps> = ({
         let waypointLat = parseCoordinate(waypoint.address?.latitude);
         let waypointLng = parseCoordinate(waypoint.address?.longitude);
         
+        console.log(`  📍 Initial coords from address:`, {
+          lat: waypointLat,
+          lng: waypointLng,
+          addressLat: waypoint.address?.latitude,
+          addressLng: waypoint.address?.longitude,
+        });
+        
         // If not found in address, try direct on waypoint
         if (waypointLat === null || waypointLng === null) {
           waypointLat = parseCoordinate((waypoint as any)?.latitude);
           waypointLng = parseCoordinate((waypoint as any)?.longitude);
+          console.log(`  📍 Tried direct on waypoint:`, { lat: waypointLat, lng: waypointLng });
         }
         
         // If still not found, try coordinates array
@@ -734,11 +807,22 @@ const MapViewWithLiveTracking: React.FC<MapViewWithLiveTrackingProps> = ({
           if (Array.isArray(coords) && coords.length >= 2) {
             waypointLng = parseCoordinate(coords[0]); // longitude first in GeoJSON
             waypointLat = parseCoordinate(coords[1]); // latitude second in GeoJSON
+            console.log(`  📍 Tried coordinates array:`, { lat: waypointLat, lng: waypointLng });
           }
         }
         
         // Log warning if coordinates are missing
         if (waypointLat === null || waypointLng === null) {
+          console.error(`❌ Waypoint ${originalIndex} missing coordinates:`, {
+            waypointIndex: originalIndex,
+            hasAddress: !!waypoint.address,
+            addressKeys: waypoint.address ? Object.keys(waypoint.address) : [],
+            waypointKeys: Object.keys(waypoint),
+            place: waypoint.address?.place,
+            stopNumber: (waypoint as any).stopNumber,
+            stopType: (waypoint as any).stopType,
+            fullWaypoint: waypoint,
+          });
           logger.warn('Waypoint missing coordinates', {
             waypointIndex: originalIndex,
             hasAddress: !!waypoint.address,
@@ -749,6 +833,14 @@ const MapViewWithLiveTracking: React.FC<MapViewWithLiveTrackingProps> = ({
           return null;
         }
 
+        console.log(`✅ Waypoint ${originalIndex} has valid coordinates:`, {
+          lat: waypointLat,
+          lng: waypointLng,
+          place: waypoint.address?.place,
+          stopNumber: (waypoint as any).stopNumber,
+          stopType: (waypoint as any).stopType,
+        });
+
         return {
           waypoint,
           waypointLat,
@@ -756,14 +848,33 @@ const MapViewWithLiveTracking: React.FC<MapViewWithLiveTrackingProps> = ({
           originalIndex,
           isDropoff: waypoint.dropOff === true,
           isPickup: waypoint.pickup === true,
+          stopNumber: (waypoint as any).stopNumber,
+          stopType: (waypoint as any).stopType || 'main',
         };
       })
       .filter((item): item is NonNullable<typeof item> => item !== null);
+    
+    console.log('🗺️ Valid waypoints summary:', {
+      totalWaypoints: wayPoints.length,
+      validWaypoints: valid.length,
+      invalidCount: wayPoints.length - valid.length,
+      multipleDropOffs,
+      waypointsWithStops: valid.filter(w => w.stopType === 'additional').length,
+      validWaypointsDetails: valid.map(w => ({ 
+        place: w.waypoint.address?.place, 
+        stopNumber: w.stopNumber, 
+        stopType: w.stopType,
+        isPickup: w.isPickup,
+        isDropoff: w.isDropoff,
+        coords: [w.waypointLat, w.waypointLng]
+      }))
+    });
     
     logger.info('Valid waypoints prepared', {
       totalWaypoints: wayPoints.length,
       validWaypoints: valid.length,
       multipleDropOffs,
+      waypointsWithStops: valid.filter(w => w.stopType === 'additional').length,
     });
     
     return valid;
@@ -1129,7 +1240,7 @@ const MapViewWithLiveTracking: React.FC<MapViewWithLiveTrackingProps> = ({
       });
       
       if (!response || !response.success) {
-        const errorMsg = response?.error_message || response?.message || response?.error || 'Directions request failed';
+        const errorMsg = response?.message || response?.error || 'Directions request failed';
         console.error('❌ Directions API error:', errorMsg);
         throw new Error(`Directions request failed: ${errorMsg}`);
       }
@@ -1153,8 +1264,9 @@ const MapViewWithLiveTracking: React.FC<MapViewWithLiveTrackingProps> = ({
       
       // Check for API errors in the Google response
       if (googleResponse.status && googleResponse.status !== 'OK') {
-        console.error('❌ Directions API returned error:', googleResponse.status, googleResponse.error_message);
-        throw new Error(`Directions API error: ${googleResponse.status} - ${googleResponse.error_message || 'Unknown error'}`);
+        const errorMsg = (googleResponse as any).error_message || googleResponse.error || 'Unknown error';
+        console.error('❌ Directions API returned error:', googleResponse.status, errorMsg);
+        throw new Error(`Directions API error: ${googleResponse.status} - ${errorMsg}`);
       }
 
       // Extract polyline from Google Directions API response
@@ -1269,6 +1381,15 @@ const MapViewWithLiveTracking: React.FC<MapViewWithLiveTrackingProps> = ({
       points.push({ latitude: dropoffLat, longitude: dropoffLng });
     }
     
+    // Add yard location if vehicle location is not available (as starting point)
+    if (!vehicleCoordinates && load.yardLocation?.coordinates) {
+      const yardLat = parseCoordinate(load.yardLocation.coordinates.latitude);
+      const yardLng = parseCoordinate(load.yardLocation.coordinates.longitude);
+      if (yardLat !== null && yardLng !== null) {
+        points.push({ latitude: yardLat, longitude: yardLng });
+      }
+    }
+    
     if (vehicleCoordinates) {
       points.push(vehicleCoordinates);
     }
@@ -1283,7 +1404,7 @@ const MapViewWithLiveTracking: React.FC<MapViewWithLiveTrackingProps> = ({
 
     try {
       mapRef.current.fitToCoordinates(points, {
-        edgePadding: { top: 120, right: 80, bottom: 220, left: 80 },
+        edgePadding: { top: 120, right: 80, bottom: 280, left: 80 },
         animated: true,
       });
     } catch (fitError) {
@@ -1653,7 +1774,7 @@ const MapViewWithLiveTracking: React.FC<MapViewWithLiveTrackingProps> = ({
                 }
               }}
             />
-          ) : MapView && PROVIDER_GOOGLE ? (() => {
+          ) : MapView ? (() => {
             try {
               const region = calculateRegion();
               console.log('🗺️ Calculated region:', region);
@@ -1683,8 +1804,7 @@ const MapViewWithLiveTracking: React.FC<MapViewWithLiveTrackingProps> = ({
               return (
                 <MapView
                   ref={mapRef}
-        style={styles.map}
-                  provider={PROVIDER_GOOGLE}
+                  style={styles.map}
                   region={region}
                   initialRegion={region}
                   mapType="standard"
@@ -1696,6 +1816,13 @@ const MapViewWithLiveTracking: React.FC<MapViewWithLiveTrackingProps> = ({
                   loadingEnabled={true}
                   loadingIndicatorColor="#666666"
                   loadingBackgroundColor="#ffffff"
+                  pitchEnabled={false}
+                  rotateEnabled={true}
+                  scrollEnabled={true}
+                  zoomEnabled={true}
+                  zoomControlEnabled={false}
+                  minZoomLevel={5}
+                  maxZoomLevel={20}
                   onMapReady={() => {
                     console.log('✅ Map is ready and loaded');
                     console.log('📍 Map region:', region);
@@ -1708,7 +1835,7 @@ const MapViewWithLiveTracking: React.FC<MapViewWithLiveTrackingProps> = ({
                     console.error('❌ Map error:', error);
                     console.error('❌ Error details:', JSON.stringify(error, null, 2));
                     logger.error('Map error', error);
-                    const errorMessage = error?.message || error?.nativeEvent?.message || 'Map failed to load. Please check your Google Maps API key configuration.';
+                    const errorMessage = error?.message || error?.nativeEvent?.message || 'Map failed to load.';
                     setMapError(errorMessage);
                     setMapLoading(false);
                     // Show error but don't block the UI
@@ -1732,17 +1859,39 @@ const MapViewWithLiveTracking: React.FC<MapViewWithLiveTrackingProps> = ({
                 }}
                 anchor={{ x: 0.5, y: 0.5 }}
                 tracksViewChanges={false}
-                zIndex={2000}
+                zIndex={4000}
               >
                 <View style={styles.markerWrapper} collapsable={false} pointerEvents="none">
-                  <View style={[styles.markerCard, styles.pickupCard]}>
-                    <Text style={styles.markerCardTitle}>Pickup</Text>
-                    <Text style={styles.markerCardSubtitle} numberOfLines={1}>
+                  {/* Round Marker - Circular */}
+                  <View style={styles.roundMarkerContainer}>
+                    <View style={[styles.roundMarker, styles.pickupRoundMarker]}>
+                      <Ionicons name="location" size={24} color="#fff" />
+                    </View>
+                    <View style={[styles.roundMarkerShadow, styles.pickupRoundMarkerShadow]} />
+                  </View>
+                  
+                  {/* Label Card */}
+                  <View style={[
+                    styles.markerCard, 
+                    styles.pickupCard,
+                    styles.markerCardAboveRound,
+                    {
+                      borderWidth: 3,
+                      borderColor: '#1e40af',
+                      shadowColor: '#3b82f6',
+                      shadowOffset: { width: 0, height: 4 },
+                      shadowOpacity: 1.0,
+                      shadowRadius: 12,
+                      elevation: 20,
+                    }
+                  ]}>
+                    <Text style={[styles.markerCardTitle, { color: '#fff', fontWeight: '900', fontSize: 14 }]}>
+                      📦 Pickup
+                    </Text>
+                    <Text style={[styles.markerCardSubtitle, { color: '#dbeafe', fontWeight: '600' }]} numberOfLines={1}>
                       {pickup?.place || pickup?.city || 'Location'}
                     </Text>
                   </View>
-                  <View style={[styles.markerPointer, styles.pickupPointer]} />
-                  <View style={[styles.markerPointerShadow, styles.pickupPointerShadow]} />
                 </View>
               </Marker>
             )}
@@ -1757,36 +1906,113 @@ const MapViewWithLiveTracking: React.FC<MapViewWithLiveTrackingProps> = ({
                 }}
                 anchor={{ x: 0.5, y: 0.5 }}
                 tracksViewChanges={false}
-                zIndex={1500}
+                zIndex={3500}
               >
                 <View style={styles.markerWrapper} collapsable={false} pointerEvents="none">
-                  <View style={[styles.markerCard, styles.dropoffCard]}>
-                    <Text style={styles.markerCardTitle}>Drop-off</Text>
-                    <Text style={styles.markerCardSubtitle} numberOfLines={1}>
+                  {/* Round Marker - Circular */}
+                  <View style={styles.roundMarkerContainer}>
+                    <View style={[styles.roundMarker, styles.dropoffRoundMarker]}>
+                      <Ionicons name="location" size={24} color="#fff" />
+                    </View>
+                    <View style={[styles.roundMarkerShadow, styles.dropoffRoundMarkerShadow]} />
+                  </View>
+                  
+                  {/* Label Card */}
+                  <View style={[
+                    styles.markerCard, 
+                    styles.dropoffCard,
+                    styles.markerCardAboveRound,
+                    {
+                      borderWidth: 3,
+                      borderColor: '#d97706',
+                      shadowColor: '#f59e0b',
+                      shadowOffset: { width: 0, height: 4 },
+                      shadowOpacity: 1.0,
+                      shadowRadius: 12,
+                      elevation: 20,
+                    }
+                  ]}>
+                    <Text style={[styles.markerCardTitle, { color: '#fff', fontWeight: '900', fontSize: 14 }]}>
+                      🚚 Drop-off
+                    </Text>
+                    <Text style={[styles.markerCardSubtitle, { color: '#fef3c7', fontWeight: '600' }]} numberOfLines={1}>
                       {dropoff?.place || dropoff?.city || 'Location'}
                     </Text>
                   </View>
-                  <View style={[styles.markerPointer, styles.dropoffPointer]} />
-                  <View style={[styles.markerPointerShadow, styles.dropoffPointerShadow]} />
                 </View>
               </Marker>
             )}
 
-            {/* Waypoint Markers with Labels */}
-            {validWaypoints.map((item, displayIndex) => {
-              const { waypoint, waypointLat, waypointLng, originalIndex, isDropoff, isPickup } = item;
+            {/* Waypoint Markers with Labels - Shows all stops including additional stops */}
+            {validWaypoints.length > 0 && validWaypoints.map((item, displayIndex) => {
+              const { waypoint, waypointLat, waypointLng, originalIndex, isDropoff, isPickup, stopNumber, stopType } = item;
+              
+              // Log each waypoint being rendered
+              console.log(`🗺️ Rendering waypoint ${displayIndex + 1}:`, {
+                place: waypoint.address?.place,
+                stopNumber,
+                stopType,
+                isPickup,
+                isDropoff,
+                coords: [waypointLat, waypointLng]
+              });
               
               // Skip rendering pickup waypoint if it's already shown as pickup marker
               // Only skip if pickup exists and coordinates match
               if (isPickup && pickup && 
                   parseCoordinate(pickup?.latitude) === waypointLat &&
                   parseCoordinate(pickup?.longitude) === waypointLng) {
+                console.log(`  ⏭️ Skipping waypoint (already shown as pickup marker)`);
                 return null;
               }
               
               // Create unique key for each marker
               const markerKey = `waypoint-${load._id}-${originalIndex}-${Math.round(waypointLat * 10000)}-${Math.round(waypointLng * 10000)}`;
 
+              // Log if this is an additional stop
+              if (stopType === 'additional') {
+                console.log(`  ⭐ This is an ADDITIONAL STOP - should be highlighted!`, {
+                  stopNumber,
+                  stopType,
+                  hasHighlight: true
+                });
+              }
+
+              // Determine pin color based on stop type
+              let pinColor = '#3b82f6'; // Default blue for pickup
+              if (stopType === 'additional') {
+                pinColor = '#fbbf24'; // Yellow for additional stops
+              } else if (isDropoff) {
+                pinColor = '#f59e0b'; // Orange for drop-off
+              } else if (isPickup) {
+                pinColor = '#3b82f6'; // Blue for pickup
+              }
+
+              console.log(`🎨 Rendering marker for waypoint ${displayIndex + 1}:`, {
+                place: waypoint.address?.place,
+                stopNumber,
+                stopType,
+                pinColor,
+                isPickup,
+                isDropoff,
+                coords: [waypointLat, waypointLng]
+              });
+
+              // Force re-render for additional stops to ensure highlighting is visible
+              const isAdditionalStop = stopType === 'additional';
+              
+              console.log(`🎨 Rendering marker for waypoint ${displayIndex + 1}:`, {
+                place: waypoint.address?.place,
+                stopNumber,
+                stopType,
+                isAdditionalStop,
+                isPickup,
+                isDropoff,
+                coords: [waypointLat, waypointLng],
+                willHighlight: isAdditionalStop,
+                zIndex: isAdditionalStop ? 3000 + originalIndex : 1000 + originalIndex
+              });
+              
               return (
                 <Marker
                   key={markerKey}
@@ -1794,55 +2020,180 @@ const MapViewWithLiveTracking: React.FC<MapViewWithLiveTrackingProps> = ({
                     latitude: waypointLat,
                     longitude: waypointLng,
                   }}
-                  anchor={{ x: 0.5, y: 0.5 }}
-                  tracksViewChanges={false}
-                  zIndex={1000 + originalIndex}
+                  anchor={{ x: 0.5, y: 1.0 }}
+                  tracksViewChanges={isAdditionalStop}
+                  zIndex={isAdditionalStop ? 3000 + originalIndex : 1000 + originalIndex}
                 >
                   <View style={styles.markerWrapper} collapsable={false} pointerEvents="none">
                     <View
                       style={[
                         styles.markerCard,
-                        isDropoff
-                          ? styles.dropoffCard
-                          : isPickup
-                          ? styles.pickupCard
-                          : styles.waypointCard,
+                        // For additional stops, use special highlighting - MUST be first to ensure it applies
+                        isAdditionalStop && styles.additionalStopCard,
+                        !isAdditionalStop && isDropoff && styles.dropoffCard,
+                        !isAdditionalStop && isPickup && styles.pickupCard,
+                        !isAdditionalStop && !isPickup && !isDropoff && styles.waypointCard,
+                        // Additional inline styles for extra emphasis on additional stops
+                        isAdditionalStop && {
+                          borderWidth: 6,
+                          borderColor: '#f59e0b',
+                          shadowColor: '#f59e0b',
+                          shadowOffset: { width: 0, height: 4 },
+                          shadowOpacity: 1.0,
+                          shadowRadius: 15,
+                          elevation: 25,
+                        },
                       ]}
                     >
-                      <Text style={styles.markerCardTitle}>
-                        {isDropoff ? 'Drop-off' : isPickup ? 'Pickup' : `Stop ${displayIndex + 1}`}
+                      <Text style={[
+                        styles.markerCardTitle,
+                        isAdditionalStop && { 
+                          color: '#78350f',
+                          fontWeight: '900',
+                          fontSize: 14,
+                        }
+                      ]}>
+                        {stopNumber 
+                          ? `${isDropoff ? 'Drop-off' : 'Pickup'} Stop ${stopNumber}`
+                          : isDropoff 
+                          ? 'Drop-off' 
+                          : isPickup 
+                          ? 'Pickup' 
+                          : `Stop ${displayIndex + 1}`}
+                        {isAdditionalStop && ' ⭐'}
                       </Text>
-                      <Text style={styles.markerCardSubtitle} numberOfLines={1}>
+                      <Text style={[
+                        styles.markerCardSubtitle,
+                        isAdditionalStop && { 
+                          color: '#92400e',
+                          fontWeight: '700',
+                        }
+                      ]} numberOfLines={1}>
                         {waypoint.address?.place || waypoint.address?.city || 'Waypoint'}
                       </Text>
+                      {isAdditionalStop && (
+                        <View style={[styles.markerCardBadge, { backgroundColor: '#f59e0b' }]}>
+                          <Text style={[styles.markerCardBadgeText, { color: '#fff', fontWeight: '900' }]}>
+                            Additional Stop
+                          </Text>
+                        </View>
+                      )}
                     </View>
+                    {/* Enhanced marker pointer for additional stops */}
                     <View
                       style={[
                         styles.markerPointer,
-                        isDropoff
+                        isAdditionalStop
+                          ? styles.additionalStopPointer
+                          : isDropoff
                           ? styles.dropoffPointer
                           : isPickup
                           ? styles.pickupPointer
                           : styles.waypointPointer,
+                        isAdditionalStop && {
+                          width: 32,
+                          height: 32,
+                          backgroundColor: '#f59e0b',
+                          borderWidth: 5,
+                          borderColor: '#fff',
+                          borderRadius: 16,
+                          transform: [{ rotate: '0deg' }],
+                          shadowColor: '#f59e0b',
+                          shadowOffset: { width: 0, height: 0 },
+                          shadowOpacity: 1.0,
+                          shadowRadius: 15,
+                          elevation: 30,
+                          marginTop: -12,
+                        }
                       ]}
-                    />
+                    >
+                      {isAdditionalStop && (
+                        <Ionicons name="location" size={18} color="#fff" />
+                      )}
+                    </View>
                     <View
                       style={[
                         styles.markerPointerShadow,
-                        isDropoff
+                        isAdditionalStop
+                          ? styles.additionalStopPointerShadow
+                          : isDropoff
                           ? styles.dropoffPointerShadow
                           : isPickup
                           ? styles.pickupPointerShadow
                           : styles.waypointPointerShadow,
+                        isAdditionalStop && {
+                          width: 42,
+                          height: 14,
+                          backgroundColor: 'rgba(245, 158, 11, 0.8)',
+                          borderRadius: 7,
+                          marginTop: 2,
+                        }
                       ]}
                     />
-    </View>
+                  </View>
                 </Marker>
               );
             })}
 
+            {/* Yard Location Marker (Starting Point) - Show when vehicle location is not available */}
+            {!vehicleCoordinates && load.yardLocation?.coordinates && (() => {
+              const yardLat = parseCoordinate(load.yardLocation.coordinates.latitude);
+              const yardLng = parseCoordinate(load.yardLocation.coordinates.longitude);
+              if (yardLat !== null && yardLng !== null) {
+                return (
+                  <Marker
+                    key={`yard-${load._id}-${yardLat}-${yardLng}`}
+                    coordinate={{ latitude: yardLat, longitude: yardLng }}
+                    anchor={{ x: 0.5, y: 0.5 }}
+                    tracksViewChanges={false}
+                    zIndex={2500}
+                    pinColor="#10b981"
+                  >
+                    <View style={styles.markerWrapper} collapsable={false} pointerEvents="none">
+                      <View style={[styles.markerCard, styles.yardCard]}>
+                        <Text style={styles.markerCardTitle}>
+                          🏭 {load.yardLocation.yardName || 'Yard'}
+                        </Text>
+                        <Text style={styles.markerCardSubtitle} numberOfLines={1}>
+                          Starting Point
+                        </Text>
+                      </View>
+                      <View style={styles.yardPointer} />
+                      <View style={styles.yardPointerShadow} />
+                    </View>
+                  </Marker>
+                );
+              }
+              return null;
+            })()}
+
+            {/* Route from Yard to Vehicle Location */}
+            {vehicleCoordinates && load.yardLocation?.coordinates && (() => {
+              const yardLat = parseCoordinate(load.yardLocation.coordinates.latitude);
+              const yardLng = parseCoordinate(load.yardLocation.coordinates.longitude);
+              if (yardLat !== null && yardLng !== null) {
+                const yardToVehicleRoute = [
+                  { latitude: yardLat, longitude: yardLng },
+                  { latitude: vehicleCoordinates.latitude, longitude: vehicleCoordinates.longitude }
+                ];
+                return (
+                  <Polyline
+                    key={`yard-to-vehicle-${load._id}`}
+                    coordinates={yardToVehicleRoute}
+                    strokeColor="#10b981"
+                    strokeWidth={4}
+                    lineCap="round"
+                    lineJoin="round"
+                    lineDashPattern={[8, 4]}
+                    zIndex={2000}
+                  />
+                );
+              }
+              return null;
+            })()}
+
             {/* Vehicle Location with Label */}
-            {vehicleCoordinates && (
+            {vehicleCoordinates && vehicleCoordinates.latitude !== null && vehicleCoordinates.longitude !== null && (
               <Marker
                 key={`vehicle-${load._id}-${vehicleLocation?._id || 'unknown'}-${Math.round(vehicleCoordinates.latitude * 10000)}-${Math.round(vehicleCoordinates.longitude * 10000)}`}
                 coordinate={vehicleCoordinates}
@@ -1857,10 +2208,12 @@ const MapViewWithLiveTracking: React.FC<MapViewWithLiveTrackingProps> = ({
               <Polyline
                 coordinates={routePath}
                 strokeColor="#3b82f6"
-                strokeWidth={5}
+                strokeWidth={6}
+          
                 lineCap="round"
                 lineJoin="round"
                 miterLimit={1}
+                zIndex={100}
               />
             )}
             
@@ -1906,7 +2259,7 @@ const MapViewWithLiveTracking: React.FC<MapViewWithLiveTrackingProps> = ({
               <Ionicons name="map-outline" size={64} color="#8B5CF6" />
               <Text style={styles.fallbackText}>Maps Not Available</Text>
               <Text style={styles.fallbackSubtext}>
-                {!MapView ? 'react-native-maps is not installed. Please rebuild the app with EAS Build.' : 'Map provider is not available. Please check your configuration.'}
+                {!MapView ? 'react-native-maps is not installed. Please rebuild the app with EAS Build.' : 'Map is not available. Please check your configuration.'}
               </Text>
               <TouchableOpacity 
                 style={styles.errorButton} 
@@ -2291,7 +2644,7 @@ const styles = StyleSheet.create({
   },
   pickupMarker: {
     width: 44,
-    height: 44,
+    height: 60,
     borderRadius: 22,
     backgroundColor: '#27ae60',
     justifyContent: 'center',
@@ -2387,6 +2740,54 @@ const styles = StyleSheet.create({
     justifyContent: 'flex-end',
     paddingHorizontal: 4,
   },
+  // Round marker styles
+  roundMarkerContainer: {
+    position: 'relative',
+    zIndex: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  roundMarker: {
+    width: 50,
+    height: 50,
+    borderRadius: 25,
+    backgroundColor: '#3b82f6',
+    borderWidth: 5,
+    borderColor: '#fff',
+    justifyContent: 'center',
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.5,
+    shadowRadius: 8,
+    elevation: 20,
+  },
+  pickupRoundMarker: {
+    backgroundColor: '#3b82f6',
+    borderColor: '#fff',
+  },
+  dropoffRoundMarker: {
+    backgroundColor: '#f59e0b',
+    borderColor: '#fff',
+  },
+  roundMarkerShadow: {
+    position: 'absolute',
+    width: 50,
+    height: 50,
+    borderRadius: 25,
+    top: 3,
+    left: 0,
+    zIndex: -1,
+  },
+  pickupRoundMarkerShadow: {
+    backgroundColor: 'rgba(59, 130, 246, 0.4)',
+  },
+  dropoffRoundMarkerShadow: {
+    backgroundColor: 'rgba(245, 158, 11, 0.4)',
+  },
+  markerCardAboveRound: {
+    marginBottom: 60,
+  },
   markerCard: {
     minWidth: 150,
     maxWidth: 220,
@@ -2401,13 +2802,26 @@ const styles = StyleSheet.create({
     elevation: 8,
   },
   pickupCard: {
-    backgroundColor: '#047857',
+    backgroundColor: '#3b82f6', // Blue for pickup (matches web app)
   },
   dropoffCard: {
-    backgroundColor: '#b91c1c',
+    backgroundColor: '#f59e0b', // Orange/Amber for drop-off (matches web app)
   },
   waypointCard: {
     backgroundColor: '#c2410c',
+  },
+  additionalStopCard: {
+    backgroundColor: '#fef3c7', // Light yellow background for additional stops
+    borderWidth: 3,
+    borderColor: '#fbbf24', // Yellow border for visibility
+    shadowColor: '#fbbf24',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.6,
+    shadowRadius: 6,
+    elevation: 10,
+  },
+  yardCard: {
+    backgroundColor: '#10b981', // Green for yard (starting point)
   },
   markerCardTitle: {
     color: '#ffffff',
@@ -2419,6 +2833,24 @@ const styles = StyleSheet.create({
     color: '#e5e7eb',
     fontSize: 12,
     fontWeight: '500',
+  },
+  markerCardBadge: {
+    marginTop: 6,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    backgroundColor: '#f59e0b',
+    borderRadius: 6,
+    alignSelf: 'flex-start',
+    overflow: 'hidden',
+    borderWidth: 2,
+    borderColor: '#fff',
+  },
+  markerCardBadgeText: {
+    color: '#fff',
+    fontSize: 11,
+    fontWeight: '900',
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
   },
   markerCardMeta: {
     marginTop: 6,
@@ -2442,22 +2874,34 @@ const styles = StyleSheet.create({
     marginTop: 4,
   },
   pickupPointer: {
-    backgroundColor: '#047857',
+    backgroundColor: '#3b82f6', // Blue for pickup (matches web app)
   },
   dropoffPointer: {
-    backgroundColor: '#b91c1c',
+    backgroundColor: '#f59e0b', // Orange/Amber for drop-off (matches web app)
   },
   waypointPointer: {
     backgroundColor: '#c2410c',
   },
   pickupPointerShadow: {
-    backgroundColor: 'rgba(4, 120, 87, 0.25)',
+    backgroundColor: 'rgba(59, 130, 246, 0.25)', // Blue shadow
   },
   dropoffPointerShadow: {
-    backgroundColor: 'rgba(185, 28, 28, 0.25)',
+    backgroundColor: 'rgba(245, 158, 11, 0.25)', // Orange shadow
   },
   waypointPointerShadow: {
     backgroundColor: 'rgba(194, 65, 12, 0.25)',
+  },
+  additionalStopPointer: {
+    backgroundColor: '#fbbf24', // Yellow pointer for additional stops
+  },
+  additionalStopPointerShadow: {
+    backgroundColor: 'rgba(251, 191, 36, 0.4)', // Yellow shadow for additional stops
+  },
+  yardPointer: {
+    backgroundColor: '#10b981', // Green for yard
+  },
+  yardPointerShadow: {
+    backgroundColor: 'rgba(16, 185, 129, 0.25)', // Green shadow
   },
   waypointLegend: {
     backgroundColor: '#f39c12',
@@ -2485,10 +2929,10 @@ const styles = StyleSheet.create({
     marginBottom: 8,
   },
   pickupCalloutHeader: {
-    backgroundColor: '#27ae60',
+    backgroundColor: '#3b82f6', // Blue for pickup (matches web app)
   },
   dropoffCalloutHeader: {
-    backgroundColor: '#e74c3c',
+    backgroundColor: '#f59e0b', // Orange/Amber for drop-off (matches web app)
   },
   vehicleCalloutHeader: {
     backgroundColor: '#3498db',

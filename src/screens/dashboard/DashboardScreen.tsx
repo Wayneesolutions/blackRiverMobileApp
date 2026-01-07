@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { useFocusEffect } from '@react-navigation/native';
+import { useFocusEffect, useRoute } from '@react-navigation/native';
 import {
     View,
     Text,
@@ -51,6 +51,7 @@ interface LoadStats {
 
 export default function DashboardScreen() {
     const navigation = useNavigation<NavigationProp>();
+    const route = useRoute();
     const [showAllWishList, setShowAllWishList] = useState(false);
     const [profile, setProfile] = useState<DriverProfile | null>(null);
     const [stats, setStats] = useState<LoadStats>({
@@ -68,8 +69,7 @@ export default function DashboardScreen() {
         // { id: 3, name: "HOS", icon: <MaterialIcons name="schedule" size={28} color="#fff" />, color: "#FFCC00", route: "HOS" },
         // { id: 4, name: "Asset Inspection", icon: <MaterialIcons name="report-problem" size={28} color="#fff" />, color: "#D74848", route: "AssetIncidents" },
         { id: 1, name: "Settings", icon: <Ionicons name="settings" size={28} color="#fff" />, color: "#2CDBFA", route: "Settings" },
-        { id: 2, name: "Document", icon: <Ionicons name="document-text" size={28} color="#fff" />, color: "#C79EFF", route: "Documents" },
-        { id: 3, name: "Load Map", icon: <Ionicons name="map" size={28} color="#fff" />, color: "#831775", route: "LoadMap" },
+        { id: 2, name: "Load Map", icon: <Ionicons name="map" size={28} color="#fff" />, color: "#831775", route: "LoadMap" },
         // { id: 8, name: "Transfer", icon: <Ionicons name="swap-horizontal" size={28} color="#fff" />, color: "#E61DCC", route: "Transfer" },
         // { id: 9, name: "Fuel", icon: <FontAwesome5 name="gas-pump" size={28} color="#fff" />, color: "#04AA30", route: "Fuel" },
     ];
@@ -79,12 +79,39 @@ export default function DashboardScreen() {
         fetchDashboardData();
     }, []);
 
+    // Track last refresh time to avoid duplicate calls
+    const lastRefreshRef = React.useRef<number>(0);
+    const REFRESH_DEBOUNCE_MS = 500; // Minimum time between refreshes
+
+    const refreshDashboardIfNeeded = React.useCallback(() => {
+        const now = Date.now();
+        if (now - lastRefreshRef.current > REFRESH_DEBOUNCE_MS) {
+            lastRefreshRef.current = now;
+            logger.info('Dashboard refresh triggered');
+            fetchDashboardData();
+        } else {
+            logger.info('Dashboard refresh skipped (too soon since last refresh)');
+        }
+    }, []);
+
     // Refresh dashboard data when screen comes into focus
     useFocusEffect(
         React.useCallback(() => {
-            fetchDashboardData();
-        }, [])
+            refreshDashboardIfNeeded();
+        }, [refreshDashboardIfNeeded])
     );
+
+    // Also listen for navigation focus events as a backup to ensure refresh
+    useEffect(() => {
+        const unsubscribe = navigation.addListener('focus', () => {
+            // Small delay to ensure any navigation transitions are complete
+            setTimeout(() => {
+                refreshDashboardIfNeeded();
+            }, 200);
+        });
+
+        return unsubscribe;
+    }, [navigation, refreshDashboardIfNeeded]);
 
     const fetchDashboardData = async () => {
         try {

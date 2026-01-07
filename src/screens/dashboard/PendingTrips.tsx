@@ -58,9 +58,6 @@ interface Trip {
           address?: string;
         };
       };
-      shipperName?: string;
-      shipperPhone?: string;
-      shipperAddress?: string;
     };
     deliveryLocation?: {
       place?: string;
@@ -70,10 +67,61 @@ interface Trip {
           address?: string;
         };
       };
-      receiverName?: string;
-      receiverPhone?: string;
-      deliveryAddress?: string;
     };
+    shipper?: {
+      name?: string;
+      phone?: string;
+      email?: string;
+      address?: string;
+      unit?: string;
+      country?: string;
+      province?: string;
+      city?: string;
+      postalCode?: string;
+      primaryPhone?: string;
+      secondaryPhone?: string;
+      contact?: string;
+      store?: string;
+      type?: string;
+    };
+    receiver?: {
+      name?: string;
+      phone?: string;
+      address?: string;
+      contact?: string;
+    };
+    stops?: Array<{
+      stop?: number;
+      shipper?: string;
+      date?: string;
+      endDate?: string;
+      appointment?: string;
+      pickUpNumber?: string;
+      contact?: string;
+      skids?: string;
+      cases?: string;
+      weight?: string;
+      uom?: string;
+      temperature?: string;
+      address?: string;
+      ltl?: boolean;
+    }>;
+    receiverStops?: Array<{
+      stop?: number;
+      receiver?: string;
+      date?: string;
+      endDate?: string;
+      appointment?: string;
+      dropOffNumber?: string;
+      contact?: string;
+      skids?: string;
+      cases?: string;
+      weight?: string;
+      uom?: string;
+      temperature?: string;
+      address?: string;
+      ltl?: boolean;
+    }>;
     pickupDate?: string;
     deliveryDate?: string;
     pickupAppointment?: {
@@ -85,6 +133,16 @@ interface Trip {
       date?: string;
       time?: string;
     };
+    attachments?: Array<{
+      id?: number;
+      name: string;
+      url: string;
+      fileSize?: number;
+      payable?: boolean;
+      shareWithDriver?: boolean;
+      uploadedAt?: string;
+      uploadedBy?: any;
+    }>;
   }>;
   plannedStartDate?: string;
   plannedEndDate?: string;
@@ -328,24 +386,92 @@ const PendingTrips = () => {
                       <View style={styles.sectionDivider}>
                         <Text style={styles.sectionTitle}>Shipper Information</Text>
                       </View>
-                      {order.pickupLocation?.shipperName && (
+                      {order.shipper?.name && (
                         <View style={styles.infoRow}>
                           <Text style={styles.infoLabel}>Name:</Text>
-                          <Text style={styles.infoValue}>{order.pickupLocation.shipperName}</Text>
+                          <Text style={styles.infoValue}>{order.shipper.name}</Text>
                         </View>
                       )}
-                      {order.pickupLocation?.shipperPhone && (
+                      {order.shipper?.phone && (
                         <View style={styles.infoRow}>
                           <Text style={styles.infoLabel}>Phone:</Text>
-                          <Text style={styles.infoValue}>{order.pickupLocation.shipperPhone}</Text>
+                          <Text style={styles.infoValue}>{order.shipper.phone}</Text>
+                        </View>
+                      )}
+                      {order.shipper?.contact && (
+                        <View style={styles.infoRow}>
+                          <Text style={styles.infoLabel}>Contact:</Text>
+                          <Text style={styles.infoValue}>{order.shipper.contact}</Text>
                         </View>
                       )}
                       <View style={styles.locationRow}>
                         <Text style={styles.locationLabel}>Address: </Text>
                         <Text style={styles.locationValue}>
-                          {order.pickupLocation?.shipperAddress || formatAddress(order.pickupLocation)}
+                          {order.shipper?.address || formatAddress(order.pickupLocation) || 'N/A'}
                         </Text>
                       </View>
+                      {order.shipper?.city && order.shipper?.province && (
+                        <View style={styles.infoRow}>
+                          <Text style={styles.infoLabel}>City/Province:</Text>
+                          <Text style={styles.infoValue}>
+                            {order.shipper.city}, {order.shipper.province}
+                          </Text>
+                        </View>
+                      )}
+                      {order.shipper?.postalCode && (
+                        <View style={styles.infoRow}>
+                          <Text style={styles.infoLabel}>Postal Code:</Text>
+                          <Text style={styles.infoValue}>{order.shipper.postalCode}</Text>
+                        </View>
+                      )}
+                      
+                      {/* Multiple Pickup Stops */}
+                      {order.stops && order.stops.length > 0 && (
+                        <View style={styles.stopsSection}>
+                          <Text style={styles.stopsTitle}>Additional Pickup Stops ({order.stops.length}):</Text>
+                          {order.stops.map((stop: any, stopIndex: number) => (
+                            <View key={stopIndex} style={styles.stopItem}>
+                              <Text style={styles.stopNumber}>Stop {stop.stop || stopIndex + 1}</Text>
+                              {stop.shipper && (
+                                <View style={styles.infoRow}>
+                                  <Text style={styles.infoLabel}>Shipper:</Text>
+                                  <Text style={styles.infoValue}>{stop.shipper}</Text>
+                                </View>
+                              )}
+                              {stop.address && (
+                                <View style={styles.locationRow}>
+                                  <Text style={styles.locationLabel}>Address:</Text>
+                                  <Text style={styles.locationValue}>{stop.address}</Text>
+                                </View>
+                              )}
+                              {stop.contact && (
+                                <View style={styles.infoRow}>
+                                  <Text style={styles.infoLabel}>Contact:</Text>
+                                  <Text style={styles.infoValue}>{stop.contact}</Text>
+                                </View>
+                              )}
+                              {stop.date && (
+                                <View style={styles.infoRow}>
+                                  <Text style={styles.infoLabel}>Date:</Text>
+                                  <Text style={styles.infoValue}>{stop.date}</Text>
+                                </View>
+                              )}
+                              {stop.appointment && (
+                                <View style={styles.infoRow}>
+                                  <Text style={styles.infoLabel}>Appointment:</Text>
+                                  <Text style={styles.infoValue}>{stop.appointment}</Text>
+                                </View>
+                              )}
+                              {stop.pickUpNumber && (
+                                <View style={styles.infoRow}>
+                                  <Text style={styles.infoLabel}>Pickup #:</Text>
+                                  <Text style={styles.infoValue}>{stop.pickUpNumber}</Text>
+                                </View>
+                              )}
+                            </View>
+                          ))}
+                        </View>
+                      )}
                       
                       {/* Pickup Appointment Details */}
                       {(order.pickupAppointment || order.pickupDate) && (
@@ -384,24 +510,78 @@ const PendingTrips = () => {
                       <View style={styles.sectionDivider}>
                         <Text style={styles.sectionTitle}>Receiver Information</Text>
                       </View>
-                      {order.deliveryLocation?.receiverName && (
+                      {order.receiver?.name && (
                         <View style={styles.infoRow}>
                           <Text style={styles.infoLabel}>Name:</Text>
-                          <Text style={styles.infoValue}>{order.deliveryLocation.receiverName}</Text>
+                          <Text style={styles.infoValue}>{order.receiver.name}</Text>
                         </View>
                       )}
-                      {order.deliveryLocation?.receiverPhone && (
+                      {order.receiver?.phone && (
                         <View style={styles.infoRow}>
                           <Text style={styles.infoLabel}>Phone:</Text>
-                          <Text style={styles.infoValue}>{order.deliveryLocation.receiverPhone}</Text>
+                          <Text style={styles.infoValue}>{order.receiver.phone}</Text>
+                        </View>
+                      )}
+                      {order.receiver?.contact && (
+                        <View style={styles.infoRow}>
+                          <Text style={styles.infoLabel}>Contact:</Text>
+                          <Text style={styles.infoValue}>{order.receiver.contact}</Text>
                         </View>
                       )}
                       <View style={styles.locationRow}>
                         <Text style={styles.locationLabel}>Address: </Text>
                         <Text style={styles.locationValue}>
-                          {order.deliveryLocation?.deliveryAddress || formatAddress(order.deliveryLocation)}
+                          {order.receiver?.address || formatAddress(order.deliveryLocation) || 'N/A'}
                         </Text>
                       </View>
+                      
+                      {/* Multiple Delivery Stops */}
+                      {order.receiverStops && order.receiverStops.length > 0 && (
+                        <View style={styles.stopsSection}>
+                          <Text style={styles.stopsTitle}>Additional Delivery Stops ({order.receiverStops.length}):</Text>
+                          {order.receiverStops.map((stop: any, stopIndex: number) => (
+                            <View key={stopIndex} style={styles.stopItem}>
+                              <Text style={styles.stopNumber}>Stop {stop.stop || stopIndex + 1}</Text>
+                              {stop.receiver && (
+                                <View style={styles.infoRow}>
+                                  <Text style={styles.infoLabel}>Receiver:</Text>
+                                  <Text style={styles.infoValue}>{stop.receiver}</Text>
+                                </View>
+                              )}
+                              {stop.address && (
+                                <View style={styles.locationRow}>
+                                  <Text style={styles.locationLabel}>Address:</Text>
+                                  <Text style={styles.locationValue}>{stop.address}</Text>
+                                </View>
+                              )}
+                              {stop.contact && (
+                                <View style={styles.infoRow}>
+                                  <Text style={styles.infoLabel}>Contact:</Text>
+                                  <Text style={styles.infoValue}>{stop.contact}</Text>
+                                </View>
+                              )}
+                              {stop.date && (
+                                <View style={styles.infoRow}>
+                                  <Text style={styles.infoLabel}>Date:</Text>
+                                  <Text style={styles.infoValue}>{stop.date}</Text>
+                                </View>
+                              )}
+                              {stop.appointment && (
+                                <View style={styles.infoRow}>
+                                  <Text style={styles.infoLabel}>Appointment:</Text>
+                                  <Text style={styles.infoValue}>{stop.appointment}</Text>
+                                </View>
+                              )}
+                              {stop.dropOffNumber && (
+                                <View style={styles.infoRow}>
+                                  <Text style={styles.infoLabel}>Drop-off #:</Text>
+                                  <Text style={styles.infoValue}>{stop.dropOffNumber}</Text>
+                                </View>
+                              )}
+                            </View>
+                          ))}
+                        </View>
+                      )}
                       
                       {/* Delivery Appointment Details */}
                       {(order.deliveryAppointment || order.deliveryDate) && (
@@ -429,6 +609,69 @@ const PendingTrips = () => {
                           </View>
                         </View>
                       )}
+                      
+                      {/* Documents from Order - Only show if shareWithDriver is true */}
+                      {order.attachments && order.attachments.length > 0 && (() => {
+                        const sharedDocuments = order.attachments.filter((att: any) => att.shareWithDriver === true);
+                        if (sharedDocuments.length === 0) return null;
+                        
+                        return (
+                          <View style={styles.documentsSection}>
+                            <Text style={styles.documentsTitle}>
+                              Documents ({sharedDocuments.length}):
+                            </Text>
+                            {sharedDocuments.map((doc: any, docIndex: number) => (
+                              <TouchableOpacity
+                                key={doc.id || docIndex}
+                                style={styles.documentItem}
+                                onPress={async () => {
+                                  if (!doc.id || !order._id) {
+                                    Alert.alert('Error', 'Document information is missing.');
+                                    return;
+                                  }
+
+                                  try {
+                                    // Fetch signed URL before opening
+                                    const response = await apiService.getOrderAttachmentSignedUrl(order._id, doc.id.toString(), 'inline');
+                                    if (response?.success && response?.data?.url) {
+                                      await Linking.openURL(response.data.url);
+                                    } else {
+                                      // Fallback to original URL
+                                      if (doc.url) {
+                                        await Linking.openURL(doc.url);
+                                      } else {
+                                        Alert.alert('Error', 'Unable to get document URL.');
+                                      }
+                                    }
+                                  } catch (error: any) {
+                                    console.error('Error opening document:', error);
+                                    // Fallback to original URL
+                                    if (doc.url) {
+                                      Linking.openURL(doc.url).catch(() => {
+                                        Alert.alert('Error', 'Unable to open document. Please try again.');
+                                      });
+                                    } else {
+                                      Alert.alert('Error', 'Unable to open document. Please try again.');
+                                    }
+                                  }
+                                }}
+                              >
+                                <Ionicons name="document-text" size={20} color="#2563eb" />
+                                <View style={styles.documentInfo}>
+                                  <Text style={styles.documentName} numberOfLines={1}>
+                                    {doc.name || 'Document'}
+                                  </Text>
+                                  <Text style={styles.documentMeta}>
+                                    {doc.fileSize ? formatFileSize(doc.fileSize) : 'Unknown size'}
+                                    {doc.uploadedAt && ` • ${new Date(doc.uploadedAt).toLocaleDateString()}`}
+                                  </Text>
+                                </View>
+                                <Ionicons name="download-outline" size={20} color="#2563eb" />
+                              </TouchableOpacity>
+                            ))}
+                          </View>
+                        );
+                      })()}
                     </View>
                   ))}
                 </View>
@@ -745,6 +988,32 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontWeight: '600',
     color: '#333',
+    marginBottom: 6,
+  },
+  stopsSection: {
+    marginTop: 12,
+    padding: 8,
+    backgroundColor: '#f9f9f9',
+    borderRadius: 6,
+  },
+  stopsTitle: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#333',
+    marginBottom: 8,
+  },
+  stopItem: {
+    marginBottom: 12,
+    padding: 8,
+    backgroundColor: '#fff',
+    borderRadius: 6,
+    borderLeftWidth: 3,
+    borderLeftColor: '#2563eb',
+  },
+  stopNumber: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#2563eb',
     marginBottom: 6,
   },
 });

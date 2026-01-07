@@ -74,6 +74,11 @@ export default function NotificationsScreen({ }) {
                         icon = 'play-circle-outline';
                         color = '#906AD1';
                         priority = 'high';
+                    } else if (notif.action?.toLowerCase().includes('assigned') || notif.action?.toLowerCase().includes('order assigned')) {
+                        type = 'order_assigned';
+                        icon = 'notifications';
+                        color = '#2563eb';
+                        priority = 'high';
                     }
 
                     return {

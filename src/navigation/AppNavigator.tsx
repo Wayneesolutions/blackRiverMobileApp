@@ -68,7 +68,7 @@ interface PlaceholderScreenProps {
 
 // Navigation Types - Include all screens in MainTabParamList
 export type MainTabParamList = {
-    Dashboard: undefined;
+    Dashboard: { refresh?: boolean } | undefined;
     NewTrip: undefined;
     Vehicle: undefined;
     Trailer: undefined;
