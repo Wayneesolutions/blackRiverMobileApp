@@ -106,8 +106,8 @@ const getFallbackIPs = () => {
     
     const possibleIPs = [
         // Add common server IPs first (prioritize these)
-        '192.168.31.161', // Current system IP (Windows Wi-Fi adapter) - PRIMARY
-        '192.168.1.4', // Alternative network IP
+        '192.168.1.4', // Primary network IP - LOCAL SERVER
+        '192.168.31.161', // Current system IP (Windows Wi-Fi adapter)
         '192.168.31.247', // Alternative server IP
         '192.168.1.17',
         '192.168.1.16',

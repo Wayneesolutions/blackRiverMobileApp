@@ -673,10 +673,10 @@ const TripInfoScreen = () => {
                 <TouchableOpacity
                   style={styles.chatButton}
                   onPress={() => {
-                    navigation.navigate('TripChat' as never, {
+                    (navigation as any).navigate('TripChat', {
                       tripId: trip._id,
                       tripNumber: trip.tripNumber,
-                    } as never);
+                    });
                   }}
                   activeOpacity={0.8}
                 >
@@ -940,32 +940,6 @@ const styles = StyleSheet.create({
     fontSize: 11,
     color: '#999',
   },
-  sectionDivider: {
-    marginTop: 12,
-    marginBottom: 8,
-    paddingTop: 12,
-    borderTopWidth: 1,
-    borderTopColor: '#e0e0e0',
-  },
-  sectionTitle: {
-    fontSize: 14,
-    fontWeight: '700',
-    color: '#2563eb',
-    marginBottom: 8,
-  },
-  appointmentSection: {
-    backgroundColor: '#f0f7ff',
-    padding: 10,
-    borderRadius: 6,
-    marginTop: 8,
-    marginBottom: 8,
-  },
-  appointmentTitle: {
-    fontSize: 13,
-    fontWeight: '600',
-    color: '#333',
-    marginBottom: 6,
-  },
   chatButtonContainer: {
     marginTop: 16,
     paddingTop: 16,
@@ -1012,13 +986,38 @@ const styles = StyleSheet.create({
     padding: 8,
     backgroundColor: '#fff',
     borderRadius: 6,
-    borderLeftWidth: 3,
-    borderLeftColor: '#2563eb',
   },
   stopNumber: {
     fontSize: 13,
     fontWeight: '600',
     color: '#2563eb',
+    marginBottom: 6,
+  },
+  sectionDivider: {
+    marginTop: 12,
+    marginBottom: 8,
+    paddingTop: 8,
+    borderTopWidth: 1,
+    borderTopColor: '#e5e5e5',
+  },
+  sectionTitle: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#2563eb',
+    marginBottom: 4,
+  },
+  appointmentSection: {
+    marginTop: 8,
+    padding: 8,
+    backgroundColor: '#f0f9ff',
+    borderRadius: 6,
+    borderLeftWidth: 3,
+    borderLeftColor: '#2563eb',
+  },
+  appointmentTitle: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#333',
     marginBottom: 6,
   },
 });
