@@ -163,85 +163,121 @@ class ChatService {
   async getChatMessageFileSignedUrl(
     messageId: string,
     disposition: 'inline' | 'attachment' = 'inline'
-  ): Promise<{ success: boolean; url: string; expiresIn: number }> {
+  ): Promise<{ success: boolean; url?: string; expiresIn?: number; message?: string }> {
     try {
-      logger.info('Getting signed URL for chat message file', { messageId, disposition });
+      console.log('📎 Requesting signed URL for message:', messageId, 'disposition:', disposition);
       
       const response = await apiService.get(
         `/driver/chat/message/${messageId}/file-signed-url?disposition=${disposition}`
       );
       
-      logger.info('Signed URL API response', { 
-        success: response.success,
-        hasData: !!response.data,
-        hasError: !!response.error,
+      console.log('📎 Signed URL API response (raw):', JSON.stringify(response, null, 2));
+      console.log('📎 Response structure:', {
+        hasSuccess: 'success' in response,
+        hasData: 'data' in response,
+        hasUrl: 'url' in response,
+        hasError: 'error' in response,
         statusCode: response.statusCode,
+        dataType: typeof response.data,
         dataKeys: response.data ? Object.keys(response.data) : []
       });
+      
+      // Check for error first
+      if (!response.success || response.error) {
+        const errorMessage = response.error?.message || response.data?.message || response.message || 'Failed to get signed URL';
+        console.error('📎 ❌ API returned error:', errorMessage);
+        return {
+          success: false,
+          message: errorMessage
+        };
+      }
       
       // apiService wraps response in { success, data, error, statusCode }
       // Backend returns { success, url, expiresIn }
       // So we need to extract from response.data
-      if (response.success && response.data) {
-        // response.data contains the backend response
+      let url = '';
+      let expiresIn = 0;
+      
+      // Try multiple extraction strategies
+      if (response.url) {
+        // Direct URL in response (apiService might not wrap it)
+        url = response.url;
+        expiresIn = response.expiresIn || 3600;
+        console.log('📎 Found URL directly in response');
+      } else if (response.success && response.data) {
         const backendResponse = response.data;
         
         // Handle nested structure: response.data might be { success, url, expiresIn }
         // or response.data might be { data: { success, url, expiresIn } }
-        let url = '';
-        let expiresIn = 0;
-        let success = false;
-        
         if (backendResponse.url) {
-          // Direct structure: { success, url, expiresIn }
+          // Direct access: { success: true, data: { url, expiresIn } }
           url = backendResponse.url;
-          expiresIn = backendResponse.expiresIn || 0;
-          success = backendResponse.success !== false; // Default to true if not explicitly false
+          expiresIn = backendResponse.expiresIn || 3600;
+          console.log('📎 Found URL in response.data.url');
         } else if (backendResponse.data && backendResponse.data.url) {
-          // Nested structure: { data: { success, url, expiresIn } }
+          // Nested: { success: true, data: { data: { url, expiresIn } } }
           url = backendResponse.data.url;
-          expiresIn = backendResponse.data.expiresIn || 0;
-          success = backendResponse.data.success !== false;
-        }
-        
-        if (url) {
-          logger.info('Successfully got signed URL', { urlLength: url.length, expiresIn });
-          return {
-            success: true,
-            url,
-            expiresIn,
-          };
+          expiresIn = backendResponse.data.expiresIn || 3600;
+          console.log('📎 Found URL in response.data.data.url');
+        } else if (backendResponse.success !== undefined && backendResponse.url) {
+          // Backend response directly: { success: true, url, expiresIn }
+          url = backendResponse.url;
+          expiresIn = backendResponse.expiresIn || 3600;
+          console.log('📎 Found URL in response.data (backend format)');
+        } else {
+          console.error('📎 ❌ Could not find URL in response.data:', {
+            backendResponseKeys: Object.keys(backendResponse),
+            hasUrl: 'url' in backendResponse,
+            hasData: 'data' in backendResponse
+          });
         }
       }
       
+      console.log('📎 Extracted signed URL:', {
+        success: !!url,
+        urlLength: url.length,
+        urlPreview: url.substring(0, 100),
+        expiresIn
+      });
+      
+      if (url) {
+        return {
+          success: true,
+          url,
+          expiresIn
+        };
+      }
+      
+      console.error('📎 ❌ Could not extract URL from response');
+      
       // Check for error in response
       if (response.error) {
+        console.error('📎 ❌ Error in signed URL response:', response.error);
         logger.error('Error in signed URL response', { error: response.error });
       }
       
       // If response structure is different, try direct access
       if (response.url) {
+        console.log('📎 Using direct URL from response');
         logger.info('Using direct URL from response');
         return {
           success: true,
           url: response.url,
-          expiresIn: response.expiresIn || 0,
+          expiresIn: response.expiresIn || 3600,
         };
       }
       
       logger.warn('No URL found in response', { response });
       return {
         success: false,
-        url: '',
-        expiresIn: 0,
+        message: 'Could not extract signed URL from response'
       };
     } catch (error: any) {
+      console.error('📎 ❌ Get chat message file signed URL error:', error.message);
       logger.error('Get chat message file signed URL error', error);
-      console.error('Get chat message file signed URL error:', error);
       return {
         success: false,
-        url: '',
-        expiresIn: 0,
+        message: error.message || 'Failed to get signed URL'
       };
     }
   }

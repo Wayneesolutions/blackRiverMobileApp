@@ -475,10 +475,26 @@ class SocketService {
   // Listen to new messages
   onNewChatMessage(callback: (message: any) => void): void {
     if (!this.socket) {
+      logger.warn('Cannot listen for chat messages - socket not initialized');
       return;
     }
 
-    this.socket.on('newChatMessage', callback);
+    // Remove existing listener to avoid duplicates
+    this.socket.off('newChatMessage', callback);
+    
+    // Add new listener with logging
+    this.socket.on('newChatMessage', (message) => {
+      logger.info('📨 Socket received newChatMessage event', {
+        messageId: message._id,
+        orderId: message.orderId,
+        tripId: message.tripId,
+        senderId: message.senderId?._id || message.senderId,
+        senderName: message.senderName
+      });
+      callback(message);
+    });
+    
+    logger.info('✅ Registered newChatMessage listener');
   }
 
   // Remove new message listener

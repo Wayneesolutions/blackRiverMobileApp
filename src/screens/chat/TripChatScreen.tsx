@@ -141,6 +141,118 @@ const TripChatScreen = () => {
 
   // Initialize socket and load messages
   useEffect(() => {
+    // Set up socket listeners FIRST (before joining room) to catch messages immediately
+    const handleNewMessage = (message: any) => {
+      try {
+        // Normalize message format from socket
+        const normalizedMessage = normalizeMessage(message);
+
+        logger.info('📨 Received new chat message via socket', { 
+          messageId: normalizedMessage._id,
+          orderId: normalizedMessage.orderId,
+          tripId: normalizedMessage.tripId,
+          chatId: chatId,
+          senderId: normalizedMessage.senderId._id,
+          senderName: normalizedMessage.senderName,
+          senderType: normalizedMessage.senderType,
+          currentUserId: currentUserIdRef.current,
+          hasFile: !!normalizedMessage.fileUrl
+        });
+
+        // Filter: Only process messages for this chat (orderId or tripId must match chatId)
+        const messageOrderId = normalizedMessage.orderId?.toString() || normalizedMessage.orderId;
+        const messageTripId = normalizedMessage.tripId?.toString() || normalizedMessage.tripId;
+        const currentChatId = chatId?.toString() || chatId;
+        
+        if (messageOrderId !== currentChatId && messageTripId !== currentChatId) {
+          logger.info('⚠️ Ignoring message from different chat', {
+            messageOrderId,
+            messageTripId,
+            currentChatId
+          });
+          return; // Ignore messages from other chats
+        }
+
+        logger.info('✅ Message belongs to current chat, adding to state');
+
+        // Check if message already exists or replace optimistic message
+        setMessages((prev) => {
+          // Check if this is replacing an optimistic message (same content, different ID)
+          const optimisticIndex = prev.findIndex(
+            (msg) => msg._id.startsWith('temp-') && 
+                     msg.message === normalizedMessage.message &&
+                     msg.tripId === normalizedMessage.tripId
+          );
+          
+          if (optimisticIndex !== -1) {
+            // Replace optimistic message with real one
+            const newMessages = [...prev];
+            newMessages[optimisticIndex] = normalizedMessage;
+            logger.info('Replaced optimistic message with real message', { 
+              optimisticId: prev[optimisticIndex]._id,
+              realId: normalizedMessage._id
+            });
+            return newMessages;
+          }
+          
+          // Check if message already exists (avoid duplicates)
+          const exists = prev.some((msg) => msg._id === normalizedMessage._id);
+          if (exists) {
+            logger.warn('⚠️ Message already exists, skipping', { messageId: normalizedMessage._id });
+            return prev;
+          }
+          
+          logger.info('✅ Adding new message to state', {
+            messageId: normalizedMessage._id,
+            senderId: normalizedMessage.senderId._id,
+            currentUserId: currentUserIdRef.current,
+            isOwn: String(normalizedMessage.senderId._id) === String(currentUserIdRef.current),
+            messageCount: prev.length + 1
+          });
+          
+          return [...prev, normalizedMessage];
+        });
+        
+        // Scroll to bottom after a brief delay to ensure UI update
+        setTimeout(() => {
+          scrollToBottom();
+        }, 100);
+        
+        // Mark as read if it's not from current user
+        const senderId = normalizedMessage.senderId._id || normalizedMessage.senderId;
+        if (senderId !== currentUserIdRef.current) {
+          chatService.markMessagesAsRead(chatId);
+        }
+      } catch (error) {
+        logger.error('Error handling new message', error);
+      }
+    };
+
+    // Listen for typing indicators
+    const handleTyping = (data: {
+      userId: string;
+      userName: string;
+      tripId: string;
+      isTyping: boolean;
+    }) => {
+      if ((data.tripId === chatId || data.tripId === tripId) && data.userId !== currentUserIdRef.current) {
+        setTypingUsers((prev) => {
+          const newSet = new Set(prev);
+          if (data.isTyping) {
+            newSet.add(data.userName);
+          } else {
+            newSet.delete(data.userName);
+          }
+          return newSet;
+        });
+      }
+    };
+
+    // Set up listeners BEFORE initializing chat
+    socketService.onNewChatMessage(handleNewMessage);
+    socketService.onUserTyping(handleTyping);
+    logger.info('✅ Socket listeners set up for chat', { chatId });
+
     const initializeChat = async () => {
       try {
         // Get token and user ID
@@ -188,6 +300,7 @@ const TripChatScreen = () => {
 
         // Join trip/order chat room (tripId is actually orderId now)
         await socketService.joinTripChat(chatId);
+        logger.info('✅ Joined chat room', { chatId });
 
         // Load messages
         await loadMessages();
@@ -202,90 +315,14 @@ const TripChatScreen = () => {
 
     initializeChat();
 
-    // Listen for new messages
-    const handleNewMessage = (message: any) => {
-      try {
-        // Normalize message format from socket
-        const normalizedMessage = normalizeMessage(message);
-
-        logger.info('Received new chat message', { 
-          messageId: normalizedMessage._id,
-          senderId: normalizedMessage.senderId._id,
-          currentUserId: currentUserIdRef.current
-        });
-
-        // Check if message already exists or replace optimistic message
-        setMessages((prev) => {
-          // Check if this is replacing an optimistic message (same content, different ID)
-          const optimisticIndex = prev.findIndex(
-            (msg) => msg._id.startsWith('temp-') && 
-                     msg.message === normalizedMessage.message &&
-                     msg.tripId === normalizedMessage.tripId
-          );
-          
-          if (optimisticIndex !== -1) {
-            // Replace optimistic message with real one
-            const newMessages = [...prev];
-            newMessages[optimisticIndex] = normalizedMessage;
-            logger.info('Replaced optimistic message with real message', { 
-              optimisticId: prev[optimisticIndex]._id,
-              realId: normalizedMessage._id
-            });
-            return newMessages;
-          }
-          
-          // Check if message already exists (avoid duplicates)
-          const exists = prev.some((msg) => msg._id === normalizedMessage._id);
-          if (exists) {
-            logger.warn('Message already exists, skipping', { messageId: normalizedMessage._id });
-            return prev;
-          }
-          
-          return [...prev, normalizedMessage];
-        });
-        
-        scrollToBottom();
-        
-        // Mark as read if it's not from current user
-        const senderId = normalizedMessage.senderId._id || normalizedMessage.senderId;
-        if (senderId !== currentUserIdRef.current) {
-          chatService.markMessagesAsRead(chatId);
-        }
-      } catch (error) {
-        logger.error('Error handling new message', error);
-      }
-    };
-
-    // Listen for typing indicators
-    const handleTyping = (data: {
-      userId: string;
-      userName: string;
-      tripId: string;
-      isTyping: boolean;
-    }) => {
-      if (data.tripId === tripId && data.userId !== currentUserIdRef.current) {
-        setTypingUsers((prev) => {
-          const newSet = new Set(prev);
-          if (data.isTyping) {
-            newSet.add(data.userName);
-          } else {
-            newSet.delete(data.userName);
-          }
-          return newSet;
-        });
-      }
-    };
-
-    socketService.onNewChatMessage(handleNewMessage);
-    socketService.onUserTyping(handleTyping);
-
     // Cleanup
     return () => {
+      logger.info('🧹 Cleaning up socket listeners', { chatId });
       socketService.offNewChatMessage(handleNewMessage);
       socketService.offUserTyping(handleTyping);
-      socketService.leaveTripChat(tripId);
+      socketService.leaveTripChat(chatId);
     };
-  }, [tripId]);
+  }, [chatId]);
 
   // Auto-scroll when messages change
   useEffect(() => {
@@ -454,6 +491,7 @@ const TripChatScreen = () => {
             messages.map((message, index) => {
               // Handle different senderId formats
               const senderId = message.senderId?._id || message.senderId || '';
+              const currentUserId = currentUserIdRef.current || '';
               const isOwn = String(senderId) === String(currentUserId);
               
               // Debug log for first message
@@ -486,14 +524,32 @@ const TripChatScreen = () => {
                       style={styles.fileContainer}
                       onPress={async () => {
                         try {
+                          console.log('📄 ===== OPENING DOCUMENT (Mobile App) =====');
+                          console.log('📄 Message ID:', message._id);
+                          console.log('📄 File Name:', message.fileName);
+                          console.log('📄 File Type:', message.fileType);
+                          console.log('📄 File Size:', message.fileSize);
+                          console.log('📄 Original fileUrl (full):', message.fileUrl);
+                          console.log('📄 File URL length:', message.fileUrl?.length || 0);
+                          
                           logger.info('Opening chat file', { 
                             messageId: message._id,
                             fileName: message.fileName,
-                            fileUrl: message.fileUrl?.substring(0, 50) + '...'
+                            fileUrl: message.fileUrl,
+                            fileType: message.fileType,
+                            fileSize: message.fileSize
                           });
                           
                           // Get signed URL first
+                          console.log('📄 Attempting to get signed URL for message:', message._id);
                           const response = await chatService.getChatMessageFileSignedUrl(message._id, 'inline');
+                          
+                          console.log('📄 Signed URL response:', {
+                            success: response.success,
+                            hasUrl: !!response.url,
+                            urlLength: response.url?.length || 0,
+                            urlPreview: response.url?.substring(0, 100) || 'N/A'
+                          });
                           
                           logger.info('Signed URL response', { 
                             success: response.success,
@@ -502,19 +558,27 @@ const TripChatScreen = () => {
                           });
                           
                           if (response.success && response.url) {
+                            console.log('📄 Using signed URL:', response.url);
                             logger.info('Opening signed URL');
                             const canOpen = await Linking.canOpenURL(response.url);
+                            console.log('📄 Can open signed URL?', canOpen);
                             if (canOpen) {
                               await Linking.openURL(response.url);
+                              console.log('📄 ✅ Successfully opened signed URL');
                             } else {
+                              console.log('📄 ⚠️ Cannot open signed URL, trying fallback original URL');
                               logger.warn('Cannot open URL, trying fallback');
                               if (message.fileUrl) {
+                                console.log('📄 Opening fallback original URL:', message.fileUrl);
                                 await Linking.openURL(message.fileUrl);
+                                console.log('📄 ✅ Successfully opened original URL (fallback)');
                               } else {
+                                console.log('📄 ❌ No original URL available');
                                 Alert.alert('Error', 'Unable to open file URL.');
                               }
                             }
                           } else {
+                            console.log('📄 ⚠️ Signed URL failed, using original URL');
                             logger.warn('Signed URL failed, using fallback', { 
                               responseSuccess: response.success,
                               hasUrl: !!response.url,
@@ -522,29 +586,40 @@ const TripChatScreen = () => {
                             });
                             // Fallback to original URL
                             if (message.fileUrl) {
+                              console.log('📄 Attempting to open original URL:', message.fileUrl);
                               const canOpen = await Linking.canOpenURL(message.fileUrl);
+                              console.log('📄 Can open original URL?', canOpen);
                               if (canOpen) {
                                 await Linking.openURL(message.fileUrl);
+                                console.log('📄 ✅ Successfully opened original URL');
                               } else {
-                                Alert.alert('Error', 'Unable to open file. The file URL is not accessible.');
+                                console.log('📄 ❌ Cannot open original URL - URL may be invalid');
+                                Alert.alert('Error', `Unable to open file. URL: ${message.fileUrl.substring(0, 50)}...`);
                               }
                             } else {
+                              console.log('📄 ❌ No fileUrl available');
                               Alert.alert('Error', 'Unable to get file URL.');
                             }
                           }
                         } catch (error: any) {
+                          console.log('📄 ❌ Error opening file:', error.message);
+                          console.log('📄 Error stack:', error.stack);
+                          console.log('📄 Error details:', JSON.stringify(error, null, 2));
                           logger.error('Error opening file', error);
                           console.error('Error opening file:', error);
                           const errorMessage = error?.message || 'Unknown error';
                           // Fallback to original URL
                           if (message.fileUrl) {
-                            Linking.openURL(message.fileUrl).catch(() => {
+                            console.log('📄 Attempting final fallback to original URL:', message.fileUrl);
+                            Linking.openURL(message.fileUrl).catch((linkError) => {
+                              console.log('📄 ❌ Failed to open URL even as fallback:', linkError.message);
                               Alert.alert('Error', `Unable to open file: ${errorMessage}`);
                             });
                           } else {
                             Alert.alert('Error', `Unable to open file: ${errorMessage}`);
                           }
                         }
+                        console.log('📄 ==========================================');
                       }}
                     >
                       <Ionicons
