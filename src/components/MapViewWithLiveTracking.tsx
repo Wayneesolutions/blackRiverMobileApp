@@ -221,6 +221,8 @@ const MapViewWithLiveTracking: React.FC<MapViewWithLiveTrackingProps> = ({
   const [mapError, setMapError] = useState<string | null>(null);
   const [showDistanceInfo, setShowDistanceInfo] = useState(true);
   const [forceWarningDemo, setForceWarningDemo] = useState(false);
+  const [mapReady, setMapReady] = useState(false);
+  const [mapLayoutReady, setMapLayoutReady] = useState(false);
   const mapRef = useRef<any>(null);
   const [routePath, setRoutePath] = useState<Array<{ latitude: number; longitude: number }>>([]);
   const googleMapsApiKeyRef = useRef<string | null | undefined>(undefined);
@@ -540,6 +542,30 @@ const MapViewWithLiveTracking: React.FC<MapViewWithLiveTrackingProps> = ({
       }
     }
   }, [visible, load?._id]);
+
+  // iOS-specific fix: Enable gestures after map is ready and layout is complete
+  useEffect(() => {
+    if (Platform.OS === 'ios' && mapReady && mapLayoutReady && mapRef.current) {
+      // Small delay to ensure gesture recognizers are properly initialized
+      const timer = setTimeout(() => {
+        if (mapRef.current) {
+          console.log('✅ iOS: Enabling map gestures after initialization');
+          // Force a small region update to activate gesture recognizers
+          const region = calculateRegion();
+          if (region && !isNaN(region.latitude) && !isNaN(region.longitude)) {
+            mapRef.current.setCamera({
+              center: {
+                latitude: region.latitude,
+                longitude: region.longitude,
+              },
+              zoom: region.latitudeDelta ? Math.log2(360 / region.latitudeDelta) : 10,
+            });
+          }
+        }
+      }, 300);
+      return () => clearTimeout(timer);
+    }
+  }, [mapReady, mapLayoutReady]);
 
   // Add timeout for map loading
   useEffect(() => {
@@ -1818,18 +1844,36 @@ const MapViewWithLiveTracking: React.FC<MapViewWithLiveTrackingProps> = ({
                   loadingBackgroundColor="#ffffff"
                   pitchEnabled={false}
                   rotateEnabled={true}
-                  scrollEnabled={true}
-                  zoomEnabled={true}
+                  scrollEnabled={mapReady && mapLayoutReady}
+                  zoomEnabled={mapReady && mapLayoutReady}
                   zoomControlEnabled={false}
                   minZoomLevel={5}
                   maxZoomLevel={20}
+                  moveOnMount={false}
+                  onLayout={() => {
+                    console.log('✅ Map layout completed');
+                    if (Platform.OS === 'ios') {
+                      // On iOS, wait a bit longer for gesture recognizers to initialize
+                      setTimeout(() => {
+                        setMapLayoutReady(true);
+                      }, 150);
+                    } else {
+                      setMapLayoutReady(true);
+                    }
+                  }}
                   onMapReady={() => {
                     console.log('✅ Map is ready and loaded');
                     console.log('📍 Map region:', region);
                     logger.info('Map ready', { region });
+                    setMapReady(true);
                     setMapLoading(false);
                     setMapError(null);
-                    // Don't set loading=false here, let socket connection handle that
+                    // Ensure layout is marked as ready if onLayout hasn't fired yet (iOS fallback)
+                    if (Platform.OS === 'ios' && !mapLayoutReady) {
+                      setTimeout(() => {
+                        setMapLayoutReady(true);
+                      }, 200);
+                    }
                   }}
                   onError={(error: any) => {
                     console.error('❌ Map error:', error);
@@ -1844,6 +1888,8 @@ const MapViewWithLiveTracking: React.FC<MapViewWithLiveTrackingProps> = ({
                     console.log('🔄 Map loading started...');
                     console.log('📍 Initial region:', region);
                     setMapLoading(true);
+                    setMapReady(false);
+                    setMapLayoutReady(false);
                   }}
                   onLoadEnd={() => {
                     console.log('✅ Map load ended');
