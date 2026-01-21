@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
+import { AppState } from 'react-native';
 import {
   View,
   Text,
@@ -223,6 +224,7 @@ const MapViewWithLiveTracking: React.FC<MapViewWithLiveTrackingProps> = ({
   const [forceWarningDemo, setForceWarningDemo] = useState(false);
   const [mapReady, setMapReady] = useState(false);
   const [mapLayoutReady, setMapLayoutReady] = useState(false);
+  const [isFullScreen, setIsFullScreen] = useState(false);
   const mapRef = useRef<any>(null);
   const [routePath, setRoutePath] = useState<Array<{ latitude: number; longitude: number }>>([]);
   const googleMapsApiKeyRef = useRef<string | null | undefined>(undefined);
@@ -581,6 +583,33 @@ const MapViewWithLiveTracking: React.FC<MapViewWithLiveTrackingProps> = ({
       return () => clearTimeout(timeout);
     }
   }, [visible, mapLoading]);
+
+  // Inside your component
+useEffect(() => {
+  const subscription = AppState.addEventListener('change', nextAppState => {
+    if (nextAppState === 'active' && mapRef.current) {
+      // Force a tiny region shift to wake up the map rendering
+      const currentRegion = calculateRegion();
+      mapRef.current.animateToRegion(currentRegion, 100);
+    }
+  });
+  return () => subscription.remove();
+}, []);
+
+  // Fullscreen toggle handler for iOS - forces map re-render to fix freeze issue
+  const handleFullScreenToggle = useCallback(() => {
+    setIsFullScreen((prev) => {
+      const newValue = !prev;
+      // Force map re-render when toggling fullscreen
+      if (mapRef.current && Platform.OS === 'ios') {
+        setTimeout(() => {
+          const currentRegion = calculateRegion();
+          mapRef.current.animateToRegion(currentRegion, 100);
+        }, 50);
+      }
+      return newValue;
+    });
+  }, []);
 
   // Calculate map region to fit all markers
   const calculateRegion = () => {
@@ -1578,17 +1607,19 @@ const MapViewWithLiveTracking: React.FC<MapViewWithLiveTrackingProps> = ({
     >
       <View style={styles.container}>
         {/* Header */}
-        <View style={styles.header}>
-          <View style={styles.headerContent}>
-            <Text style={styles.headerTitle}>Route Map</Text>
-            {load.internalId && (
-              <Text style={styles.headerSubtitle}>Load: {load.internalId}</Text>
-            )}
+        {!isFullScreen && (
+          <View style={styles.header}>
+            <View style={styles.headerContent}>
+              <Text style={styles.headerTitle}>Route Map</Text>
+              {load.internalId && (
+                <Text style={styles.headerSubtitle}>Load: {load.internalId}</Text>
+              )}
+            </View>
+            <TouchableOpacity style={styles.closeButton} onPress={onClose}>
+              <Ionicons name="close" size={24} color="#fff" />
+            </TouchableOpacity>
           </View>
-          <TouchableOpacity style={styles.closeButton} onPress={onClose}>
-            <Ionicons name="close" size={24} color="#fff" />
-          </TouchableOpacity>
-        </View>
+        )}
 
         {/* Map Container */}
         <View style={styles.mapContainer}>
@@ -1643,10 +1674,43 @@ const MapViewWithLiveTracking: React.FC<MapViewWithLiveTrackingProps> = ({
             </View>
           )}
 
+          {/* Full Screen Toggle Button - iOS only */}
+          {Platform.OS === 'ios' && (
+            <TouchableOpacity
+              style={[
+                styles.fullScreenToggleButton,
+                isFullScreen && styles.fullScreenToggleButtonActive,
+                !shouldShowDistanceOverlay && styles.fullScreenToggleButtonAlone
+              ]}
+              onPress={handleFullScreenToggle}
+              activeOpacity={0.7}
+            >
+              <Ionicons 
+                name={isFullScreen ? "contract" : "expand"} 
+                size={20} 
+                color="#fff" 
+              />
+            </TouchableOpacity>
+          )}
+
+          {/* Close Button in Fullscreen Mode - iOS only */}
+          {Platform.OS === 'ios' && isFullScreen && (
+            <TouchableOpacity
+              style={styles.fullScreenCloseButton}
+              onPress={onClose}
+              activeOpacity={0.7}
+            >
+              <Ionicons name="close" size={24} color="#fff" />
+            </TouchableOpacity>
+          )}
+
           {/* Distance Toggle Button */}
           {shouldShowDistanceOverlay && (
             <TouchableOpacity
-              style={styles.distanceToggleButton}
+              style={[
+                styles.distanceToggleButton,
+                isFullScreen && styles.distanceToggleButtonFullScreen
+              ]}
               onPress={() => setShowDistanceInfo(!showDistanceInfo)}
               activeOpacity={0.7}
             >
@@ -2492,6 +2556,55 @@ const styles = StyleSheet.create({
       height: 2,
     },
     shadowOpacity: 0.25,
+    shadowRadius: 4,
+  },
+  distanceToggleButtonFullScreen: {
+    top: 16,
+  },
+  fullScreenToggleButton: {
+    position: 'absolute',
+    top: 16,
+    right: 68, // Position to the left of distance toggle when it's visible
+    zIndex: 1001,
+    elevation: 11,
+    backgroundColor: '#6366F1',
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    justifyContent: 'center',
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.25,
+    shadowRadius: 4,
+  },
+  fullScreenToggleButtonAlone: {
+    right: 16, // When distance toggle is not visible, position at edge
+  },
+  fullScreenToggleButtonActive: {
+    backgroundColor: '#4F46E5',
+  },
+  fullScreenCloseButton: {
+    position: 'absolute',
+    top: 50, // Account for iOS status bar
+    right: 16,
+    zIndex: 1002,
+    elevation: 12,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    justifyContent: 'center',
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.3,
     shadowRadius: 4,
   },
   mapDistanceOverlay: {
