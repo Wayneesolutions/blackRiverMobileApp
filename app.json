@@ -1,15 +1,19 @@
 {
   "expo": {
     "name": "Logistiq Innovations",
+<<<<<<< HEAD
     "slug": "logistiq-innovations",
+=======
+    "slug": "black-river-logistics",
+>>>>>>> f9d2362a172712a6cc63305e9e831f8062bdabad
     "version": "1.0.0",
     "orientation": "portrait",
-    "icon": "./assets/app-icon.jpeg",
+    "icon": "./assets/app-icon.png",
     "userInterfaceStyle": "light",
     "splash": {
-      "image": "./assets/app-icon.jpeg",
-      "resizeMode": "cover",
-      "backgroundColor": "#E5E5E5"
+      "image": "./assets/app-icon.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#FFFFFF"
     },
     "assetBundlePatterns": [
       "**/*"
@@ -27,9 +31,9 @@
         "ITSAppUsesNonExemptEncryption": false
       },
       "splash": {
-        "image": "./assets/app-icon.jpeg",
-        "resizeMode": "cover",
-        "backgroundColor": "#E5E5E5"
+        "image": "./assets/app-icon.png",
+        "resizeMode": "contain",
+        "backgroundColor": "#FFFFFF"
       }
     },
     "android": {
@@ -41,14 +45,18 @@
       "config": {
         "googleMapsApiKey": "AIzaSyDBhzYegComYfj8I4K2Di_ltSLk7ify_IU"
       },
-      "adaptiveIcon": {
-        "foregroundImage": "./assets/app-icon.jpeg"
-      },
-      "splash": {
-        "image": "./assets/app-icon.jpeg",
-        "resizeMode": "cover",
-        "backgroundColor": "#E5E5E5"
-      },
+      "android": {
+  "adaptiveIcon": {
+    "foregroundImage": "./assets/android-foreground.png",
+    "backgroundColor": "#FFFFFF"
+  },
+  "splash": {
+    "image": "./assets/splash-icon.png",
+    "resizeMode": "contain",
+    "backgroundColor": "#FFFFFF"
+  }
+}
+,
       "permissions": [
         "ACCESS_FINE_LOCATION",
         "ACCESS_COARSE_LOCATION",
@@ -80,7 +88,7 @@
       "expo-font"
     ],
     "web": {
-      "favicon": "./assets/app-icon.jpeg",
+      "favicon": "./assets/app-icon.png",
       "bundler": "metro",
       "title": "Logistiq Innovations - Driver App",
       "description": "Driver Mobile App for Logistiq Innovations"
