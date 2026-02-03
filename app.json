@@ -4,12 +4,12 @@
     "slug": "black-river-logistics",
     "version": "1.0.0",
     "orientation": "portrait",
-    "icon": "./assets/icon.png",
+    "icon": "./assets/app-icon.jpeg",
     "userInterfaceStyle": "light",
     "splash": {
-      "image": "./assets/splash-icon.png",
-      "resizeMode": "contain",
-      "backgroundColor": "#ffffff"
+      "image": "./assets/app-icon.jpeg",
+      "resizeMode": "cover",
+      "backgroundColor": "#E5E5E5"
     },
     "assetBundlePatterns": [
       "**/*"
@@ -18,6 +18,7 @@
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.blackriverlogistics.app",
+      "buildNumber": "1",
       "infoPlist": {
         "NSLocationWhenInUseUsageDescription": "This app needs access to your location to show your current position on the map.",
         "NSLocationAlwaysUsageDescription": "This app needs access to your location for live tracking of your trips.",
@@ -26,9 +27,9 @@
         "ITSAppUsesNonExemptEncryption": false
       },
       "splash": {
-        "image": "./assets/splash-icon.png",
-        "resizeMode": "contain",
-        "backgroundColor": "#ffffff"
+        "image": "./assets/app-icon.jpeg",
+        "resizeMode": "cover",
+        "backgroundColor": "#E5E5E5"
       }
     },
     "android": {
@@ -41,13 +42,12 @@
         "googleMapsApiKey": "AIzaSyDBhzYegComYfj8I4K2Di_ltSLk7ify_IU"
       },
       "adaptiveIcon": {
-        "foregroundImage": "./assets/adaptive-icon.png",
-        "backgroundColor": "#FFFFFF"
+        "foregroundImage": "./assets/app-icon.jpeg"
       },
       "splash": {
-        "image": "./assets/splash-icon.png",
-        "resizeMode": "contain",
-        "backgroundColor": "#ffffff"
+        "image": "./assets/app-icon.jpeg",
+        "resizeMode": "cover",
+        "backgroundColor": "#E5E5E5"
       },
       "permissions": [
         "ACCESS_FINE_LOCATION",
@@ -80,7 +80,7 @@
       "expo-font"
     ],
     "web": {
-      "favicon": "./assets/favicon.png",
+      "favicon": "./assets/app-icon.jpeg",
       "bundler": "metro",
       "title": "Black River Logistics - Driver App",
       "description": "Driver Mobile App for Black River Logistics"

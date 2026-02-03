@@ -19,9 +19,8 @@
     "production": {
       "autoIncrement": true,
       "android": {
-        "buildType": "apk",
-        "gradleCommand": ":app:assembleRelease"
-      },
+        "buildType": "app-bundle"
+            },
       "env": {
         "API_BASE_URL": "https://portal.logistiqinnovations.ca/api/v1",
         "SOCKET_URL": "https://portal.logistiqinnovations.ca",
