@@ -86,7 +86,7 @@ function setEnvironment(env) {
 const env = process.argv[2];
 
 if (!env) {
-  console.log('🔧 Environment Switcher for Black River Logistics');
+  console.log('🔧 Environment Switcher for Logistiq Innovations');
   console.log('Usage: node scripts/set-env.js <environment>');
   console.log('\nAvailable environments:');
   Object.keys(environments).forEach(key => {

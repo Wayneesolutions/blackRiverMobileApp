@@ -24,7 +24,7 @@ export default function App() {
       const setTitle = () => {
         const appTitle = Constants.expoConfig?.web?.title || 
                          Constants.expoConfig?.name || 
-                         'Black River Logistics - Driver App';
+                         'Logistiq Innovations - Driver App';
         
         // Always set the title directly
         document.title = appTitle;
@@ -61,7 +61,7 @@ export default function App() {
         <NavigationContainer
           documentTitle={{
             formatter: (options, route) => {
-              return options?.title ?? route?.name ?? 'Black River Logistics - Driver App';
+              return options?.title ?? route?.name ?? 'Logistiq Innovations - Driver App';
             },
           }}
         >
