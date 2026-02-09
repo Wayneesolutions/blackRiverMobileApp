@@ -3,7 +3,9 @@ import { logger } from '../../utils/loggerHelper';
 
 export interface ChatMessage {
   _id: string;
-  tripId: string;
+  tripId?: string;
+  orderId?: string;
+  driverId?: string;
   senderId: {
     _id: string;
     name: string;
@@ -278,6 +280,128 @@ class ChatService {
       return {
         success: false,
         message: error.message || 'Failed to get signed URL'
+      };
+    }
+  }
+
+  // ===== DRIVER CHAT FUNCTIONS (Global Chat) =====
+
+  // Get chat messages for driver (global chat with dispatcher)
+  async getDriverChatMessages(
+    driverId: string,
+    page: number = 1,
+    limit: number = 50
+  ): Promise<ChatMessagesResponse> {
+    try {
+      const response = await apiService.get(
+        `/driver/chat/driver/${driverId}/messages?page=${page}&limit=${limit}`
+      );
+      return response as ChatMessagesResponse;
+    } catch (error: any) {
+      console.error('Get driver chat messages error:', error);
+      return {
+        success: false,
+        message: error?.message || 'Failed to fetch chat messages',
+        data: {
+          messages: [],
+          pagination: { current: 1, pages: 0, total: 0, limit: 50 },
+        },
+      };
+    }
+  }
+
+  // Send a chat message to dispatcher (with optional file)
+  async sendDriverChatMessage(
+    driverId: string,
+    message: string,
+    fileUri?: string,
+    fileName?: string,
+    fileType?: string
+  ): Promise<{ success: boolean; data?: ChatMessage; message: string }> {
+    try {
+      const formData = new FormData();
+      formData.append('message', message);
+      
+      if (fileUri) {
+        // @ts-ignore - FormData in React Native
+        formData.append('file', {
+          uri: fileUri,
+          type: fileType || 'application/octet-stream',
+          name: fileName || 'file',
+        } as any);
+      }
+
+      // Use fetch directly for FormData in React Native
+      const token = await apiService.getStoredToken();
+      if (!token) {
+        throw new Error('No authentication token found');
+      }
+      
+      const baseURL = apiService.getEndpointInfo().current;
+      if (!baseURL) {
+        throw new Error('API base URL not configured');
+      }
+      
+      // Ensure baseURL doesn't have trailing slash and endpoint starts with /
+      const cleanBaseURL = baseURL.endsWith('/') ? baseURL.slice(0, -1) : baseURL;
+      const response = await fetch(`${cleanBaseURL}/driver/chat/driver/${driverId}/message`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          // Don't set Content-Type - let fetch set it with boundary for FormData
+        },
+        body: formData,
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({ message: 'Failed to send message' }));
+        throw new Error(errorData.message || 'Failed to send message');
+      }
+
+      const data = await response.json();
+      return data as { success: boolean; data?: ChatMessage; message: string };
+    } catch (error: any) {
+      console.error('Send driver chat message error:', error);
+      return {
+        success: false,
+        message: error?.message || 'Failed to send message',
+      };
+    }
+  }
+
+  // Mark driver messages as read
+  async markDriverMessagesAsRead(
+    driverId: string
+  ): Promise<{ success: boolean; message: string; count?: number }> {
+    try {
+      const response = await apiService.post(
+        `/driver/chat/driver/${driverId}/mark-read`,
+        {}
+      );
+      return response as { success: boolean; message: string; count?: number };
+    } catch (error: any) {
+      console.error('Mark driver messages as read error:', error);
+      return {
+        success: false,
+        message: error?.message || 'Failed to mark messages as read',
+      };
+    }
+  }
+
+  // Get unread message count for driver chat
+  async getDriverUnreadMessageCount(
+    driverId: string
+  ): Promise<{ success: boolean; data: { unreadCount: number } }> {
+    try {
+      const response = await apiService.get(
+        `/driver/chat/driver/${driverId}/unread-count`
+      );
+      return response as { success: boolean; data: { unreadCount: number } };
+    } catch (error: any) {
+      console.error('Get driver unread count error:', error);
+      return {
+        success: false,
+        data: { unreadCount: 0 },
       };
     }
   }

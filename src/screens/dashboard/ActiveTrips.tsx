@@ -1309,21 +1309,6 @@ const ActiveTrips = () => {
                 )}
 
         <View style={styles.buttonContainer}>
-          {/* Chat Button */}
-          <TouchableOpacity
-            style={styles.chatButton}
-            onPress={() => {
-              navigation.navigate('TripChat' as never, {
-                tripId: trip._id,
-                tripNumber: trip.tripNumber,
-              } as never);
-            }}
-            activeOpacity={0.8}
-          >
-            <Ionicons name="chatbubbles" size={16} color="#ffffff" />
-            <Text style={styles.chatButtonText} numberOfLines={1}>Chat</Text>
-          </TouchableOpacity>
-                  
           {hasMap && (
             <TouchableOpacity
               style={styles.mapButton}

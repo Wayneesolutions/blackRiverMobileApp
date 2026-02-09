@@ -558,6 +558,83 @@ class SocketService {
       this.socket.off('error');
     }
   }
+
+  // ===== DRIVER CHAT METHODS (Global Chat) =====
+
+  // Join driver chat room
+  joinDriverChat(driverId: string): Promise<void> {
+    return new Promise((resolve, reject) => {
+      if (!this.socket || !this.isConnected) {
+        reject(new Error('Socket not connected'));
+        return;
+      }
+
+      const timeout = setTimeout(() => {
+        reject(new Error('Join driver chat timeout'));
+      }, 10000); // Increased timeout
+
+      // Set up error handler first
+      const errorHandler = (error: any) => {
+        clearTimeout(timeout);
+        logger.error('Error joining driver chat', error);
+        this.socket?.off('joinedDriverChat', successHandler);
+        reject(new Error(error.message || 'Failed to join driver chat'));
+      };
+
+      // Set up success handler
+      const successHandler = (data: any) => {
+        clearTimeout(timeout);
+        logger.info('Joined driver chat', data);
+        this.socket?.off('error', errorHandler);
+        resolve();
+      };
+
+      // Listen for both success and error
+      this.socket.once('joinedDriverChat', successHandler);
+      this.socket.once('error', errorHandler);
+
+      // Emit join event
+      logger.info('Emitting joinDriverChat', { driverId });
+      this.socket.emit('joinDriverChat', driverId);
+    });
+  }
+
+  // Leave driver chat room
+  leaveDriverChat(driverId: string): void {
+    if (!this.socket || !this.isConnected) {
+      return;
+    }
+
+    logger.info('Leaving driver chat', { driverId });
+    this.socket.emit('leaveDriverChat', driverId);
+  }
+
+  // Send driver chat message
+  sendDriverChatMessage(data: {
+    driverId: string;
+    message: string;
+    fileUrl?: string;
+    fileName?: string;
+    fileType?: string;
+    fileSize?: number;
+  }): void {
+    if (!this.socket || !this.isConnected) {
+      logger.warn('Cannot send driver chat message - socket not connected');
+      return;
+    }
+
+    logger.info('Sending driver chat message', { driverId: data.driverId });
+    this.socket.emit('sendDriverChatMessage', data);
+  }
+
+  // Typing indicator for driver chat
+  setDriverTyping(driverId: string, isTyping: boolean): void {
+    if (!this.socket || !this.isConnected) {
+      return;
+    }
+
+    this.socket.emit('driverTyping', { driverId, isTyping });
+  }
 }
 
 export const socketService = new SocketService();

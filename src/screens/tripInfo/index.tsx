@@ -668,24 +668,6 @@ const TripInfoScreen = () => {
                 </View>
               )}
 
-              {/* Chat Button - Always visible at the bottom */}
-              <View style={styles.chatButtonContainer}>
-                <TouchableOpacity
-                  style={styles.chatButton}
-                  onPress={() => {
-                    (navigation as any).navigate('TripChat', {
-                      tripId: trip._id,
-                      tripNumber: trip.tripNumber,
-                    });
-                  }}
-                  activeOpacity={0.8}
-                >
-                  <View style={styles.chatButtonContent}>
-                    <Ionicons name="chatbubbles" size={22} color="#ffffff" />
-                    <Text style={styles.chatButtonText}>Chat with Dispatcher</Text>
-                  </View>
-                </TouchableOpacity>
-              </View>
             </View>
           ))}
         </ScrollView>

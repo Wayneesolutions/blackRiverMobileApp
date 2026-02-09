@@ -36,6 +36,7 @@ import SearchScreen from "../screens/search/index";
 import TripInfoScreen from "../screens/tripInfo/index";
 import CrashLogsScreen from "../screens/settings/CrashLogsScreen";
 import TripChatScreen from "../screens/chat/TripChatScreen";
+import DriverChatScreen from "../screens/chat/DriverChatScreen";
 
 // Constants for storage keys
 const STORAGE_KEYS = {
@@ -109,6 +110,7 @@ export type RootStackParamList = {
     Help: undefined;
     TripInfo: undefined;
     TripChat: { tripId: string; tripNumber: string };
+    DriverChat: undefined;
     Search: undefined;
     Trips: undefined;
     CrashLogs: undefined;
@@ -550,6 +552,16 @@ export default function AppNavigator() {
                 {(props) => (
                     <ScreenWithHeaderFooter
                         component={TripChatScreen}
+                        navigation={props.navigation}
+                        route={props.route}
+                        onLogout={handleLogout}
+                    />
+                )}
+            </RootStack.Screen>
+            <RootStack.Screen name="DriverChat">
+                {(props) => (
+                    <ScreenWithHeaderFooter
+                        component={DriverChatScreen}
                         navigation={props.navigation}
                         route={props.route}
                         onLogout={handleLogout}

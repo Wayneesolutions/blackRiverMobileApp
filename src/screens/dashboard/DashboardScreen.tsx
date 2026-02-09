@@ -68,8 +68,9 @@ export default function DashboardScreen() {
         // { id: 2, name: "Trailer", icon: <FontAwesome5 name="truck-moving" size={28} color="#fff" />, color: "#FF9797", route: "Trailer" },
         // { id: 3, name: "HOS", icon: <MaterialIcons name="schedule" size={28} color="#fff" />, color: "#FFCC00", route: "HOS" },
         // { id: 4, name: "Asset Inspection", icon: <MaterialIcons name="report-problem" size={28} color="#fff" />, color: "#D74848", route: "AssetIncidents" },
-        { id: 1, name: "Settings", icon: <Ionicons name="settings" size={28} color="#fff" />, color: "#2CDBFA", route: "Settings" },
-        { id: 2, name: "Load Map", icon: <Ionicons name="map" size={28} color="#fff" />, color: "#831775", route: "LoadMap" },
+        { id: 1, name: "Chat", icon: <Ionicons name="chatbubbles" size={28} color="#fff" />, color: "#00C2A6", route: "DriverChat" },
+        { id: 2, name: "Settings", icon: <Ionicons name="settings" size={28} color="#fff" />, color: "#2CDBFA", route: "Settings" },
+        { id: 3, name: "Load Map", icon: <Ionicons name="map" size={28} color="#fff" />, color: "#831775", route: "LoadMap" },
         // { id: 8, name: "Transfer", icon: <Ionicons name="swap-horizontal" size={28} color="#fff" />, color: "#E61DCC", route: "Transfer" },
         // { id: 9, name: "Fuel", icon: <FontAwesome5 name="gas-pump" size={28} color="#fff" />, color: "#04AA30", route: "Fuel" },
     ];

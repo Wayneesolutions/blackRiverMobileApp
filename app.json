@@ -1,11 +1,7 @@
 {
   "expo": {
     "name": "Logistiq Innovations",
-<<<<<<< HEAD
-    "slug": "logistiq-innovations",
-=======
     "slug": "black-river-logistics",
->>>>>>> f9d2362a172712a6cc63305e9e831f8062bdabad
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/app-icon.png",
@@ -22,7 +18,7 @@
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.logistiqinnovations.app",
-      "buildNumber": "1",
+      "buildNumber": "7",
       "infoPlist": {
         "NSLocationWhenInUseUsageDescription": "This app needs access to your location to show your current position on the map.",
         "NSLocationAlwaysUsageDescription": "This app needs access to your location for live tracking of your trips.",
@@ -45,18 +41,15 @@
       "config": {
         "googleMapsApiKey": "AIzaSyDBhzYegComYfj8I4K2Di_ltSLk7ify_IU"
       },
-      "android": {
-  "adaptiveIcon": {
-    "foregroundImage": "./assets/android-foreground.png",
-    "backgroundColor": "#FFFFFF"
-  },
-  "splash": {
-    "image": "./assets/splash-icon.png",
-    "resizeMode": "contain",
-    "backgroundColor": "#FFFFFF"
-  }
-}
-,
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/app-icon.jpeg",
+        "backgroundColor": "#E5E5E5"
+      },
+      "splash": {
+        "image": "./assets/app-icon.jpeg",
+        "resizeMode": "cover",
+        "backgroundColor": "#E5E5E5"
+      },
       "permissions": [
         "ACCESS_FINE_LOCATION",
         "ACCESS_COARSE_LOCATION",
