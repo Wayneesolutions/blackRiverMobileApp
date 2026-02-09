@@ -1,5 +1,6 @@
 // src/services/ApiService.ts - CORRECTED VERSION
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { Platform } from 'react-native';
 import { API_BASE_URL, API_ENDPOINTS, IS_DEV, getAPIBaseURL } from '../../config/env';
 import { logger } from '../../utils/loggerHelper';
 import { authManager } from '../../types/AuthManager';
@@ -37,7 +38,13 @@ class ApiService {
         // Initialize immediately without async operations
         this.loadTokenSync();
         // Try to get baseURL from config (might be undefined if config not loaded yet)
-        this.baseURL = API_BASE_URL || null;
+        let initialBaseURL = API_BASE_URL || null;
+        // Replace old IP if found
+        if (initialBaseURL && initialBaseURL.includes('192.168.1.4')) {
+            initialBaseURL = initialBaseURL.replace('192.168.1.4', '192.168.1.9');
+            logger.warn('Replaced old IP in initial baseURL', { newBaseURL: initialBaseURL });
+        }
+        this.baseURL = initialBaseURL;
     }
 
     // Set callback for token expiration
@@ -103,17 +110,33 @@ class ApiService {
             try {
                 const baseURL = await getAPIBaseURL();
                 if (baseURL) {
-                    this.baseURL = baseURL;
+                    // Replace old IP if found
+                    let finalBaseURL = baseURL;
+                    if (finalBaseURL.includes('192.168.1.4')) {
+                        finalBaseURL = finalBaseURL.replace('192.168.1.4', '192.168.1.9');
+                        logger.warn('Replaced old IP in config baseURL', { old: baseURL, new: finalBaseURL });
+                    }
+                    this.baseURL = finalBaseURL;
                     this.configInitialized = true;
                     logger.info('Config loaded, baseURL set', { baseURL: this.baseURL });
                 } else {
                     // Fallback if config still not ready
-                    this.baseURL = API_BASE_URL || 'http://localhost:3000/api/v1';
+                    let fallbackURL = API_BASE_URL || 'http://localhost:3000/api/v1';
+                    // Replace old IP if found
+                    if (fallbackURL.includes('192.168.1.4')) {
+                        fallbackURL = fallbackURL.replace('192.168.1.4', '192.168.1.9');
+                    }
+                    this.baseURL = fallbackURL;
                     logger.warn('Using fallback baseURL', { baseURL: this.baseURL });
                 }
             } catch (error) {
                 logger.error('Failed to get API base URL', error);
-                this.baseURL = API_BASE_URL || 'http://localhost:3000/api/v1';
+                let fallbackURL = API_BASE_URL || 'http://localhost:3000/api/v1';
+                // Replace old IP if found
+                if (fallbackURL.includes('192.168.1.4')) {
+                    fallbackURL = fallbackURL.replace('192.168.1.4', '192.168.1.9');
+                }
+                this.baseURL = fallbackURL;
             }
         } else {
             this.configInitialized = true;
@@ -253,7 +276,7 @@ class ApiService {
         // 🔧 FIXED: Create proper endpoint list for fallback
         const endpointsToTry: string[] = [];
         
-        // Ensure we have a valid baseURL
+        // Ensure we have a valid baseURL and replace old IP if found
         if (!this.baseURL || this.baseURL === 'undefined') {
             logger.error('baseURL is undefined, cannot make request', { endpoint });
             return {
@@ -261,6 +284,12 @@ class ApiService {
                 error: 'API configuration not initialized. Please restart the app.',
                 statusCode: 0
             };
+        }
+        
+        // Replace old IP (192.168.1.4) with new IP (192.168.1.9) if found
+        if (this.baseURL.includes('192.168.1.4')) {
+            this.baseURL = this.baseURL.replace('192.168.1.4', '192.168.1.9');
+            logger.warn('Replaced old IP 192.168.1.4 with 192.168.1.9', { newBaseURL: this.baseURL });
         }
         
         // Always try current baseURL first
@@ -646,6 +675,41 @@ class ApiService {
         return this.request(`/driver/trips/${tripId}/documents/${documentId}/signed-url?disposition=${disposition}`, {
             method: 'GET'
         }, true);
+    }
+
+    async uploadTripDocument(tripId: string, documentFile: any, documentType: string, description?: string): Promise<ApiResponse> {
+        try {
+            const formData = new FormData();
+            
+            if (documentFile) {
+                if (Platform.OS === 'web') {
+                    formData.append('document', documentFile);
+                } else {
+                    formData.append('document', {
+                        uri: documentFile.uri,
+                        type: documentFile.type || 'application/pdf',
+                        name: documentFile.name || 'document.pdf',
+                    } as any);
+                }
+            }
+            
+            formData.append('documentType', documentType);
+            if (description) {
+                formData.append('description', description);
+            }
+
+            return this.request(`/driver/trips/${tripId}/documents`, {
+                method: 'POST',
+                body: formData,
+            }, true);
+        } catch (error: any) {
+            logger.error('Error uploading trip document', error);
+            return {
+                success: false,
+                error: error.message || 'Failed to upload document',
+                statusCode: 0
+            };
+        }
     }
 
     async getOrderAttachmentSignedUrl(orderId: string, attachmentId: string, disposition: 'inline' | 'attachment' = 'inline'): Promise<ApiResponse<{ url: string; expiresIn: number }>> {
