@@ -134,6 +134,12 @@ const DriverChatScreen = () => {
 
     // Define handlers outside async function so they can be cleaned up
     const handleNewMessage = (message: any) => {
+      // Skip system messages with trip status - these are only for dispatchers
+      if (message.isSystemMessage || message.senderType === 'system' || message.forDispatchersOnly) {
+        logger.info('Skipping system message (trip status) - only for dispatchers');
+        return;
+      }
+      
       // Normalize driverId from message (handle both object and string formats)
       let messageDriverId: string = '';
       if (message.driverId) {
