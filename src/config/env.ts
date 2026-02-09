@@ -106,7 +106,8 @@ const getFallbackIPs = () => {
     
     const possibleIPs = [
         // Add common server IPs first (prioritize these)
-        '192.168.1.4', // Primary network IP - LOCAL SERVER
+        '192.168.1.9', // Primary network IP - LOCAL SERVER
+        '192.168.1.4', // Previous server IP
         '192.168.31.161', // Current system IP (Windows Wi-Fi adapter)
         '192.168.31.247', // Alternative server IP
         '192.168.1.17',
@@ -126,31 +127,37 @@ const getFallbackIPs = () => {
 
 
 const getLocalIP = async (): Promise<string> => {
-    // PRIORITY 1: Use .env value if available
+    // PRIORITY 1: Use .env value if available, BUT replace 192.168.1.4 with 192.168.1.9
     if (ENV_API_BASE_URL && ENV_API_BASE_URL !== 'undefined') {
         const envUrl = ENV_API_BASE_URL;
         const match = envUrl.match(/http:\/\/([^:]+)/);
         if (match && match[1]) {
-            console.log(`✅ Using .env IP: ${match[1]}`);
-            return match[1];
+            const envIP = match[1];
+            // Force replace old IP with new IP
+            if (envIP === '192.168.1.4') {
+                console.log(`⚠️ Replacing old IP 192.168.1.4 with 192.168.1.9`);
+                return '192.168.1.9';
+            }
+            console.log(`✅ Using .env IP: ${envIP}`);
+            return envIP;
         }
     }
     
     // PRIORITY 2: Try auto-detection
     const currentIP = await getCurrentIP();
-    if (currentIP) {
+    if (currentIP && currentIP !== '192.168.1.4') {
         return currentIP;
     }
 
-    // PRIORITY 3: Use fallback IPs
+    // PRIORITY 3: Use fallback IPs (192.168.1.9 is first)
     const fallbackIPs = getFallbackIPs();
     console.log('🔄 Using fallback IPs, auto-detection failed');
 
     if (Platform.OS === 'android') {
-        return fallbackIPs[0];
+        return fallbackIPs[0]; // This will be 192.168.1.9
     }
 
-    return fallbackIPs[0];
+    return fallbackIPs[0]; // This will be 192.168.1.9
 };
 
 const getAPIEndpoints = async (): Promise<string[]> => {
@@ -182,11 +189,13 @@ const getAPIEndpoints = async (): Promise<string[]> => {
 
 const createENVConfig = async () => {
     const localIP = await getLocalIP();
+    // Use 192.168.1.9 as primary development IP if localIP detection fails or returns wrong IP
+    const devIP = localIP && localIP !== '192.168.1.4' ? localIP : '192.168.1.9';
 
     return {
         development: {
-            API_BASE_URL: `http://${localIP}:3000/api/v1`,
-            SOCKET_URL: `http://${localIP}:3000`,
+            API_BASE_URL: `http://${devIP}:3000/api/v1`,
+            SOCKET_URL: `http://${devIP}:3000`,
             NODE_ENV: 'development',
             DB_NAME: 'blackriver',
         },
@@ -230,8 +239,14 @@ let config: Config | null = null;
 
 // Get values from .env file, process.env (EAS), or Constants.extra, with platform-specific fallbacks
 const getDefaultBaseURL = (): string => {
-  // Priority 1: .env or process.env value
+  // Priority 1: .env or process.env value (but replace old IP)
   if (ENV_API_BASE_URL && ENV_API_BASE_URL !== 'undefined') {
+    // Force replace 192.168.1.4 with 192.168.1.9
+    if (ENV_API_BASE_URL.includes('192.168.1.4')) {
+      const updatedUrl = ENV_API_BASE_URL.replace('192.168.1.4', '192.168.1.9');
+      console.log(`⚠️ Replacing old IP in .env: ${ENV_API_BASE_URL} -> ${updatedUrl}`);
+      return updatedUrl;
+    }
     return ENV_API_BASE_URL;
   }
   
@@ -241,7 +256,13 @@ const getDefaultBaseURL = (): string => {
     return extraConfig.apiBaseUrl;
   }
   
-  // Priority 3: Platform-specific fallbacks
+  // Priority 3: Development server IP (192.168.1.9) - check NODE_ENV directly
+  const nodeEnv = (ENV_NODE_ENV && ENV_NODE_ENV !== 'undefined') ? ENV_NODE_ENV : 'development';
+  if (nodeEnv === 'development') {
+    return 'http://192.168.1.9:3000/api/v1';
+  }
+  
+  // Priority 4: Platform-specific fallbacks
   return Platform.OS === 'android' 
     ? 'http://10.0.2.2:3000/api/v1'  // Android emulator default
     : 'http://localhost:3000/api/v1'; // iOS simulator / web default
@@ -259,7 +280,13 @@ const getDefaultSocketURL = (): string => {
     return extraConfig.socketUrl;
   }
   
-  // Priority 3: Platform-specific fallbacks
+  // Priority 3: Development server IP (192.168.1.9) - check NODE_ENV directly
+  const nodeEnv = (ENV_NODE_ENV && ENV_NODE_ENV !== 'undefined') ? ENV_NODE_ENV : 'development';
+  if (nodeEnv === 'development') {
+    return 'http://192.168.1.9:3000';
+  }
+  
+  // Priority 4: Platform-specific fallbacks
   return Platform.OS === 'android'
     ? 'http://10.0.2.2:3000'
     : 'http://localhost:3000';
@@ -284,16 +311,28 @@ const initConfig = async () => {
                            (ENV_SOCKET_URL && ENV_SOCKET_URL !== 'undefined');
         
         if (hasEnvValues) {
-            console.log('✅ .env file detected - skipping auto-detection');
-            // Use .env values directly, no auto-detection needed
+            console.log('✅ .env file detected - checking for old IP');
+            // Use .env values directly, but replace old IP with new IP
             if (ENV_API_BASE_URL && ENV_API_BASE_URL !== 'undefined') {
-                API_BASE_URL = ENV_API_BASE_URL;
-                console.log(`✅ Using .env API_BASE_URL: ${API_BASE_URL}`);
+                // Force replace 192.168.1.4 with 192.168.1.9
+                if (ENV_API_BASE_URL.includes('192.168.1.4')) {
+                    API_BASE_URL = ENV_API_BASE_URL.replace('192.168.1.4', '192.168.1.9');
+                    console.log(`⚠️ Replaced old IP in .env: ${ENV_API_BASE_URL} -> ${API_BASE_URL}`);
+                } else {
+                    API_BASE_URL = ENV_API_BASE_URL;
+                    console.log(`✅ Using .env API_BASE_URL: ${API_BASE_URL}`);
+                }
             }
             
             if (ENV_SOCKET_URL && ENV_SOCKET_URL !== 'undefined') {
-                SOCKET_URL = ENV_SOCKET_URL;
-                console.log(`✅ Using .env SOCKET_URL: ${SOCKET_URL}`);
+                // Force replace 192.168.1.4 with 192.168.1.9
+                if (ENV_SOCKET_URL.includes('192.168.1.4')) {
+                    SOCKET_URL = ENV_SOCKET_URL.replace('192.168.1.4', '192.168.1.9');
+                    console.log(`⚠️ Replaced old IP in .env: ${ENV_SOCKET_URL} -> ${SOCKET_URL}`);
+                } else {
+                    SOCKET_URL = ENV_SOCKET_URL;
+                    console.log(`✅ Using .env SOCKET_URL: ${SOCKET_URL}`);
+                }
             }
             
             // Still get config for other values (NODE_ENV, DB_NAME)

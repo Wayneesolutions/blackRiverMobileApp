@@ -12,8 +12,8 @@ const environments = {
 const envConfigs = {
   development: {  
 
-    API_BASE_URL: 'http://192.168.1.4:3000/api/v1',
-    SOCKET_URL: 'http://192.168.1.4:3000',
+    API_BASE_URL: 'http://192.168.1.9:3000/api/v1',
+    SOCKET_URL: 'http://192.168.1.9:3000',
 
     NODE_ENV: 'development',
     GOOGLE_MAPS_API_KEY: 'AIzaSyCv8vuE1jOgt-F6Szqvfn1DPrQdbPn5aEI',
