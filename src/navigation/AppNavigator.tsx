@@ -37,6 +37,11 @@ import TripInfoScreen from "../screens/tripInfo/index";
 import CrashLogsScreen from "../screens/settings/CrashLogsScreen";
 import TripChatScreen from "../screens/chat/TripChatScreen";
 import DriverChatScreen from "../screens/chat/DriverChatScreen";
+import OnboardingGuardScreen from "../screens/onboarding/OnboardingGuardScreen";
+import TrainingScreen from "../screens/onboarding/TrainingScreen";
+import TestsScreen from "../screens/onboarding/TestsScreen";
+import CertificatesScreen from "../screens/onboarding/CertificatesScreen";
+import HRApprovalScreen from "../screens/onboarding/HRApprovalScreen";
 
 // Constants for storage keys
 const STORAGE_KEYS = {
@@ -114,6 +119,11 @@ export type RootStackParamList = {
     Search: undefined;
     Trips: undefined;
     CrashLogs: undefined;
+    OnboardingGuard: undefined;
+    TrainingScreen: undefined;
+    TestsScreen: undefined;
+    CertificatesScreen: undefined;
+    HRApprovalScreen: undefined;
 };
 
 const MainTab = createBottomTabNavigator<MainTabParamList>();
@@ -384,6 +394,16 @@ export default function AppNavigator() {
             screenOptions={{ headerShown: false }}
             initialRouteName="MainTabs"
         >
+            {/* Onboarding Screens */}
+            <RootStack.Screen name="OnboardingGuard">
+                {(props) => (
+                    <OnboardingGuardScreen {...props} />
+                )}
+            </RootStack.Screen>
+            <RootStack.Screen name="TrainingScreen" component={TrainingScreen} />
+            <RootStack.Screen name="TestsScreen" component={TestsScreen} />
+            <RootStack.Screen name="CertificatesScreen" component={CertificatesScreen} />
+            <RootStack.Screen name="HRApprovalScreen" component={HRApprovalScreen} />
             {/* Main Tabs - These will have Header and Footer */}
             <RootStack.Screen name="MainTabs">
                 {(props) => (
