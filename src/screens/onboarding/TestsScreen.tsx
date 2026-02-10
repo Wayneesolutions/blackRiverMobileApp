@@ -290,7 +290,7 @@ const TestsScreen = () => {
       return;
     }
 
-    navigation.navigate('CertificatesScreen' as never);
+    navigation.navigate('HRApprovalScreen' as never);
   };
 
   const getTestTypeLabel = (type: TestType) => {
@@ -501,7 +501,7 @@ const TestsScreen = () => {
           disabled={!allMandatoryPassed}
         >
           <Text style={styles.continueButtonText}>
-            {allMandatoryPassed ? 'Continue to Certificates →' : 'Go to Trips (Disabled)'}
+            {allMandatoryPassed ? 'Continue to HR Approval →' : 'Go to Trips (Disabled)'}
           </Text>
         </TouchableOpacity>
 

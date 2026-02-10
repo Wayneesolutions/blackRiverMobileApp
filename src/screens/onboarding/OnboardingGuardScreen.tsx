@@ -179,10 +179,7 @@ const OnboardingGuardScreen = () => {
       case 2: // Tests
         if (!progress.trainingCompleted) return 'locked';
         return progress.testsCompleted ? 'completed' : 'pending';
-      case 3: // Certificates (optional)
-        if (!progress.testsCompleted) return 'locked';
-        return progress.certificatesUploaded ? 'completed' : 'pending';
-      case 4: // HR Approval
+      case 3: // HR Approval
         if (!progress.testsCompleted) return 'locked';
         return progress.hrApproved ? 'completed' : 'pending';
       default:
@@ -372,43 +369,7 @@ const OnboardingGuardScreen = () => {
             </View>
           </TouchableOpacity>
 
-          {/* Step 3: Certificates (Optional) */}
-          <TouchableOpacity
-            style={styles.stepCard}
-            onPress={() => navigation.navigate('CertificatesScreen' as never)}
-          >
-            <View style={styles.stepIconContainer}>
-              {getStepStatus(3) === 'completed' && (
-                <View style={styles.completedIcon}>
-                  <Ionicons name="checkmark" size={24} color="#FFFFFF" />
-                </View>
-              )}
-              {getStepStatus(3) !== 'completed' && (
-                <View style={styles.optionalIcon}>
-                  <Ionicons name="document-text-outline" size={24} color="#6B7280" />
-                </View>
-              )}
-            </View>
-            <View style={styles.stepContent}>
-              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-                <Text style={styles.stepNumber}>Step 3</Text>
-                <View style={styles.optionalBadge}>
-                  <Text style={styles.optionalBadgeText}>Optional</Text>
-                </View>
-              </View>
-              <Text style={styles.stepTitle}>Upload/Verify Certificates</Text>
-              <Text style={styles.stepDescription}>
-                You can upload additional certificates here for verification (not required for test access).
-              </Text>
-              {getStepStatus(3) === 'completed' && (
-                <View style={styles.statusBadge}>
-                  <Text style={styles.statusText}>Completed</Text>
-                </View>
-              )}
-            </View>
-          </TouchableOpacity>
-
-          {/* Step 4: HR Approval */}
+          {/* Step 3: HR Approval */}
           <TouchableOpacity
             style={styles.stepCard}
             onPress={() => navigation.navigate('HRApprovalScreen' as never)}
@@ -432,7 +393,7 @@ const OnboardingGuardScreen = () => {
               )}
             </View>
             <View style={styles.stepContent}>
-              <Text style={styles.stepNumber}>Step 4</Text>
+              <Text style={styles.stepNumber}>Step 3</Text>
               <Text style={styles.stepTitle}>HR Approval</Text>
               <Text style={styles.stepDescription}>
                 Wait for HR to review and approve your documents. You will be notified once approved.
@@ -460,7 +421,7 @@ const OnboardingGuardScreen = () => {
         <View style={styles.complianceBanner}>
           <Ionicons name="information-circle" size={20} color="#0ea3d8" />
           <Text style={styles.complianceText}>
-            <Text style={styles.complianceBold}>Required Steps:</Text> Complete training materials and pass all required tests. Certificates are optional and can be uploaded later. HR will review and approve your onboarding.
+            <Text style={styles.complianceBold}>Required Steps:</Text> Complete training materials and pass all required tests. HR will review and approve your onboarding.
           </Text>
         </View>
 
