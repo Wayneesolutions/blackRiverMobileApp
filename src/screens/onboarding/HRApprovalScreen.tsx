@@ -10,7 +10,9 @@ import {
   RefreshControl,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { useNavigation } from '@react-navigation/native';
+import { useNavigation, useFocusEffect } from '@react-navigation/native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { apiService } from '../../services/api/apiService';
 
 type OnboardingStatus = 'PENDING_TESTS' | 'IN_PROGRESS' | 'WAITING_FOR_HR_APPROVAL' | 'APPROVED' | 'REJECTED';
 
@@ -20,25 +22,81 @@ const HRApprovalScreen = () => {
   const [refreshing, setRefreshing] = useState(false);
   const [status, setStatus] = useState<OnboardingStatus>('WAITING_FOR_HR_APPROVAL');
   const [submittedDate, setSubmittedDate] = useState<string>('');
+  const [allTestsApproved, setAllTestsApproved] = useState(false);
 
   useEffect(() => {
     fetchApprovalStatus();
   }, []);
 
+  // Refresh when screen comes into focus
+  useFocusEffect(
+    React.useCallback(() => {
+      fetchApprovalStatus();
+    }, [])
+  );
+
   const fetchApprovalStatus = async () => {
     try {
       setLoading(true);
-      // TODO: Replace with actual API call
-      // const response = await apiService.getDriverOnboardingStatus();
       
-      // Mock data
-      const mockStatus: OnboardingStatus = 'WAITING_FOR_HR_APPROVAL';
-      const mockDate = new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString();
+      // Get driver ID from storage
+      const userDataStr = await AsyncStorage.getItem('user_data') || 
+                         await AsyncStorage.getItem('@fleetgo_user_data') ||
+                         await AsyncStorage.getItem('userData');
       
-      setStatus(mockStatus);
-      setSubmittedDate(mockDate);
+      if (!userDataStr) {
+        console.error('❌ No user data found');
+        setLoading(false);
+        setRefreshing(false);
+        return;
+      }
+      
+      const userData = JSON.parse(userDataStr);
+      const driverId = userData._id || userData.id || userData.userId;
+      
+      if (!driverId) {
+        console.error('❌ No driver ID found');
+        setLoading(false);
+        setRefreshing(false);
+        return;
+      }
+      
+      console.log('📋 Fetching HR approval status for driver:', driverId);
+      
+      // Call backend API
+      const response = await apiService.getDriverOnboardingStatus(driverId);
+      
+      console.log('📋 HR Approval response:', JSON.stringify(response, null, 2));
+      
+      if (response.success && response.data) {
+        const data = response.data.data || response.data;
+        
+        // Map backend status to local status
+        let mappedStatus: OnboardingStatus = 'WAITING_FOR_HR_APPROVAL';
+        
+        if (data.allTestsApprovedByHR || data.hrApprovalStatus === 'APPROVED') {
+          mappedStatus = 'APPROVED';
+          setAllTestsApproved(true);
+        } else if (data.hrApprovalStatus === 'REJECTED') {
+          mappedStatus = 'REJECTED';
+        } else if (data.hrApprovalStatus === 'IN_REVIEW' || data.onboardingStatus === 'AWAITING_HR_APPROVAL') {
+          mappedStatus = 'WAITING_FOR_HR_APPROVAL';
+        }
+        
+        setStatus(mappedStatus);
+        
+        // Set submitted date from tests completed date or onboarding status
+        if (data.testsCompleted && data.tests) {
+          const completedTests = data.tests.filter((t: any) => t.passed);
+          if (completedTests.length > 0) {
+            // Use the latest test completion date
+            const latestTest = completedTests[completedTests.length - 1];
+            setSubmittedDate(new Date().toISOString()); // Use current date as fallback
+          }
+        }
+      }
     } catch (error) {
-      console.error('Error fetching approval status:', error);
+      console.error('❌ Error fetching approval status:', error);
     } finally {
       setLoading(false);
       setRefreshing(false);

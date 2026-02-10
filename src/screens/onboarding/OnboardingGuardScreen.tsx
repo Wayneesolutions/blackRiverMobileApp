@@ -107,12 +107,20 @@ const OnboardingGuardScreen = () => {
           status = 'PENDING_TESTS';
         }
         
+        // Check if all tests are approved by HR
+        const hrApproved = data.allTestsApprovedByHR || data.hrApprovalStatus === 'APPROVED';
+        
+        // Update status if all tests are approved
+        if (hrApproved && status !== 'APPROVED') {
+          status = 'APPROVED';
+        }
+        
         const progress: OnboardingProgress = {
           status,
           trainingCompleted: data.trainingCompleted || false,
           testsCompleted: data.testsCompleted || false,
           certificatesUploaded: data.certificatesUploaded || false,
-          hrApproved: data.hrApprovalStatus === 'APPROVED',
+          hrApproved: hrApproved,
         };
 
         setProgress(progress);
@@ -171,9 +179,10 @@ const OnboardingGuardScreen = () => {
       case 2: // Tests
         if (!progress.trainingCompleted) return 'locked';
         return progress.testsCompleted ? 'completed' : 'pending';
-      case 3: // Certificates (now optional - not blocking)
+      case 3: // Certificates (optional)
+        if (!progress.testsCompleted) return 'locked';
         return progress.certificatesUploaded ? 'completed' : 'pending';
-      case 4: // HR Approval - only requires tests to be completed
+      case 4: // HR Approval
         if (!progress.testsCompleted) return 'locked';
         return progress.hrApproved ? 'completed' : 'pending';
       default:
