@@ -41,6 +41,7 @@ import OnboardingGuardScreen from "../screens/onboarding/OnboardingGuardScreen";
 import TrainingScreen from "../screens/onboarding/TrainingScreen";
 import TestsScreen from "../screens/onboarding/TestsScreen";
 import TakeTestScreen from "../screens/onboarding/TakeTestScreen";
+import TestResultsScreen from "../screens/onboarding/TestResultsScreen";
 import CertificatesScreen from "../screens/onboarding/CertificatesScreen";
 import HRApprovalScreen from "../screens/onboarding/HRApprovalScreen";
 
@@ -404,6 +405,7 @@ export default function AppNavigator() {
             <RootStack.Screen name="TrainingScreen" component={TrainingScreen} />
             <RootStack.Screen name="TestsScreen" component={TestsScreen} />
             <RootStack.Screen name="TakeTestScreen" component={TakeTestScreen} />
+            <RootStack.Screen name="TestResultsScreen" component={TestResultsScreen} />
             <RootStack.Screen name="CertificatesScreen" component={CertificatesScreen} />
             <RootStack.Screen name="HRApprovalScreen" component={HRApprovalScreen} />
             {/* Main Tabs - These will have Header and Footer */}

@@ -10,7 +10,7 @@ import {
   Alert,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { useNavigation } from '@react-navigation/native';
+import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { apiService } from '../../services/api/apiService';
 
@@ -25,6 +25,11 @@ interface TestResult {
   status: 'not_taken' | 'failed' | 'passed';
   mandatory: boolean;
   completedAt?: string | null;
+  hrApproved?: boolean;
+  hrRejected?: boolean;
+  hrApprovedBy?: string;
+  hrApprovedAt?: string;
+  hrRejectionReason?: string;
 }
 
 interface DriverFlags {
@@ -42,6 +47,14 @@ const TestsScreen = () => {
   useEffect(() => {
     fetchTests();
   }, []);
+
+  // Refresh tests when screen comes into focus (e.g., after submitting a test)
+  useFocusEffect(
+    React.useCallback(() => {
+      console.log('📱 TestsScreen focused - refreshing test data...');
+      fetchTests();
+    }, [])
+  );
 
   const fetchTests = async () => {
     try {
@@ -368,9 +381,9 @@ const TestsScreen = () => {
         )}
 
         {/* Test Cards */}
-        {tests.map((test) => (
+        {tests.map((test, index) => (
           <View
-            key={test.id}
+            key={test.id || test.testType || `test-${index}`}
             style={[
               styles.testCard,
               test.status === 'passed' && styles.testCardPassed,
@@ -425,6 +438,32 @@ const TestsScreen = () => {
                 </View>
               )}
             </View>
+
+            {/* HR Approval Status */}
+            {test.status !== 'not_taken' && (
+              <View style={styles.hrApprovalContainer}>
+                <Text style={styles.hrApprovalLabel}>HR Approval:</Text>
+                {test.hrApproved ? (
+                  <View style={styles.hrApprovalBadgeApproved}>
+                    <Ionicons name="checkmark-circle" size={14} color="#10B981" />
+                    <Text style={styles.hrApprovalTextApproved}>Approved</Text>
+                  </View>
+                ) : test.hrRejected ? (
+                  <View style={styles.hrApprovalBadgeRejected}>
+                    <Ionicons name="close-circle" size={14} color="#EF4444" />
+                    <Text style={styles.hrApprovalTextRejected}>Rejected</Text>
+                    {test.hrRejectionReason && (
+                      <Text style={styles.hrRejectionReason}>Reason: {test.hrRejectionReason}</Text>
+                    )}
+                  </View>
+                ) : (
+                  <View style={styles.hrApprovalBadgePending}>
+                    <Ionicons name="time-outline" size={14} color="#F59E0B" />
+                    <Text style={styles.hrApprovalTextPending}>Pending Review</Text>
+                  </View>
+                )}
+              </View>
+            )}
 
             {test.attempts > 0 && (
               <Text style={styles.attemptsText}>Attempts: {test.attempts}</Text>
@@ -691,6 +730,68 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: '#6B7280',
     marginBottom: 12,
+  },
+  hrApprovalContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 12,
+    paddingTop: 8,
+    borderTopWidth: 1,
+    borderTopColor: '#E5E7EB',
+  },
+  hrApprovalLabel: {
+    fontSize: 13,
+    color: '#6B7280',
+    marginRight: 8,
+    fontWeight: '600',
+  },
+  hrApprovalBadgeApproved: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#D1FAE5',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 12,
+  },
+  hrApprovalTextApproved: {
+    marginLeft: 4,
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#065F46',
+  },
+  hrApprovalBadgeRejected: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#FEE2E2',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 12,
+  },
+  hrApprovalTextRejected: {
+    marginLeft: 4,
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#991B1B',
+  },
+  hrApprovalBadgePending: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#FEF3C7',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 12,
+  },
+  hrApprovalTextPending: {
+    marginLeft: 4,
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#92400E',
+  },
+  hrRejectionReason: {
+    fontSize: 11,
+    color: '#991B1B',
+    marginTop: 4,
+    fontStyle: 'italic',
   },
   startButton: {
     backgroundColor: '#0ea3d8',

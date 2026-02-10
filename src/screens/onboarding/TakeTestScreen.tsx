@@ -189,10 +189,23 @@ const TakeTestScreen = () => {
       const driverId = userData._id || userData.id;
 
       // Format answers for submission
-      const formattedAnswers: UserAnswer[] = questionBank.questions.map((q, index) => ({
-        questionId: q._id || index.toString(),
-        selectedAnswer: answers.get(q._id || index.toString()) ?? -1
-      }));
+      // IMPORTANT: Use the exact question ID from the question bank
+      const formattedAnswers: UserAnswer[] = questionBank.questions.map((q, index) => {
+        const questionId = q._id?.toString() || index.toString();
+        const selectedAnswer = answers.get(questionId) ?? -1;
+        
+        console.log(`📝 Question ${index + 1}:`, {
+          questionId,
+          selectedAnswer,
+          correctAnswer: q.correctAnswer,
+          question: q.question.substring(0, 50) + '...'
+        });
+        
+        return {
+          questionId,
+          selectedAnswer
+        };
+      });
 
       console.log('📤 Formatted answers:', formattedAnswers);
 
@@ -204,11 +217,37 @@ const TakeTestScreen = () => {
         answers: formattedAnswers
       });
 
-      console.log('📤 Submit response:', response);
+      console.log('📤 Submit response:', JSON.stringify(response, null, 2));
       console.log('========================================');
 
       if (response.success && response.data) {
-        const { score, passed } = response.data;
+        // Handle nested data structure: response.data.data or response.data
+        let data = response.data;
+        
+        // Check if data is nested
+        if (data.data && typeof data.data === 'object') {
+          data = data.data;
+          console.log('📤 Using nested data structure');
+        }
+        
+        console.log('📤 Extracted data:', JSON.stringify(data, null, 2));
+        console.log('📤 Data keys:', Object.keys(data));
+        
+        // Try multiple possible locations for score
+        // IMPORTANT: Use nullish coalescing (??) instead of || because score can be 0 (falsy)
+        const score = data.score ?? data.data?.score ?? null;
+        const passed = data.passed !== undefined ? data.passed : (data.data?.passed !== undefined ? data.data.passed : false);
+        
+        console.log('📊 Score extracted:', score);
+        console.log('📊 Score type:', typeof score);
+        console.log('📊 Passed extracted:', passed);
+        
+        if (score === null || score === undefined) {
+          console.error('❌ Score is null/undefined in response');
+          console.error('❌ Full response structure:', JSON.stringify(response, null, 2));
+          Alert.alert('Error', 'Failed to get test score. Please check console logs.');
+          return;
+        }
         
         // Save test completion to AsyncStorage
         const allTests = await AsyncStorage.getItem('completedTests');
@@ -218,22 +257,25 @@ const TakeTestScreen = () => {
           await AsyncStorage.setItem('completedTests', JSON.stringify(completedTests));
         }
 
-        Alert.alert(
-          passed ? '🎉 Congratulations!' : '📝 Test Complete',
-          `You scored ${score}%\n\n${
-            passed
-              ? `You passed the ${getTestTypeLabel(testType)} test!`
-              : `You need ${questionBank.passingPercentage}% to pass. You can retake the test.`
-          }`,
-          [
-            {
-              text: 'OK',
-              onPress: () => navigation.goBack()
+        // Navigate to results screen with detailed results
+        navigation.navigate('TestResultsScreen' as never, {
+          testResult: {
+            score,
+            passed,
+            attempts: data.attempts || 1,
+            answers: data.answers || [],
+            questionBank: {
+              testName: questionBank.testName,
+              testType: questionBank.testType,
+              passingPercentage: questionBank.passingPercentage,
+              questions: questionBank.questions
             }
-          ]
-        );
+          },
+          testType
+        } as never);
       } else {
-        Alert.alert('Error', response.error || 'Failed to submit test. Please try again.');
+        console.error('❌ Submit failed:', response.error || response.message);
+        Alert.alert('Error', response.error || response.message || 'Failed to submit test. Please try again.');
       }
     } catch (error: any) {
       console.error('❌ Error submitting test:', error);
