@@ -989,6 +989,212 @@ class ApiService {
         }
     }
 
+    // ==================== DRIVER ONBOARDING & TESTS ====================
+    
+    /**
+     * Get driver test status and required tests based on driver flags
+     */
+    async getDriverTestStatus(driverId: string): Promise<ApiResponse> {
+        try {
+            logger.info('Fetching driver test status', { driverId });
+            
+            const response = await this.request(`/hr/driver/${driverId}/test-status`, {
+                method: 'GET'
+            }, true);
+
+            return response;
+        } catch (error: any) {
+            logger.error('Error fetching driver test status', error);
+            return {
+                success: false,
+                error: error.message || 'Failed to fetch test status',
+                statusCode: 0
+            };
+        }
+    }
+
+    /**
+     * Submit test result
+     */
+    async submitTestResult(data: {
+        driverId: string;
+        testType: string;
+        questionBankId?: string;
+        answers: Array<{
+            questionId: string;
+            selectedAnswer: number;
+        }>;
+    }): Promise<ApiResponse> {
+        try {
+            logger.info('Submitting test result', { 
+                driverId: data.driverId, 
+                testType: data.testType,
+                answerCount: data.answers.length
+            });
+            
+            const response = await this.request('/hr/driver/test-result', {
+                method: 'POST',
+                body: JSON.stringify(data)
+            }, true);
+
+            return response;
+        } catch (error: any) {
+            logger.error('Error submitting test result', error);
+            return {
+                success: false,
+                error: error.message || 'Failed to submit test result',
+                statusCode: 0
+            };
+        }
+    }
+
+    /**
+     * Get question bank for a specific test type
+     */
+    async getQuestionBank(testType: string): Promise<ApiResponse> {
+        try {
+            logger.info('Fetching question bank', { testType });
+            
+            const response = await this.request(`/hr/driver/question-bank?testType=${testType}`, {
+                method: 'GET'
+            }, true);
+
+            return response;
+        } catch (error: any) {
+            logger.error('Error fetching question bank', error);
+            return {
+                success: false,
+                error: error.message || 'Failed to fetch question bank',
+                statusCode: 0
+            };
+        }
+    }
+
+    /**
+     * Get training content (videos, PDFs, images)
+     */
+    async getTrainingContent(testType?: string): Promise<ApiResponse> {
+        try {
+            logger.info('Fetching training content', { testType });
+            
+            const url = testType 
+                ? `/hr/driver/training-content?testType=${testType}`
+                : '/hr/driver/training-content';
+            
+            const response = await this.request(url, {
+                method: 'GET'
+            }, true);
+
+            return response;
+        } catch (error: any) {
+            logger.error('Error fetching training content', error);
+            return {
+                success: false,
+                error: error.message || 'Failed to fetch training content',
+                statusCode: 0
+            };
+        }
+    }
+
+    /**
+     * Get signed URL to view/download training content
+     */
+    // Mark training as complete
+    async markTrainingComplete(): Promise<ApiResponse> {
+        try {
+            console.log('📚 API: Marking training as complete');
+            
+            const response = await this.request(
+                '/hr/driver/onboarding/training-complete',
+                { method: 'POST' },
+                true
+            );
+
+            console.log('📚 API: Training complete response:', response);
+            return response;
+        } catch (error: any) {
+            console.error('❌ API: Error marking training complete:', error);
+            return {
+                success: false,
+                error: error.message || 'Failed to mark training complete',
+                statusCode: 0
+            };
+        }
+    }
+
+    // Get driver onboarding status
+    async getDriverOnboardingStatus(driverId: string): Promise<ApiResponse> {
+        try {
+            console.log('📊 API: Getting onboarding status for driver:', driverId);
+            
+            const response = await this.request(
+                `/hr/driver/onboarding/${driverId}/status`,
+                { method: 'GET' },
+                true
+            );
+
+            console.log('📊 API: Onboarding status response:', response);
+            return response;
+        } catch (error: any) {
+            console.error('❌ API: Error getting onboarding status:', error);
+            return {
+                success: false,
+                error: error.message || 'Failed to get onboarding status',
+                statusCode: 0
+            };
+        }
+    }
+
+    async getTrainingContentSignedUrl(contentId: string, disposition: 'inline' | 'attachment' = 'inline'): Promise<ApiResponse> {
+        try {
+            console.log('========================================');
+            console.log('📱 API: Getting signed URL for training content');
+            console.log('📱 API: Content ID:', contentId);
+            console.log('📱 API: Disposition:', disposition);
+            
+            const endpoint = `/hr/driver/training-content/${contentId}/signed-url?disposition=${disposition}`;
+            console.log('📱 API: Endpoint:', endpoint);
+            
+            const response = await this.request(
+                endpoint,
+                { method: 'GET' },
+                true
+            );
+
+            console.log('📱 API: Response received');
+            console.log('📱 API: Response success:', response.success);
+            console.log('📱 API: Response keys:', Object.keys(response));
+            console.log('📱 API: Full response:', JSON.stringify(response, null, 2));
+            
+            if (response.data) {
+                console.log('📱 API: Response.data:', JSON.stringify(response.data, null, 2));
+            }
+            
+            if (response.url) {
+                console.log('📱 API: Direct URL found:', response.url.substring(0, 100) + '...');
+            }
+            
+            if (response.data?.url) {
+                console.log('📱 API: Nested URL found:', response.data.url.substring(0, 100) + '...');
+            }
+            
+            console.log('========================================');
+
+            return response;
+        } catch (error: any) {
+            console.error('❌ API: Error getting signed URL:', error);
+            console.error('❌ API: Error message:', error.message);
+            console.log('========================================');
+            
+            logger.error('Error getting signed URL', error);
+            return {
+                success: false,
+                error: error.message || 'Failed to get signed URL',
+                statusCode: 0
+            };
+        }
+    }
+
     // Utility methods
     isAuthenticated(): boolean {
         return !!this.token;

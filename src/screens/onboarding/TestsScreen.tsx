@@ -11,17 +11,25 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { apiService } from '../../services/api/apiService';
 
 type TestType = 'TDG' | 'VEHICLE' | 'HOS' | 'WINTER';
 
 interface TestResult {
-  id: string;
+  id: string | null;
   testType: TestType;
   score: number;
   passed: boolean;
   attempts: number;
   status: 'not_taken' | 'failed' | 'passed';
   mandatory: boolean;
+  completedAt?: string | null;
+}
+
+interface DriverFlags {
+  handlesHazardousLoads: boolean;
+  winterTestRequired: boolean;
 }
 
 const TestsScreen = () => {
@@ -29,6 +37,7 @@ const TestsScreen = () => {
   const [loading, setLoading] = useState(true);
   const [tests, setTests] = useState<TestResult[]>([]);
   const [allTestsPassed, setAllTestsPassed] = useState(false);
+  const [driverFlags, setDriverFlags] = useState<DriverFlags | null>(null);
 
   useEffect(() => {
     fetchTests();
@@ -37,56 +46,108 @@ const TestsScreen = () => {
   const fetchTests = async () => {
     try {
       setLoading(true);
-      // TODO: Replace with actual API call
       
-      // Mock data
-      const mockTests: TestResult[] = [
-        {
-          id: '1',
-          testType: 'TDG',
-          score: 85,
-          passed: true,
-          attempts: 1,
-          status: 'passed',
-          mandatory: true,
-        },
-        {
-          id: '2',
-          testType: 'VEHICLE',
-          score: 0,
-          passed: false,
-          attempts: 0,
-          status: 'not_taken',
-          mandatory: true,
-        },
-        {
-          id: '3',
-          testType: 'HOS',
-          score: 0,
-          passed: false,
-          attempts: 0,
-          status: 'not_taken',
-          mandatory: true,
-        },
-        {
-          id: '4',
-          testType: 'WINTER',
-          score: 0,
-          passed: false,
-          attempts: 0,
-          status: 'not_taken',
-          mandatory: false,
-        },
-      ];
+      console.log('📱 Fetching user data from storage...');
+      
+      // Try multiple storage keys for backward compatibility
+      let userDataStr = await AsyncStorage.getItem('user_data');
+      if (!userDataStr) {
+        userDataStr = await AsyncStorage.getItem('@fleetgo_user_data');
+      }
+      if (!userDataStr) {
+        userDataStr = await AsyncStorage.getItem('userData');
+      }
+      
+      if (!userDataStr) {
+        console.log('❌ No user data found in any storage key');
+        Alert.alert('Error', 'User data not found. Please login again.');
+        return;
+      }
 
-      setTests(mockTests);
+      console.log('✅ User data found in storage');
+      const userData = JSON.parse(userDataStr);
+      const driverId = userData._id || userData.id;
       
-      // Check if all mandatory tests passed
-      const mandatoryTests = mockTests.filter(t => t.mandatory);
-      const allMandatoryPassed = mandatoryTests.every(t => t.status === 'passed');
-      setAllTestsPassed(allMandatoryPassed);
-    } catch (error) {
-      console.error('Error fetching tests:', error);
+      if (!driverId) {
+        console.log('❌ No driver ID in user data:', userData);
+        Alert.alert('Error', 'Invalid user data. Please login again.');
+        return;
+      }
+      
+      console.log('✅ Driver ID:', driverId);
+      console.log('========================================');
+      console.log('📱 Step 2: Calling API to get test status...');
+
+      // Call the API
+      const response = await apiService.getDriverTestStatus(driverId);
+      
+      console.log('📱 Step 3: Received response from backend');
+      console.log('📱 Response success:', response.success);
+      console.log('📱 Full response:', JSON.stringify(response, null, 2));
+
+      if (response.success && response.data) {
+        // Handle nested data structure: response.data.data
+        const data = response.data.data || response.data;
+        
+        console.log('📱 Extracted data:', JSON.stringify(data, null, 2));
+        
+        const testsData: TestResult[] = data.tests || [];
+        const flags: DriverFlags = data.driverFlags || {
+          handlesHazardousLoads: false,
+          winterTestRequired: false
+        };
+        const requiredTests = data.requiredTests || [];
+
+        console.log('✅ Tests loaded from backend:', testsData.length, 'tests');
+        console.log('✅ Driver flags:', JSON.stringify(flags, null, 2));
+        console.log('✅ Required test types:', requiredTests);
+        
+        // Log each test
+        testsData.forEach((test, index) => {
+          console.log(`📝 Test ${index + 1}:`, {
+            testType: test.testType,
+            status: test.status,
+            score: test.score,
+            passed: test.passed,
+            mandatory: test.mandatory,
+            attempts: test.attempts
+          });
+        });
+
+        setTests(testsData);
+        setDriverFlags(flags);
+        
+        // Check if all mandatory tests passed
+        const mandatoryTests = testsData.filter(t => t.mandatory);
+        const allMandatoryPassed = mandatoryTests.every(t => t.status === 'passed');
+        setAllTestsPassed(allMandatoryPassed);
+
+        console.log('📊 Mandatory tests count:', mandatoryTests.length);
+        console.log('📊 All mandatory tests passed:', allMandatoryPassed);
+        
+        // Save tests completion status to AsyncStorage
+        if (allMandatoryPassed) {
+          await AsyncStorage.setItem('testsCompleted', 'true');
+          console.log('✅ Tests completion status saved to AsyncStorage');
+        } else {
+          await AsyncStorage.setItem('testsCompleted', 'false');
+        }
+        
+        console.log('========================================');
+        console.log('✅ TESTS LOADED SUCCESSFULLY');
+        console.log('========================================');
+      } else {
+        console.error('❌ API returned error:', response.error || response.message);
+        Alert.alert('Error', response.error || response.message || 'Failed to load tests');
+      }
+    } catch (error: any) {
+      console.error('========================================');
+      console.error('❌ ERROR FETCHING TESTS');
+      console.error('❌ Error:', error);
+      console.error('❌ Error message:', error.message);
+      console.error('❌ Error stack:', error.stack);
+      console.error('========================================');
+      Alert.alert('Error', `Failed to load tests: ${error.message}`);
     } finally {
       setLoading(false);
     }
@@ -101,7 +162,65 @@ const TestsScreen = () => {
         {
           text: 'Start Test',
           onPress: () => {
-            // TODO: Navigate to actual test screen
+            console.log('🚀 Navigating to TakeTestScreen for test type:', test.testType);
+            try {
+              navigation.navigate('TakeTestScreen' as never, { testType: test.testType } as never);
+            } catch (error) {
+              console.error('❌ Navigation error:', error);
+              Alert.alert('Error', 'Failed to start test. Please try again.');
+            }
+          }
+        }
+      ]
+    );
+  };
+
+  const handleRetakeTest = (test: TestResult) => {
+    Alert.alert(
+      `Retake ${getTestTypeLabel(test.testType)} Test`,
+      `You scored ${test.score}% on your last attempt.\n\nDo you want to retake this test?`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Retake Test',
+          onPress: () => {
+            console.log('🚀 Navigating to TakeTestScreen for retake:', test.testType);
+            try {
+              navigation.navigate('TakeTestScreen' as never, { testType: test.testType } as never);
+            } catch (error) {
+              console.error('❌ Navigation error:', error);
+              Alert.alert('Error', 'Failed to start test. Please try again.');
+            }
+          }
+        }
+      ]
+    );
+  };
+
+  const handleViewResults = (test: TestResult) => {
+    Alert.alert(
+      `${getTestTypeLabel(test.testType)} Results`,
+      `Score: ${test.score}%\nStatus: ${test.status === 'passed' ? 'Passed ✅' : 'Failed ❌'}\nAttempts: ${test.attempts}`,
+      [
+        { text: 'OK' },
+        test.status !== 'passed' && {
+          text: 'Retake Test',
+          onPress: () => handleRetakeTest(test)
+        }
+      ].filter(Boolean) as any
+    );
+  };
+
+  const OLD_handleStartTest = (test: TestResult) => {
+    Alert.alert(
+      `Start ${getTestTypeLabel(test.testType)} Test`,
+      `You are about to start the ${getTestTypeLabel(test.testType)} test.\n\n${test.mandatory ? 'This is a mandatory test.' : 'This is an optional test.'}\n\nAre you ready to begin?`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Start Test',
+          onPress: () => {
+            // OLD IMPLEMENTATION
             Alert.alert(
               'Test Screen',
               'The test interface will be implemented here. For now, this is a placeholder.',
@@ -222,6 +341,28 @@ const TestsScreen = () => {
               <Text style={styles.warningText}>
                 You must pass all required safety tests before accessing trips.
               </Text>
+            </View>
+          </View>
+        )}
+
+        {/* Driver Flags Info */}
+        {driverFlags && (
+          <View style={styles.infoBanner}>
+            <Ionicons name="information-circle" size={20} color="#0ea3d8" />
+            <View style={styles.infoContent}>
+              <Text style={styles.infoTitle}>Your Required Tests</Text>
+              <Text style={styles.infoText}>
+                Based on your driver profile:
+              </Text>
+              <View style={styles.flagsList}>
+                <Text style={styles.flagItem}>✓ Vehicle Inspection & HOS (Base Tests)</Text>
+                {driverFlags.handlesHazardousLoads && (
+                  <Text style={styles.flagItem}>✓ TDG Test (Hazardous Loads)</Text>
+                )}
+                {driverFlags.winterTestRequired && (
+                  <Text style={styles.flagItem}>✓ Winter Driving Test (Winter Season)</Text>
+                )}
+              </View>
             </View>
           </View>
         )}
@@ -396,6 +537,40 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#991B1B',
     lineHeight: 20,
+  },
+  infoBanner: {
+    flexDirection: 'row',
+    backgroundColor: '#E0F2FE',
+    padding: 16,
+    borderRadius: 12,
+    marginBottom: 24,
+    borderLeftWidth: 4,
+    borderLeftColor: '#0ea3d8',
+  },
+  infoContent: {
+    flex: 1,
+    marginLeft: 12,
+  },
+  infoTitle: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: '#075985',
+    marginBottom: 4,
+  },
+  infoText: {
+    fontSize: 14,
+    color: '#075985',
+    lineHeight: 20,
+    marginBottom: 8,
+  },
+  flagsList: {
+    marginTop: 4,
+  },
+  flagItem: {
+    fontSize: 13,
+    color: '#0C4A6E',
+    lineHeight: 20,
+    marginBottom: 2,
   },
   testCard: {
     backgroundColor: '#FFFFFF',

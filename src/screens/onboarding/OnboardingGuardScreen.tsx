@@ -7,9 +7,12 @@ import {
   TouchableOpacity,
   SafeAreaView,
   ActivityIndicator,
+  Alert,
 } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
+import { apiService } from '../../services/api/apiService';
 
 type OnboardingStatus = 'PENDING_TESTS' | 'IN_PROGRESS' | 'WAITING_FOR_HR_APPROVAL' | 'APPROVED' | 'REJECTED';
 
@@ -42,27 +45,106 @@ const OnboardingGuardScreen = () => {
     try {
       setLoading(true);
       
-      // TODO: Replace with actual API call
-      // const response = await apiService.getDriverOnboardingStatus();
-      // const onboardingStatus = response.data?.status || 'PENDING_TESTS';
-      // const progressData = response.data?.progress || {};
+      console.log('========================================');
+      console.log('📋 FETCHING ONBOARDING STATUS FROM BACKEND');
+      console.log('========================================');
       
-      // Mock data for UI demonstration
-      // Shows onboarding progress and steps
-      const mockStatus: OnboardingStatus = 'IN_PROGRESS';
+      // Get user data
+      let userDataStr = await AsyncStorage.getItem('user_data');
+      if (!userDataStr) {
+        userDataStr = await AsyncStorage.getItem('@fleetgo_user_data');
+      }
+      if (!userDataStr) {
+        userDataStr = await AsyncStorage.getItem('userData');
+      }
       
-      // Mock progress data showing partial completion
-      const mockProgress: OnboardingProgress = {
-        status: mockStatus,
-        trainingCompleted: true,  // Step 1 completed
-        testsCompleted: false,     // Step 2 pending
-        certificatesUploaded: false, // Step 3 pending
-        hrApproved: false,        // Step 4 pending
-      };
+      if (!userDataStr) {
+        console.log('❌ No user data found');
+        setLoading(false);
+        return;
+      }
 
-      setProgress(mockProgress);
-    } catch (error) {
-      console.error('Error fetching onboarding status:', error);
+      const userData = JSON.parse(userDataStr);
+      const driverId = userData._id || userData.id;
+      
+      if (!driverId) {
+        console.log('❌ No driver ID found');
+        setLoading(false);
+        return;
+      }
+      
+      console.log('✅ Driver ID:', driverId);
+      console.log('📋 Calling backend API...');
+      
+      // Call backend API to get onboarding status
+      const response = await apiService.getDriverOnboardingStatus(driverId);
+      
+      console.log('📋 Backend response:', JSON.stringify(response, null, 2));
+      
+      if (response.success && response.data) {
+        // Handle nested data structure: response.data.data
+        const data = response.data.data || response.data;
+        
+        console.log('✅ Backend data received:');
+        console.log('   - Training completed:', data.trainingCompleted);
+        console.log('   - Tests completed:', data.testsCompleted);
+        console.log('   - Certificates uploaded:', data.certificatesUploaded);
+        console.log('   - HR approval status:', data.hrApprovalStatus);
+        console.log('   - Onboarding status:', data.onboardingStatus);
+        console.log('   - Required tests:', data.requiredTests);
+        
+        // Map backend status to local status
+        let status: OnboardingStatus = 'IN_PROGRESS';
+        if (data.onboardingStatus === 'APPROVED') {
+          status = 'APPROVED';
+        } else if (data.onboardingStatus === 'REJECTED') {
+          status = 'REJECTED';
+        } else if (data.onboardingStatus === 'AWAITING_HR_APPROVAL') {
+          status = 'WAITING_FOR_HR_APPROVAL';
+        } else if (data.onboardingStatus === 'TESTS_PENDING') {
+          status = 'IN_PROGRESS';
+        } else if (data.onboardingStatus === 'NOT_STARTED') {
+          status = 'PENDING_TESTS';
+        }
+        
+        const progress: OnboardingProgress = {
+          status,
+          trainingCompleted: data.trainingCompleted || false,
+          testsCompleted: data.testsCompleted || false,
+          certificatesUploaded: data.certificatesUploaded || false,
+          hrApproved: data.hrApprovalStatus === 'APPROVED',
+        };
+
+        setProgress(progress);
+        
+        console.log('✅ Onboarding status loaded from backend');
+        console.log('========================================');
+      } else {
+        console.error('❌ Failed to get onboarding status:', response.error);
+        // Fallback to default state
+        setProgress({
+          status: 'PENDING_TESTS',
+          trainingCompleted: false,
+          testsCompleted: false,
+          certificatesUploaded: false,
+          hrApproved: false,
+        });
+      }
+    } catch (error: any) {
+      console.error('========================================');
+      console.error('❌ ERROR FETCHING ONBOARDING STATUS');
+      console.error('❌ Error:', error);
+      console.error('❌ Error message:', error.message);
+      console.error('========================================');
+      
+      // Fallback to default state
+      setProgress({
+        status: 'PENDING_TESTS',
+        trainingCompleted: false,
+        testsCompleted: false,
+        certificatesUploaded: false,
+        hrApproved: false,
+      });
     } finally {
       setLoading(false);
     }
@@ -71,27 +153,28 @@ const OnboardingGuardScreen = () => {
   const calculateProgress = (): number => {
     if (!progress) return 0;
     let completed = 0;
+    const total = 3; // Only count required steps: Training, Tests, HR Approval (not certificates)
+    
     if (progress.trainingCompleted) completed++;
     if (progress.testsCompleted) completed++;
-    if (progress.certificatesUploaded) completed++;
     if (progress.hrApproved) completed++;
-    return (completed / 4) * 100;
+    
+    return (completed / total) * 100;
   };
 
   const getStepStatus = (step: number): 'locked' | 'pending' | 'completed' => {
     if (!progress) return 'locked';
     
     switch (step) {
-      case 1:
+      case 1: // Training
         return progress.trainingCompleted ? 'completed' : 'pending';
-      case 2:
+      case 2: // Tests
         if (!progress.trainingCompleted) return 'locked';
         return progress.testsCompleted ? 'completed' : 'pending';
-      case 3:
-        if (!progress.testsCompleted) return 'locked';
+      case 3: // Certificates (now optional - not blocking)
         return progress.certificatesUploaded ? 'completed' : 'pending';
-      case 4:
-        if (!progress.certificatesUploaded) return 'locked';
+      case 4: // HR Approval - only requires tests to be completed
+        if (!progress.testsCompleted) return 'locked';
         return progress.hrApproved ? 'completed' : 'pending';
       default:
         return 'locked';
@@ -101,12 +184,11 @@ const OnboardingGuardScreen = () => {
   const handleContinue = () => {
     if (!progress) return;
 
+    // Skip certificates in the main flow - tests lead directly to HR approval
     if (!progress.trainingCompleted) {
       navigation.navigate('TrainingScreen' as never);
     } else if (!progress.testsCompleted) {
       navigation.navigate('TestsScreen' as never);
-    } else if (!progress.certificatesUploaded) {
-      navigation.navigate('CertificatesScreen' as never);
     } else if (!progress.hrApproved) {
       navigation.navigate('HRApprovalScreen' as never);
     }
@@ -115,9 +197,9 @@ const OnboardingGuardScreen = () => {
   const getNextStep = (): string => {
     if (!progress) return 'Start Onboarding';
     
+    // Skip certificates in the main flow
     if (!progress.trainingCompleted) return 'Start Training';
     if (!progress.testsCompleted) return 'Take Tests';
-    if (!progress.certificatesUploaded) return 'Upload Certificates';
     if (!progress.hrApproved) return 'Check HR Approval';
     return 'Complete';
   };
@@ -183,7 +265,7 @@ const OnboardingGuardScreen = () => {
           {/* Step 1: Training */}
           <TouchableOpacity
             style={styles.stepCard}
-            onPress={() => !progress.trainingCompleted && navigation.navigate('TrainingScreen' as never)}
+            onPress={() => navigation.navigate('TrainingScreen' as never)}
             disabled={getStepStatus(1) === 'locked'}
           >
             <View style={styles.stepIconContainer}>
@@ -230,7 +312,14 @@ const OnboardingGuardScreen = () => {
           {/* Step 2: Tests */}
           <TouchableOpacity
             style={styles.stepCard}
-            onPress={() => progress.trainingCompleted && !progress.testsCompleted && navigation.navigate('TestsScreen' as never)}
+            onPress={() => {
+              console.log('📝 Step 2 clicked - Navigating to TestsScreen');
+              if (getStepStatus(2) !== 'locked') {
+                navigation.navigate('TestsScreen' as never);
+              } else {
+                Alert.alert('Locked', 'Please complete training first before taking tests.');
+              }
+            }}
             disabled={getStepStatus(2) === 'locked'}
           >
             <View style={styles.stepIconContainer}>
@@ -274,11 +363,10 @@ const OnboardingGuardScreen = () => {
             </View>
           </TouchableOpacity>
 
-          {/* Step 3: Certificates */}
+          {/* Step 3: Certificates (Optional) */}
           <TouchableOpacity
             style={styles.stepCard}
-            onPress={() => progress.testsCompleted && !progress.certificatesUploaded && navigation.navigate('CertificatesScreen' as never)}
-            disabled={getStepStatus(3) === 'locked'}
+            onPress={() => navigation.navigate('CertificatesScreen' as never)}
           >
             <View style={styles.stepIconContainer}>
               {getStepStatus(3) === 'completed' && (
@@ -286,36 +374,26 @@ const OnboardingGuardScreen = () => {
                   <Ionicons name="checkmark" size={24} color="#FFFFFF" />
                 </View>
               )}
-              {getStepStatus(3) === 'pending' && (
-                <View style={styles.pendingIcon}>
-                  <Ionicons name="time-outline" size={24} color="#F59E0B" />
-                </View>
-              )}
-              {getStepStatus(3) === 'locked' && (
-                <View style={styles.lockedIcon}>
-                  <Ionicons name="lock-closed" size={24} color="#9CA3AF" />
+              {getStepStatus(3) !== 'completed' && (
+                <View style={styles.optionalIcon}>
+                  <Ionicons name="document-text-outline" size={24} color="#6B7280" />
                 </View>
               )}
             </View>
             <View style={styles.stepContent}>
-              <Text style={styles.stepNumber}>Step 3</Text>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                <Text style={styles.stepNumber}>Step 3</Text>
+                <View style={styles.optionalBadge}>
+                  <Text style={styles.optionalBadgeText}>Optional</Text>
+                </View>
+              </View>
               <Text style={styles.stepTitle}>Upload/Verify Certificates</Text>
               <Text style={styles.stepDescription}>
-                Ensure all required certificates are uploaded and valid for each test type.
+                You can upload additional certificates here for verification (not required for test access).
               </Text>
               {getStepStatus(3) === 'completed' && (
                 <View style={styles.statusBadge}>
                   <Text style={styles.statusText}>Completed</Text>
-                </View>
-              )}
-              {getStepStatus(3) === 'pending' && (
-                <View style={[styles.statusBadge, styles.pendingBadge]}>
-                  <Text style={[styles.statusText, styles.pendingText]}>Pending</Text>
-                </View>
-              )}
-              {getStepStatus(3) === 'locked' && (
-                <View style={[styles.statusBadge, styles.lockedBadge]}>
-                  <Text style={[styles.statusText, styles.lockedText]}>Locked</Text>
                 </View>
               )}
             </View>
@@ -324,7 +402,7 @@ const OnboardingGuardScreen = () => {
           {/* Step 4: HR Approval */}
           <TouchableOpacity
             style={styles.stepCard}
-            onPress={() => progress.certificatesUploaded && !progress.hrApproved && navigation.navigate('HRApprovalScreen' as never)}
+            onPress={() => navigation.navigate('HRApprovalScreen' as never)}
             disabled={getStepStatus(4) === 'locked'}
           >
             <View style={styles.stepIconContainer}>
@@ -373,7 +451,7 @@ const OnboardingGuardScreen = () => {
         <View style={styles.complianceBanner}>
           <Ionicons name="information-circle" size={20} color="#0ea3d8" />
           <Text style={styles.complianceText}>
-            <Text style={styles.complianceBold}>Compliance Required:</Text> To ensure road safety and legal regulations, you must complete onboarding before driving.
+            <Text style={styles.complianceBold}>Required Steps:</Text> Complete training materials and pass all required tests. Certificates are optional and can be uploaded later. HR will review and approve your onboarding.
           </Text>
         </View>
 
@@ -581,6 +659,27 @@ const styles = StyleSheet.create({
     color: '#92400E',
   },
   lockedText: {
+    color: '#6B7280',
+  },
+  optionalIcon: {
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    backgroundColor: '#F9FAFB',
+    borderWidth: 2,
+    borderColor: '#E5E7EB',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  optionalBadge: {
+    backgroundColor: '#E5E7EB',
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 8,
+  },
+  optionalBadgeText: {
+    fontSize: 10,
+    fontWeight: '600',
     color: '#6B7280',
   },
   complianceBanner: {
