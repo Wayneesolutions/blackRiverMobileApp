@@ -806,6 +806,71 @@ class ApiService {
         }
     }
 
+    // ========== ELD DOCUMENT METHODS ==========
+    async getELDDocuments(): Promise<ApiResponse<{ data: any[] }>> {
+        try {
+            logger.info('Fetching ELD documents');
+            
+            const response = await this.request<{ success: boolean; message: string; data: any[] }>('/driver/eld-documents', {
+                method: 'GET'
+            }, true);
+
+            return response;
+        } catch (error: any) {
+            logger.error('Error fetching ELD documents', error);
+            return {
+                success: false,
+                error: error.message || 'Failed to fetch ELD documents',
+                statusCode: 0
+            };
+        }
+    }
+
+    async getELDDocumentById(documentId: string): Promise<ApiResponse> {
+        try {
+            logger.info('Fetching ELD document by ID', { documentId });
+            
+            const response = await this.request(`/driver/eld-documents/${documentId}`, {
+                method: 'GET'
+            }, true);
+
+            return response;
+        } catch (error: any) {
+            logger.error('Error fetching ELD document', error);
+            return {
+                success: false,
+                error: error.message || 'Failed to fetch ELD document',
+                statusCode: 0
+            };
+        }
+    }
+
+    async getELDDocumentSignedUrl(documentId: string, disposition: 'inline' | 'attachment' = 'inline'): Promise<ApiResponse<{ url: string; expiresIn: number }>> {
+        try {
+            logger.info('Getting ELD document signed URL', { documentId, disposition });
+            
+            // Ensure disposition is explicitly set to 'inline' or 'attachment'
+            const dispositionParam = disposition === 'attachment' ? 'attachment' : 'inline';
+            
+            // Use URLSearchParams for proper query parameter encoding
+            const params = new URLSearchParams({ disposition: dispositionParam });
+            const endpoint = `/driver/eld-documents/${documentId}/signed-url?${params.toString()}`;
+            
+            const response = await this.request<{ success: boolean; url: string; expiresIn: number }>(endpoint, {
+                method: 'GET'
+            }, true);
+
+            return response;
+        } catch (error: any) {
+            logger.error('Error getting ELD document signed URL', error);
+            return {
+                success: false,
+                error: error.message || 'Failed to get ELD document signed URL',
+                statusCode: 0
+            };
+        }
+    }
+
     async uploadDriverDocument(
         documentFile: any,
         documentType: string,
