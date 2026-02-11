@@ -22,6 +22,8 @@ interface OnboardingProgress {
   testsCompleted: boolean;
   certificatesUploaded: boolean;
   hrApproved: boolean;
+  pendingTestsCount?: number;
+  pendingTests?: string[];
 }
 
 const OnboardingGuardScreen = () => {
@@ -82,16 +84,31 @@ const OnboardingGuardScreen = () => {
       console.log('📋 Backend response:', JSON.stringify(response, null, 2));
       
       if (response.success && response.data) {
-        // Handle nested data structure: response.data.data
-        const data = response.data.data || response.data;
+        // Handle nested data structure: response.data.data.data (triple nesting)
+        // The backend returns: { success: true, data: { success: true, data: { ... } } }
+        let data = response.data;
         
-        console.log('✅ Backend data received:');
+        // Unwrap nested data structures
+        if (data.data && typeof data.data === 'object' && 'trainingCompleted' in data.data) {
+          // Triple nesting: response.data.data.data
+          data = data.data;
+        } else if (data.data && typeof data.data === 'object' && 'success' in data.data && data.data.data) {
+          // Double nesting with success wrapper: response.data.data.data
+          data = data.data.data;
+        } else if (data.data) {
+          // Double nesting: response.data.data
+          data = data.data;
+        }
+        
+        console.log('✅ Backend data received (after unwrapping):');
         console.log('   - Training completed:', data.trainingCompleted);
         console.log('   - Tests completed:', data.testsCompleted);
         console.log('   - Certificates uploaded:', data.certificatesUploaded);
         console.log('   - HR approval status:', data.hrApprovalStatus);
         console.log('   - Onboarding status:', data.onboardingStatus);
         console.log('   - Required tests:', data.requiredTests);
+        console.log('   - Pending tests count:', data.pendingTestsCount);
+        console.log('   - Pending tests:', data.pendingTests);
         
         // Map backend status to local status
         let status: OnboardingStatus = 'IN_PROGRESS';
@@ -121,6 +138,8 @@ const OnboardingGuardScreen = () => {
           testsCompleted: data.testsCompleted || false,
           certificatesUploaded: data.certificatesUploaded || false,
           hrApproved: hrApproved,
+          pendingTestsCount: data.pendingTestsCount || 0,
+          pendingTests: data.pendingTests || [],
         };
 
         setProgress(progress);
@@ -178,9 +197,21 @@ const OnboardingGuardScreen = () => {
         return progress.trainingCompleted ? 'completed' : 'pending';
       case 2: // Tests
         if (!progress.trainingCompleted) return 'locked';
-        return progress.testsCompleted ? 'completed' : 'pending';
-      case 3: // HR Approval
-        if (!progress.testsCompleted) return 'locked';
+        // Only show as completed if ALL required tests are passed (no pending tests)
+        const hasPendingTests = (progress.pendingTestsCount || 0) > 0;
+        if (progress.testsCompleted && !hasPendingTests) {
+          return 'completed';
+        }
+        return 'pending';
+      case 3: // Certificates (optional)
+        // Only unlock if ALL tests are completed (no pending tests)
+        const hasPendingTestsForCerts = (progress.pendingTestsCount || 0) > 0;
+        if (!progress.testsCompleted || hasPendingTestsForCerts) return 'locked';
+        return progress.certificatesUploaded ? 'completed' : 'pending';
+      case 4: // HR Approval
+        // Only unlock if ALL tests are completed (no pending tests)
+        const hasPendingTestsForHR = (progress.pendingTestsCount || 0) > 0;
+        if (!progress.testsCompleted || hasPendingTestsForHR) return 'locked';
         return progress.hrApproved ? 'completed' : 'pending';
       default:
         return 'locked';
@@ -357,9 +388,22 @@ const OnboardingGuardScreen = () => {
                 </View>
               )}
               {getStepStatus(2) === 'pending' && (
-                <View style={[styles.statusBadge, styles.pendingBadge]}>
-                  <Text style={[styles.statusText, styles.pendingText]}>Pending</Text>
-                </View>
+                <>
+                  <View style={[styles.statusBadge, styles.pendingBadge]}>
+                    <Text style={[styles.statusText, styles.pendingText]}>Pending</Text>
+                  </View>
+                  {progress && (progress.pendingTestsCount || 0) > 0 && (
+                    <View style={styles.reminderBadge}>
+                      <Ionicons name="alert-circle" size={14} color="#F59E0B" />
+                      <Text style={styles.reminderText}>
+                        You have {progress.pendingTestsCount} pending test{progress.pendingTestsCount !== 1 ? 's' : ''}
+                        {progress.pendingTests && progress.pendingTests.length > 0 && (
+                          <Text> ({progress.pendingTests.join(', ')})</Text>
+                        )}
+                      </Text>
+                    </View>
+                  )}
+                </>
               )}
               {getStepStatus(2) === 'locked' && (
                 <View style={[styles.statusBadge, styles.lockedBadge]}>
@@ -690,6 +734,23 @@ const styles = StyleSheet.create({
   },
   bottomSpacer: {
     height: 16,
+  },
+  reminderBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginTop: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    backgroundColor: '#FEF3C7',
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#FCD34D',
+  },
+  reminderText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#92400E',
   },
 });
 
