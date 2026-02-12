@@ -45,6 +45,7 @@ import TestResultsScreen from "../screens/onboarding/TestResultsScreen";
 import CertificatesScreen from "../screens/onboarding/CertificatesScreen";
 import HRApprovalScreen from "../screens/onboarding/HRApprovalScreen";
 import ELDDocumentsScreen from "../screens/eld/ELDDocumentsScreen";
+import MileageSheetScreen from "../screens/mileage/MileageSheetScreen";
 
 // Constants for storage keys
 const STORAGE_KEYS = {
@@ -95,6 +96,7 @@ export type MainTabParamList = {
     Help: undefined;
     Search: undefined;
     Trips: undefined;
+    MileageSheet: undefined;
 };
 
 export type RootStackParamList = {
@@ -128,6 +130,7 @@ export type RootStackParamList = {
     CertificatesScreen: undefined;
     HRApprovalScreen: undefined;
     ELDDocuments: undefined;
+    MileageSheet: undefined;
 };
 
 const MainTab = createBottomTabNavigator<MainTabParamList>();
@@ -414,6 +417,16 @@ export default function AppNavigator() {
                 {(props) => (
                     <ScreenWithHeaderFooter
                         component={ELDDocumentsScreen}
+                        navigation={props.navigation}
+                        route={props.route}
+                        onLogout={handleLogout}
+                    />
+                )}
+            </RootStack.Screen>
+            <RootStack.Screen name="MileageSheet">
+                {(props) => (
+                    <ScreenWithHeaderFooter
+                        component={MileageSheetScreen}
                         navigation={props.navigation}
                         route={props.route}
                         onLogout={handleLogout}

@@ -73,6 +73,7 @@ export default function DashboardScreen() {
         { id: 3, name: "Load Map", icon: <Ionicons name="map" size={28} color="#fff" />, color: "#831775", route: "LoadMap" },
         { id: 4, name: "Verification", icon: <Ionicons name="shield-checkmark" size={28} color="#fff" />, color: "#0ea3d8", route: "OnboardingGuard" },
         { id: 5, name: "ELD Documents", icon: <Ionicons name="document-text" size={28} color="#fff" />, color: "#8B5CF6", route: "ELDDocuments" },
+        { id: 6, name: "Mileage Sheet", icon: <Ionicons name="speedometer" size={28} color="#fff" />, color: "#FF6B35", route: "MileageSheet" },
         // { id: 8, name: "Transfer", icon: <Ionicons name="swap-horizontal" size={28} color="#fff" />, color: "#E61DCC", route: "Transfer" },
         // { id: 9, name: "Fuel", icon: <FontAwesome5 name="gas-pump" size={28} color="#fff" />, color: "#04AA30", route: "Fuel" },
     ];
