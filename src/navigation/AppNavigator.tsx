@@ -44,6 +44,7 @@ import TakeTestScreen from "../screens/onboarding/TakeTestScreen";
 import TestResultsScreen from "../screens/onboarding/TestResultsScreen";
 import CertificatesScreen from "../screens/onboarding/CertificatesScreen";
 import HRApprovalScreen from "../screens/onboarding/HRApprovalScreen";
+import ELDDocumentsScreen from "../screens/eld/ELDDocumentsScreen";
 
 // Constants for storage keys
 const STORAGE_KEYS = {
@@ -126,6 +127,7 @@ export type RootStackParamList = {
     TestsScreen: undefined;
     CertificatesScreen: undefined;
     HRApprovalScreen: undefined;
+    ELDDocuments: undefined;
 };
 
 const MainTab = createBottomTabNavigator<MainTabParamList>();
@@ -408,6 +410,16 @@ export default function AppNavigator() {
             <RootStack.Screen name="TestResultsScreen" component={TestResultsScreen} />
             <RootStack.Screen name="CertificatesScreen" component={CertificatesScreen} />
             <RootStack.Screen name="HRApprovalScreen" component={HRApprovalScreen} />
+            <RootStack.Screen name="ELDDocuments">
+                {(props) => (
+                    <ScreenWithHeaderFooter
+                        component={ELDDocumentsScreen}
+                        navigation={props.navigation}
+                        route={props.route}
+                        onLogout={handleLogout}
+                    />
+                )}
+            </RootStack.Screen>
             {/* Main Tabs - These will have Header and Footer */}
             <RootStack.Screen name="MainTabs">
                 {(props) => (
