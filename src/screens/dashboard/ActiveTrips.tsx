@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import {
   View,
   Text,
@@ -15,7 +15,7 @@ import {
   TextInput,
 } from "react-native";
 import { Ionicons } from '@expo/vector-icons';
-import { useNavigation } from '@react-navigation/native';
+import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { RootStackParamList } from '../../navigation/AppNavigator';
 import { apiService } from '../../services/api/apiService';
@@ -729,31 +729,99 @@ const ActiveTrips = () => {
   const [completionModalVisible, setCompletionModalVisible] = useState(false);
   const [selectedTripForCompletion, setSelectedTripForCompletion] = useState<Trip | null>(null);
   const [uploadingDocument, setUploadingDocument] = useState(false);
-  const [selectedDocumentType, setSelectedDocumentType] = useState<string>('');
-  const [selectedFile, setSelectedFile] = useState<any>(null);
+  const [selectedPodFile, setSelectedPodFile] = useState<any>(null);
+  const [selectedManifestFile, setSelectedManifestFile] = useState<any>(null);
   const navigation = useNavigation<NavigationProp>();
 
-  useEffect(() => {
-    fetchActiveTrips();
-  }, []);
+  // Split trips into active and pending approval
+  // Check if trip or any of its orders have pending review status
+  const hasPendingReviewStatus = (trip: Trip) => {
+    // Check trip status
+    if (
+      trip.status === 'pending_review' || 
+      trip.status === 'verification_pending' ||
+      trip.status === 'pending_completion' ||
+      trip.status === 'pending-completion'
+    ) {
+      return true;
+    }
+    
+    // Check order statuses
+    if (trip.orders && trip.orders.length > 0) {
+      return trip.orders.some(order => 
+        order.status === 'pending_review' || 
+        order.status === 'verification_pending' ||
+        order.status === 'pending_completion'
+      );
+    }
+    
+    return false;
+  };
+  
+  const activeTrips = trips.filter(trip => !hasPendingReviewStatus(trip));
+  const pendingApprovalTrips = trips.filter(trip => hasPendingReviewStatus(trip));
+
+  // Fetch trips when screen comes into focus
+  useFocusEffect(
+    useCallback(() => {
+      console.log('🔄 Active Trips screen focused - fetching trips...');
+      fetchActiveTrips();
+      
+      // Cleanup function (optional)
+      return () => {
+        console.log('🔄 Active Trips screen unfocused');
+      };
+    }, [])
+  );
 
   const fetchActiveTrips = async () => {
     try {
       setLoading(true);
-      const response = await apiService.getActiveTrips();
+      console.log('🔄 Fetching trips with in-progress and pending_review statuses...');
       
-      if (response.success && response.data) {
-        const tripsData = response.data.data || response.data || [];
-        setTrips(Array.isArray(tripsData) ? tripsData : []);
-        logger.info('Active trips fetched', { count: tripsData.length });
-      } else {
-        logger.warn('Failed to fetch active trips', { error: response.error });
-        setTrips([]);
+      // Fetch trips with both in-progress and pending_review statuses
+      const [inProgressResponse, pendingReviewResponse] = await Promise.all([
+        apiService.getActiveTrips(), // Gets in-progress trips
+        apiService.getPendingReviewTrips(), // Gets pending_review trips
+      ]);
+      
+      console.log('📊 In-progress response:', inProgressResponse);
+      console.log('📊 Pending review response:', pendingReviewResponse);
+      
+      let allTrips: any[] = [];
+      
+      // Combine in-progress trips
+      if (inProgressResponse.success && inProgressResponse.data) {
+        const inProgressTrips = inProgressResponse.data.data || inProgressResponse.data || [];
+        allTrips = [...allTrips, ...inProgressTrips];
+        console.log('✅ In-progress trips:', inProgressTrips.length);
       }
+      
+      // Combine pending_review trips
+      if (pendingReviewResponse.success && pendingReviewResponse.data) {
+        const pendingTrips = pendingReviewResponse.data.data || pendingReviewResponse.data || [];
+        allTrips = [...allTrips, ...pendingTrips];
+        console.log('✅ Pending review trips:', pendingTrips.length);
+      }
+      
+      // Remove duplicates based on _id (in case same trip appears in both)
+      const uniqueTrips = allTrips.filter((trip, index, self) => 
+        index === self.findIndex((t) => t._id === trip._id)
+      );
+      
+      setTrips(Array.isArray(uniqueTrips) ? uniqueTrips : []);
+      logger.info('All trips fetched', { 
+        total: uniqueTrips.length,
+        inProgress: inProgressResponse.success ? (inProgressResponse.data?.data?.length || 0) : 0,
+        pendingReview: pendingReviewResponse.success ? (pendingReviewResponse.data?.data?.length || 0) : 0
+      });
+      console.log('📋 Total trips loaded:', uniqueTrips.length);
+      
     } catch (error) {
       logger.error('Error fetching active trips', error);
+      console.error('❌ Error fetching trips:', error);
       setTrips([]);
-      Alert.alert('Error', 'Failed to load active trips. Please try again.');
+      Alert.alert('Error', 'Failed to load trips. Please try again.');
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -843,65 +911,67 @@ const ActiveTrips = () => {
     if (!selectedTripForCompletion) return;
 
     const trip = selectedTripForCompletion;
-    const documents = trip.documents || [];
-    const hasPOD = documents.some((doc: any) => 
-      doc.type === 'pod' || doc.type === 'proof_of_delivery'
-    );
-
-    // Check if trip is going to Canada
-    let isCanadaTrip = false;
-    if (trip.orders && trip.orders.length > 0) {
-      for (const order of trip.orders) {
-        const deliveryLocation = order.deliveryLocation;
-        if (deliveryLocation?.placeId?.country) {
-          const country = deliveryLocation.placeId.country.toLowerCase();
-          if (country === 'canada' || country === 'ca') {
-            isCanadaTrip = true;
-            break;
-          }
-        } else if (deliveryLocation?.place) {
-          const placeStr = deliveryLocation.place.toLowerCase();
-          if (placeStr.includes('canada') || placeStr.includes('ca ')) {
-            isCanadaTrip = true;
-            break;
-          }
-        }
-      }
-    }
-
-    const hasBorderManifest = documents.some((doc: any) => 
-      doc.type === 'stamped_manifest' || doc.type === 'manifest'
-    );
-
-    // Validate required documents
-    let missingDocs: string[] = [];
-    if (!hasPOD) {
-      missingDocs.push('Proof of Delivery (POD)');
-    }
-    if (isCanadaTrip && !hasBorderManifest) {
-      missingDocs.push('Border Manifest');
-    }
-
-    if (missingDocs.length > 0) {
-      Alert.alert(
-        'Missing Required Documents',
-        `Please upload the following required documents before completing the trip:\n\n${missingDocs.map(doc => `• ${doc}`).join('\n')}`
-      );
+    const order = trip.orders && trip.orders.length > 0 ? trip.orders[0] : null;
+    
+    if (!order) {
+      Alert.alert('Error', 'No order found for this trip');
       return;
     }
 
-    // Submit for completion
     try {
-      const response = await apiService.completeTrip(trip._id);
-      if (response.success) {
+      setUploadingDocument(true);
+      console.log('🚀 Starting document upload and completion process...');
+
+      // Check existing attachments
+      const attachments = order.attachments || [];
+      const hasPOD = attachments.some((att: any) => 
+        att.type === 'pod' || att.type === 'proof_of_delivery'
+      );
+      const hasManifest = attachments.some((att: any) => 
+        att.type === 'border_manifest' || att.type === 'manifest'
+      );
+
+      console.log('📊 Document status - POD:', hasPOD, 'Manifest:', hasManifest);
+      console.log('📂 Selected files - POD:', selectedPodFile?.name, 'Manifest:', selectedManifestFile?.name);
+
+      // Upload POD if selected and not already uploaded
+      if (selectedPodFile && !hasPOD) {
+        console.log('📤 Uploading POD document...');
+        const podResponse = await apiService.uploadOrderDocument(order._id, selectedPodFile, 'pod');
+        console.log('📤 POD upload response:', podResponse);
+        
+        if (!podResponse.success) {
+          throw new Error(podResponse.error || podResponse.message || 'Failed to upload POD');
+        }
+      }
+
+      // Upload Manifest if selected and not already uploaded
+      if (selectedManifestFile && !hasManifest) {
+        console.log('📤 Uploading Manifest document...');
+        const manifestResponse = await apiService.uploadOrderDocument(order._id, selectedManifestFile, 'border_manifest');
+        console.log('📤 Manifest upload response:', manifestResponse);
+        
+        if (!manifestResponse.success) {
+          throw new Error(manifestResponse.error || manifestResponse.message || 'Failed to upload Manifest');
+        }
+      }
+
+      // Complete the order (this will set status to pending_review)
+      console.log('✅ Completing order...');
+      const completeResponse = await apiService.completeOrder(order._id);
+      console.log('✅ Complete order response:', completeResponse);
+
+      if (completeResponse.success) {
         setCompletionModalVisible(false);
         setSelectedTripForCompletion(null);
+        setSelectedPodFile(null);
+        setSelectedManifestFile(null);
         fetchActiveTrips();
         
         setTimeout(() => {
           Alert.alert(
             'Success',
-            'Trip completion request submitted. Waiting for dispatcher approval.',
+            'Documents uploaded successfully! Your order is now pending dispatcher approval.',
             [
               {
                 text: 'OK',
@@ -913,11 +983,14 @@ const ActiveTrips = () => {
           );
         }, 800);
       } else {
-        Alert.alert('Error', response.error || response.message || 'Failed to complete trip');
+        Alert.alert('Error', completeResponse.error || completeResponse.message || 'Failed to complete order');
       }
-    } catch (error) {
-      logger.error('Error completing trip', error);
-      Alert.alert('Error', 'Failed to complete trip. Please try again.');
+    } catch (error: any) {
+      console.error('❌ Error in handleSubmitCompletion:', error);
+      logger.error('Error completing order', error);
+      Alert.alert('Error', error.message || 'Failed to submit for review. Please try again.');
+    } finally {
+      setUploadingDocument(false);
     }
   };
 
@@ -1045,12 +1118,16 @@ const ActiveTrips = () => {
     <SafeAreaView style={styles.container}>
       <View style={styles.header}>
         <View style={styles.headerContent}>
-          <Text style={styles.headerTitle}>Active Trips</Text>
-          <Text style={styles.headerSubtitle}>Monitor your ongoing trips in real-time</Text>
+          <Text style={styles.headerTitle}>My Trips</Text>
+          <Text style={styles.headerSubtitle}>Monitor your trips in real-time</Text>
           <View style={styles.statsContainer}>
             <View style={styles.statItem}>
-              <Text style={styles.statNumber}>{trips.length}</Text>
-              <Text style={styles.statLabel}>Active Trips</Text>
+              <Text style={styles.statNumber}>{activeTrips.length}</Text>
+              <Text style={styles.statLabel}>Active</Text>
+            </View>
+            <View style={styles.statItem}>
+              <Text style={styles.statNumber}>{pendingApprovalTrips.length}</Text>
+              <Text style={styles.statLabel}>Pending Approval</Text>
             </View>
           </View>
         </View>
@@ -1059,8 +1136,8 @@ const ActiveTrips = () => {
       {trips.length === 0 ? (
         <View style={styles.emptyContainer}>
           <Text style={styles.emptyIcon}>🚛</Text>
-          <Text style={styles.emptyText}>No Active Trips</Text>
-          <Text style={styles.emptySubtext}>You don't have any active trips at the moment</Text>
+          <Text style={styles.emptyText}>No Trips</Text>
+          <Text style={styles.emptySubtext}>You don't have any trips at the moment</Text>
         </View>
       ) : (
         <ScrollView
@@ -1069,7 +1146,73 @@ const ActiveTrips = () => {
             <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
           }
         >
-          {trips.map((trip) => {
+          {/* Pending Approval Section */}
+          {pendingApprovalTrips.length > 0 && (
+            <View style={styles.sectionContainer}>
+              <View style={styles.sectionHeader}>
+                <Text style={styles.sectionTitle}>📋 Pending Approval</Text>
+                <Text style={styles.sectionSubtitle}>Waiting for dispatcher verification</Text>
+              </View>
+              {pendingApprovalTrips.map((trip) => {
+            const loadForMap = convertTripToLoadForMap(trip);
+            const hasMap = loadForMap !== null && canShowMap(trip);
+    
+    return (
+              <View key={trip._id} style={[styles.tripCard, styles.pendingCard]}>
+        <View style={styles.cardHeader}>
+          <View style={styles.headerInfo}>
+                    <Text style={styles.tripNumber}>{trip.tripNumber}</Text>
+                    <Text style={styles.tripDate}>
+                      Started: {formatDate(trip.actualStartDate || trip.plannedStartDate)}
+            </Text>
+          </View>
+                  <View style={[styles.statusBadge, { backgroundColor: '#f39c12' }]}>
+                    <Text style={styles.statusText}>Pending Approval</Text>
+          </View>
+        </View>
+
+                {trip.truck && (
+                  <View style={styles.infoRow}>
+                    <Text style={styles.infoLabel}>Truck:</Text>
+                    <Text style={styles.infoValue}>
+                      {trip.truck.plateNumber || trip.truck.internalId || 'N/A'}
+                    </Text>
+                  </View>
+                )}
+
+                {trip.trailer && (
+                  <View style={styles.infoRow}>
+                    <Text style={styles.infoLabel}>Trailer:</Text>
+                    <Text style={styles.infoValue}>
+                      {trip.trailer.plateNumber || trip.trailer.trailerNumber || 'N/A'}
+                    </Text>
+              </View>
+                )}
+
+                {trip.orders && trip.orders.length > 0 && (
+                  <View style={styles.ordersSection}>
+                    <Text style={styles.ordersTitle}>
+                      Orders ({trip.orders.length}):
+                    </Text>
+                    <Text style={styles.pendingNote}>
+                      ✓ Documents uploaded and awaiting dispatcher verification
+                    </Text>
+                  </View>
+                )}
+              </View>
+            );
+          })}
+            </View>
+          )}
+
+          {/* Active Trips Section */}
+          {activeTrips.length > 0 && (
+            <View style={styles.sectionContainer}>
+              <View style={styles.sectionHeader}>
+                <Text style={styles.sectionTitle}>🚛 Active Trips</Text>
+                <Text style={styles.sectionSubtitle}>Your ongoing deliveries</Text>
+              </View>
+              {activeTrips.map((trip) => {
             const loadForMap = convertTripToLoadForMap(trip);
             const hasMap = loadForMap !== null && canShowMap(trip);
     
@@ -1472,6 +1615,8 @@ const ActiveTrips = () => {
       </View>
     );
           })}
+            </View>
+          )}
         </ScrollView>
       )}
 
@@ -1483,8 +1628,8 @@ const ActiveTrips = () => {
         onRequestClose={() => {
           setCompletionModalVisible(false);
           setSelectedTripForCompletion(null);
-          setSelectedFile(null);
-          setSelectedDocumentType('');
+          setSelectedPodFile(null);
+          setSelectedManifestFile(null);
         }}
       >
         <View style={styles.modalOverlay}>
@@ -1495,8 +1640,8 @@ const ActiveTrips = () => {
                 onPress={() => {
                   setCompletionModalVisible(false);
                   setSelectedTripForCompletion(null);
-                  setSelectedFile(null);
-                  setSelectedDocumentType('');
+                  setSelectedPodFile(null);
+                  setSelectedManifestFile(null);
                 }}
               >
                 <Ionicons name="close" size={24} color="#333" />
@@ -1512,198 +1657,174 @@ const ActiveTrips = () => {
                   Please upload required documents before completing the trip. The dispatcher will review your documents before final approval.
                 </Text>
 
-                {/* Check if Canada trip */}
+                {/* Document Upload Section - Works with Orders */}
                 {(() => {
                   const trip = selectedTripForCompletion;
-                  let isCanadaTrip = false;
-                  if (trip.orders && trip.orders.length > 0) {
-                    for (const order of trip.orders) {
-                      const deliveryLocation = order.deliveryLocation;
-                      if (deliveryLocation?.placeId?.country) {
-                        const country = deliveryLocation.placeId.country.toLowerCase();
-                        if (country === 'canada' || country === 'ca') {
-                          isCanadaTrip = true;
-                          break;
-                        }
-                      } else if (deliveryLocation?.place) {
-                        const placeStr = deliveryLocation.place.toLowerCase();
-                        if (placeStr.includes('canada') || placeStr.includes('ca ')) {
-                          isCanadaTrip = true;
-                          break;
-                        }
-                      }
-                    }
+                  
+                  // Get the first order (or modify to handle multiple orders)
+                  const order = trip.orders && trip.orders.length > 0 ? trip.orders[0] : null;
+                  if (!order) {
+                    return <Text style={styles.errorText}>No order found for this trip</Text>;
                   }
                   
-                  const documents = trip.documents || [];
-                  const hasPOD = documents.some((doc: any) => 
-                    doc.type === 'pod' || doc.type === 'proof_of_delivery'
+                  // Check if Canada trip
+                  let isCanadaTrip = false;
+                  const deliveryLocation = order.deliveryLocation;
+                  if (deliveryLocation?.placeId?.country) {
+                    const country = deliveryLocation.placeId.country.toLowerCase();
+                    isCanadaTrip = country === 'canada' || country === 'ca';
+                  } else if (deliveryLocation?.place) {
+                    const placeStr = deliveryLocation.place.toLowerCase();
+                    isCanadaTrip = placeStr.includes('canada') || placeStr.includes('ca ');
+                  }
+                  
+                  // Check existing attachments from order
+                  const attachments = order.attachments || [];
+                  const hasPOD = attachments.some((att: any) => 
+                    att.type === 'pod' || att.type === 'proof_of_delivery'
                   );
-                  const hasBorderManifest = documents.some((doc: any) => 
-                    doc.type === 'stamped_manifest' || doc.type === 'manifest'
+                  const hasManifest = attachments.some((att: any) => 
+                    att.type === 'border_manifest' || att.type === 'manifest'
                   );
+
+                  console.log('📋 Modal - Order Attachments:', attachments);
+                  console.log('✅ Has POD:', hasPOD, 'Has Manifest:', hasManifest);
 
                   return (
                     <>
-                      {/* POD Upload Section */}
+                      {/* POD Document Selection */}
                       <View style={styles.documentUploadSection}>
                         <View style={styles.documentHeader}>
                           <Text style={styles.documentTitle}>
-                            Proof of Delivery (POD) *
+                            📄 Proof of Delivery (POD) *
                           </Text>
-                          {hasPOD ? (
-                            <View style={styles.statusBadge}>
+                          {hasPOD && (
+                            <View style={[styles.statusBadge, { backgroundColor: '#d4edda' }]}>
                               <Ionicons name="checkmark-circle" size={16} color="#2ecc71" />
-                              <Text style={styles.statusText}>Uploaded</Text>
+                              <Text style={[styles.statusText, { color: '#155724' }]}>Uploaded</Text>
                             </View>
-                          ) : (
-                            <Text style={styles.requiredText}>Required</Text>
                           )}
                         </View>
-                        {!hasPOD && (
-                          <>
-                            <TouchableOpacity
-                              style={styles.uploadButton}
-                              onPress={() => handleSelectFile('pod')}
-                              disabled={uploadingDocument}
-                            >
-                              <Ionicons name="cloud-upload-outline" size={20} color="#2563eb" />
-                              <Text style={styles.uploadButtonText}>Select File</Text>
-                            </TouchableOpacity>
-                            {selectedFile && selectedDocumentType === 'pod' && (
-                              <View style={styles.selectedFileContainer}>
-                                <Text style={styles.selectedFileName}>{selectedFile.name}</Text>
-                                <TouchableOpacity
-                                  style={styles.uploadSubmitButton}
-                                  onPress={() => handleUploadDocument(trip._id, 'pod')}
-                                  disabled={uploadingDocument}
-                                >
-                                  {uploadingDocument ? (
-                                    <ActivityIndicator size="small" color="#fff" />
-                                  ) : (
-                                    <Text style={styles.uploadSubmitText}>Upload</Text>
-                                  )}
-                                </TouchableOpacity>
-                              </View>
-                            )}
-                          </>
-                        )}
-                        {hasPOD && (
+                        {!hasPOD ? (
+                          <TouchableOpacity
+                            style={styles.uploadButton}
+                            onPress={async () => {
+                              if (!DocumentPicker) {
+                                Alert.alert('Error', 'Document picker not available');
+                                return;
+                              }
+                              try {
+                                const result = await DocumentPicker.getDocumentAsync({
+                                  type: ['application/pdf', 'image/*'],
+                                  copyToCacheDirectory: true,
+                                });
+                                if (result.canceled === false && result.assets && result.assets.length > 0) {
+                                  const file = result.assets[0];
+                                  setSelectedPodFile(file);
+                                  console.log('📄 POD file selected:', file.name);
+                                }
+                              } catch (error) {
+                                console.error('Error selecting POD file:', error);
+                                Alert.alert('Error', 'Failed to select file');
+                              }
+                            }}
+                            disabled={uploadingDocument}
+                          >
+                            <Ionicons name="cloud-upload-outline" size={20} color="#2563eb" />
+                            <Text style={styles.uploadButtonText}>
+                              {selectedPodFile ? `Selected: ${selectedPodFile.name}` : 'Select POD File'}
+                            </Text>
+                          </TouchableOpacity>
+                        ) : (
                           <View style={styles.uploadedDocumentList}>
-                            {documents
-                              .filter((doc: any) => doc.type === 'pod' || doc.type === 'proof_of_delivery')
-                              .map((doc: any, index: number) => (
-                                <View key={doc._id || index} style={styles.uploadedDocumentItem}>
+                            {attachments
+                              .filter((att: any) => att.type === 'pod' || att.type === 'proof_of_delivery')
+                              .map((att: any, index: number) => (
+                                <View key={att.id || index} style={styles.uploadedDocumentItem}>
                                   <Ionicons name="document-text" size={20} color="#2ecc71" />
-                                  <Text style={styles.uploadedDocumentName}>{doc.fileName}</Text>
+                                  <Text style={styles.uploadedDocumentName}>{att.name}</Text>
                                 </View>
                               ))}
                           </View>
                         )}
                       </View>
 
-                      {/* Border Manifest Upload Section (for Canada trips) */}
-                      {isCanadaTrip && (
-                        <View style={styles.documentUploadSection}>
-                          <View style={styles.documentHeader}>
-                            <Text style={styles.documentTitle}>
-                              Border Manifest *
-                            </Text>
-                            {hasBorderManifest ? (
-                              <View style={styles.statusBadge}>
-                                <Ionicons name="checkmark-circle" size={16} color="#2ecc71" />
-                                <Text style={styles.statusText}>Uploaded</Text>
-                              </View>
-                            ) : (
-                              <Text style={styles.requiredText}>Required</Text>
-                            )}
-                          </View>
-                          {!hasBorderManifest && (
-                            <>
-                              <TouchableOpacity
-                                style={styles.uploadButton}
-                                onPress={() => handleSelectFile('stamped_manifest')}
-                                disabled={uploadingDocument}
-                              >
-                                <Ionicons name="cloud-upload-outline" size={20} color="#2563eb" />
-                                <Text style={styles.uploadButtonText}>Select File</Text>
-                              </TouchableOpacity>
-                              {selectedFile && selectedDocumentType === 'stamped_manifest' && (
-                                <View style={styles.selectedFileContainer}>
-                                  <Text style={styles.selectedFileName}>{selectedFile.name}</Text>
-                                  <TouchableOpacity
-                                    style={styles.uploadSubmitButton}
-                                    onPress={() => handleUploadDocument(trip._id, 'stamped_manifest')}
-                                    disabled={uploadingDocument}
-                                  >
-                                    {uploadingDocument ? (
-                                      <ActivityIndicator size="small" color="#fff" />
-                                    ) : (
-                                      <Text style={styles.uploadSubmitText}>Upload</Text>
-                                    )}
-                                  </TouchableOpacity>
-                                </View>
-                              )}
-                            </>
-                          )}
-                          {hasBorderManifest && (
-                            <View style={styles.uploadedDocumentList}>
-                              {documents
-                                .filter((doc: any) => doc.type === 'stamped_manifest' || doc.type === 'manifest')
-                                .map((doc: any, index: number) => (
-                                  <View key={doc._id || index} style={styles.uploadedDocumentItem}>
-                                    <Ionicons name="document-text" size={20} color="#2ecc71" />
-                                    <Text style={styles.uploadedDocumentName}>{doc.fileName}</Text>
-                                  </View>
-                                ))}
+                      {/* Border Manifest Document Selection */}
+                      <View style={styles.documentUploadSection}>
+                        <View style={styles.documentHeader}>
+                          <Text style={styles.documentTitle}>
+                            📋 Border Manifest *
+                          </Text>
+                          {hasManifest && (
+                            <View style={[styles.statusBadge, { backgroundColor: '#d4edda' }]}>
+                              <Ionicons name="checkmark-circle" size={16} color="#2ecc71" />
+                              <Text style={[styles.statusText, { color: '#155724' }]}>Uploaded</Text>
                             </View>
                           )}
                         </View>
-                      )}
-
-                      {/* All Uploaded Documents */}
-                      {documents.length > 0 && (
-                        <View style={styles.allDocumentsSection}>
-                          <Text style={styles.allDocumentsTitle}>All Uploaded Documents</Text>
-                          {documents.map((doc: any, index: number) => (
-                            <TouchableOpacity
-                              key={doc._id || index}
-                              style={styles.documentItem}
-                              onPress={async () => {
-                                if (!doc._id || !trip._id) return;
-                                try {
-                                  const response = await apiService.getTripDocumentSignedUrl(trip._id, doc._id, 'inline');
-                                  if (response?.success && response?.data?.url) {
-                                    await Linking.openURL(response.data.url);
-                                  } else if (doc.fileUrl) {
-                                    await Linking.openURL(doc.fileUrl);
-                                  }
-                                } catch (error) {
-                                  console.error('Error opening document:', error);
+                        {!hasManifest ? (
+                          <TouchableOpacity
+                            style={styles.uploadButton}
+                            onPress={async () => {
+                              if (!DocumentPicker) {
+                                Alert.alert('Error', 'Document picker not available');
+                                return;
+                              }
+                              try {
+                                const result = await DocumentPicker.getDocumentAsync({
+                                  type: ['application/pdf', 'image/*'],
+                                  copyToCacheDirectory: true,
+                                });
+                                if (result.canceled === false && result.assets && result.assets.length > 0) {
+                                  const file = result.assets[0];
+                                  setSelectedManifestFile(file);
+                                  console.log('📋 Manifest file selected:', file.name);
                                 }
-                              }}
-                            >
-                              <Ionicons name="document-text" size={20} color="#2563eb" />
-                              <View style={styles.documentInfo}>
-                                <Text style={styles.documentName}>{doc.fileName}</Text>
-                                <Text style={styles.documentType}>{doc.type || 'Other'}</Text>
-                              </View>
-                              <Ionicons name="chevron-forward" size={20} color="#999" />
-                            </TouchableOpacity>
-                          ))}
-                        </View>
-                      )}
+                              } catch (error) {
+                                console.error('Error selecting manifest file:', error);
+                                Alert.alert('Error', 'Failed to select file');
+                              }
+                            }}
+                            disabled={uploadingDocument}
+                          >
+                            <Ionicons name="cloud-upload-outline" size={20} color="#2563eb" />
+                            <Text style={styles.uploadButtonText}>
+                              {selectedManifestFile ? `Selected: ${selectedManifestFile.name}` : 'Select Manifest File'}
+                            </Text>
+                          </TouchableOpacity>
+                        ) : (
+                          <View style={styles.uploadedDocumentList}>
+                            {attachments
+                              .filter((att: any) => att.type === 'border_manifest' || att.type === 'manifest')
+                              .map((att: any, index: number) => (
+                                <View key={att.id || index} style={styles.uploadedDocumentItem}>
+                                  <Ionicons name="document-text" size={20} color="#2ecc71" />
+                                  <Text style={styles.uploadedDocumentName}>{att.name}</Text>
+                                </View>
+                              ))}
+                          </View>
+                        )}
+                      </View>
 
-                      {/* Submit Button */}
+                      {/* Submit for Review Button */}
                       <TouchableOpacity
                         style={[
                           styles.submitButton,
-                          (!hasPOD || (isCanadaTrip && !hasBorderManifest)) && styles.submitButtonDisabled
+                          ((!hasPOD && !selectedPodFile) || (!hasManifest && !selectedManifestFile)) && styles.submitButtonDisabled
                         ]}
-                        onPress={handleSubmitCompletion}
-                        disabled={!hasPOD || (isCanadaTrip && !hasBorderManifest)}
+                        onPress={async () => {
+                          console.log('🔄 Submit for Review clicked');
+                          console.log('📄 POD File:', selectedPodFile ? 'Selected' : 'Not selected');
+                          console.log('📋 Manifest File:', selectedManifestFile ? 'Selected' : 'Not selected');
+                          await handleSubmitCompletion();
+                        }}
+                        disabled={(!hasPOD && !selectedPodFile) || (!hasManifest && !selectedManifestFile) || uploadingDocument}
                       >
-                        <Text style={styles.submitButtonText}>Submit for Review</Text>
+                        {uploadingDocument ? (
+                          <ActivityIndicator size="small" color="#fff" />
+                        ) : (
+                          <Text style={styles.submitButtonText}>Submit for Review</Text>
+                        )}
                       </TouchableOpacity>
                     </>
                   );
@@ -2262,6 +2383,41 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: '#2563eb',
     marginBottom: 6,
+  },
+  sectionContainer: {
+    marginBottom: 24,
+  },
+  sectionHeader: {
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    backgroundColor: '#fff',
+    borderBottomWidth: 2,
+    borderBottomColor: '#2563eb',
+    marginBottom: 12,
+  },
+  sectionTitle: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: '#1e3a8a',
+    marginBottom: 4,
+  },
+  sectionSubtitle: {
+    fontSize: 13,
+    color: '#64748b',
+  },
+  pendingCard: {
+    borderLeftWidth: 4,
+    borderLeftColor: '#f39c12',
+  },
+  pendingNote: {
+    fontSize: 12,
+    color: '#f39c12',
+    fontStyle: 'italic',
+    marginTop: 8,
+    paddingHorizontal: 8,
+    paddingVertical: 6,
+    backgroundColor: '#fef3cd',
+    borderRadius: 4,
   },
 });
 

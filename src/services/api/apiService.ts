@@ -655,6 +655,11 @@ class ApiService {
         return this.request('/driver/trips?status=in-progress', { method: 'GET' }, true);
     }
 
+    async getPendingReviewTrips(): Promise<ApiResponse<{ count: number; data: any[] }>> {
+        console.log('📡 Fetching trips with pending_review status...');
+        return this.request('/driver/trips?status=pending_review', { method: 'GET' }, true);
+    }
+
     async getCompletedTrips(): Promise<ApiResponse<{ count: number; data: any[] }>> {
         return this.request('/driver/trips?status=completed', { method: 'GET' }, true);
     }
@@ -707,6 +712,71 @@ class ApiService {
             return {
                 success: false,
                 error: error.message || 'Failed to upload document',
+                statusCode: 0
+            };
+        }
+    }
+
+    // Order document upload and completion
+    async uploadOrderDocument(orderId: string, documentFile: any, documentType: string, description?: string): Promise<ApiResponse> {
+        try {
+            console.log('📤 uploadOrderDocument called:', { orderId, documentType, fileName: documentFile?.name });
+            
+            const formData = new FormData();
+            
+            if (documentFile) {
+                if (Platform.OS === 'web') {
+                    formData.append('document', documentFile);
+                } else {
+                    formData.append('document', {
+                        uri: documentFile.uri,
+                        type: documentFile.mimeType || documentFile.type || 'application/pdf',
+                        name: documentFile.name || 'document.pdf',
+                    } as any);
+                }
+            }
+            
+            formData.append('documentType', documentType);
+            if (description) {
+                formData.append('description', description);
+            }
+
+            console.log('📤 Sending request to /driver/orders/' + orderId + '/documents');
+            
+            const response = await this.request(`/driver/orders/${orderId}/documents`, {
+                method: 'POST',
+                body: formData,
+            }, true);
+            
+            console.log('📤 Upload response:', response);
+            return response;
+        } catch (error: any) {
+            console.error('❌ Error uploading order document:', error);
+            logger.error('Error uploading order document', error);
+            return {
+                success: false,
+                error: error.message || 'Failed to upload document',
+                statusCode: 0
+            };
+        }
+    }
+
+    async completeOrder(orderId: string): Promise<ApiResponse> {
+        try {
+            console.log('✅ completeOrder called:', { orderId });
+            
+            const response = await this.request(`/driver/orders/${orderId}/complete`, {
+                method: 'POST'
+            }, true);
+            
+            console.log('✅ Complete order response:', response);
+            return response;
+        } catch (error: any) {
+            console.error('❌ Error completing order:', error);
+            logger.error('Error completing order', error);
+            return {
+                success: false,
+                error: error.message || 'Failed to complete order',
                 statusCode: 0
             };
         }
