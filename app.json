@@ -42,7 +42,7 @@
         "googleMapsApiKey": "AIzaSyDBhzYegComYfj8I4K2Di_ltSLk7ify_IU"
       },
       "adaptiveIcon": {
-        "foregroundImage": "./assets/app-icon.jpeg",
+        "foregroundImage": "./assets/app-icon.png",
         "backgroundColor": "#E5E5E5"
       },
       "splash": {

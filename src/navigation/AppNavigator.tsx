@@ -48,7 +48,7 @@ import ELDDocumentsScreen from "../screens/eld/ELDDocumentsScreen";
 import MileageSheetScreen from "../screens/mileage/MileageSheetScreen";
 
 // Asset imports - using require for better compatibility with Expo
-const appLogo = require("../../assets/splash.png");
+const appLogo = require("../../assets/app-icon.png");
 
 // Constants for storage keys
 const STORAGE_KEYS = {
