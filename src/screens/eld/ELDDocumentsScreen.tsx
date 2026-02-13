@@ -18,10 +18,8 @@ import { logger } from '../../utils/loggerHelper';
 interface ELDDocument {
   _id: string;
   fileName: string;
-  fileSize: number;
   title?: string;
   description?: string;
-  uploadedAt: string;
   mimeType?: string;
 }
 
@@ -118,27 +116,6 @@ export default function ELDDocumentsScreen() {
     }
   };
 
-  const formatFileSize = (bytes: number): string => {
-    if (bytes === 0) return '0 Bytes';
-    const k = 1024;
-    const sizes = ['Bytes', 'KB', 'MB', 'GB'];
-    const i = Math.floor(Math.log(bytes) / Math.log(k));
-    return Math.round(bytes / Math.pow(k, i) * 100) / 100 + ' ' + sizes[i];
-  };
-
-  const formatDate = (dateString: string): string => {
-    try {
-      const date = new Date(dateString);
-      return date.toLocaleDateString('en-US', {
-        year: 'numeric',
-        month: 'short',
-        day: 'numeric'
-      });
-    } catch {
-      return 'Unknown date';
-    }
-  };
-
   return (
     <SafeAreaView style={styles.container}>
       <View style={styles.header}>
@@ -187,15 +164,6 @@ export default function ELDDocumentsScreen() {
                       {doc.description}
                     </Text>
                   )}
-                  <View style={styles.documentMeta}>
-                    <Text style={styles.documentMetaText}>
-                      {formatFileSize(doc.fileSize)}
-                    </Text>
-                    <Text style={styles.documentMetaSeparator}>•</Text>
-                    <Text style={styles.documentMetaText}>
-                      {formatDate(doc.uploadedAt)}
-                    </Text>
-                  </View>
                 </View>
               </View>
               <View style={styles.documentActions}>
@@ -320,19 +288,6 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#6B7280',
     marginBottom: 8,
-  },
-  documentMeta: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  documentMetaText: {
-    fontSize: 12,
-    color: '#9CA3AF',
-  },
-  documentMetaSeparator: {
-    fontSize: 12,
-    color: '#9CA3AF',
-    marginHorizontal: 8,
   },
   documentActions: {
     flexDirection: 'row',

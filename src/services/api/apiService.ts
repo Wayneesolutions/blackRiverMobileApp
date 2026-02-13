@@ -664,6 +664,22 @@ class ApiService {
         return this.request('/driver/trips?status=completed', { method: 'GET' }, true);
     }
 
+    async getDriverMileage(params?: {
+        startDate?: string;
+        endDate?: string;
+        groupBy?: 'monthly' | 'weekly';
+    }): Promise<ApiResponse<any[]>> {
+        const queryParams = new URLSearchParams();
+        if (params?.startDate) queryParams.append('startDate', params.startDate);
+        if (params?.endDate) queryParams.append('endDate', params.endDate);
+        if (params?.groupBy) queryParams.append('groupBy', params.groupBy);
+        
+        const queryString = queryParams.toString();
+        const endpoint = `/driver/mileage${queryString ? `?${queryString}` : ''}`;
+        
+        return this.request<any[]>(endpoint, { method: 'GET' }, true);
+    }
+
     async startTrip(tripId: string): Promise<ApiResponse> {
         return this.request(`/driver/trips/${tripId}/start`, {
             method: 'POST'

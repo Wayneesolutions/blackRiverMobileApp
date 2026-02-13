@@ -60,12 +60,19 @@ export default function MileageSheetScreen() {
 
   useEffect(() => {
     initializeDates();
-    fetchMileageData();
   }, []);
 
   useEffect(() => {
-    applyFilters();
-  }, [allMileageData, filterType, startDate, endDate]);
+    if (startDate && endDate) {
+      fetchMileageData();
+    }
+  }, [filterType, startDate, endDate]);
+
+  useEffect(() => {
+    // Backend handles grouping, so we just use the data directly
+    // Ensure filteredMileageData is always an array
+    setFilteredMileageData(Array.isArray(allMileageData) ? allMileageData : []);
+  }, [allMileageData]);
 
   const initializeDates = async () => {
     try {
@@ -88,8 +95,8 @@ export default function MileageSheetScreen() {
       // Fallback to user's createdAt from authManager if profile doesn't have it
       if (!joiningDate) {
         const currentUser = authManager.getCurrentUser();
-        if (currentUser?.createdAt) {
-          joiningDate = new Date(currentUser.createdAt);
+        if (currentUser && (currentUser as any).createdAt) {
+          joiningDate = new Date((currentUser as any).createdAt);
         }
       }
 
@@ -111,6 +118,9 @@ export default function MileageSheetScreen() {
         endDate: today.toISOString(),
         joiningDate: joiningDate?.toISOString(),
       });
+      
+      // Fetch mileage data after dates are initialized
+      // This will be called after state updates, so we'll use a separate effect
     } catch (error: any) {
       logger.error('Error initializing dates', error);
       // Set fallback dates (1 year ago to today)
@@ -128,223 +138,77 @@ export default function MileageSheetScreen() {
   const fetchMileageData = async () => {
     try {
       setLoading(true);
-      // TODO: Implement API call to fetch driver mileage data
-      // For now, using static sample data
-      // const response = await apiService.getDriverMileage();
       
-      // Static sample data for demonstration
-      const currentDate = new Date();
-      const currentMonth = currentDate.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
-      const lastMonth = new Date(currentDate.getFullYear(), currentDate.getMonth() - 1, 1)
-        .toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
-      const twoMonthsAgo = new Date(currentDate.getFullYear(), currentDate.getMonth() - 2, 1)
-        .toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
-
-      const sampleData: MileageData[] = [
-        {
-          month: currentMonth,
-          totalMiles: 8450.75,
-          loadedMiles: 7200.50,
-          emptyMiles: 1250.25,
-          iftaMiles: 8450.75,
-          trips: [
-            {
-              _id: '1',
-              tripNumber: 'TORD003370',
-              startDate: new Date(currentDate.getFullYear(), currentDate.getMonth(), 5).toISOString(),
-              endDate: new Date(currentDate.getFullYear(), currentDate.getMonth(), 8).toISOString(),
-              origin: 'Toronto, ON',
-              destination: 'Chicago, IL',
-              distance: 520.50,
-              truck: {
-                unitNumber: 'TRK-001',
-                plateNumber: 'ABC-123',
-              },
-            },
-            {
-              _id: '2',
-              tripNumber: 'TORD003371',
-              startDate: new Date(currentDate.getFullYear(), currentDate.getMonth(), 10).toISOString(),
-              endDate: new Date(currentDate.getFullYear(), currentDate.getMonth(), 12).toISOString(),
-              origin: 'Chicago, IL',
-              destination: 'Detroit, MI',
-              distance: 280.25,
-              truck: {
-                unitNumber: 'TRK-001',
-                plateNumber: 'ABC-123',
-              },
-            },
-            {
-              _id: '3',
-              tripNumber: 'TORD003372',
-              startDate: new Date(currentDate.getFullYear(), currentDate.getMonth(), 15).toISOString(),
-              endDate: new Date(currentDate.getFullYear(), currentDate.getMonth(), 18).toISOString(),
-              origin: 'Detroit, MI',
-              destination: 'Montreal, QC',
-              distance: 680.00,
-              truck: {
-                unitNumber: 'TRK-001',
-                plateNumber: 'ABC-123',
-              },
-            },
-            {
-              _id: '4',
-              tripNumber: 'TORD003373',
-              startDate: new Date(currentDate.getFullYear(), currentDate.getMonth(), 20).toISOString(),
-              endDate: new Date(currentDate.getFullYear(), currentDate.getMonth(), 23).toISOString(),
-              origin: 'Montreal, QC',
-              destination: 'New York, NY',
-              distance: 375.00,
-              truck: {
-                unitNumber: 'TRK-002',
-                plateNumber: 'XYZ-789',
-              },
-            },
-          ],
-        },
-        {
-          month: lastMonth,
-          totalMiles: 10250.30,
-          loadedMiles: 8900.75,
-          emptyMiles: 1349.55,
-          iftaMiles: 10250.30,
-          trips: [
-            {
-              _id: '5',
-              tripNumber: 'TORD003360',
-              startDate: new Date(currentDate.getFullYear(), currentDate.getMonth() - 1, 3).toISOString(),
-              endDate: new Date(currentDate.getFullYear(), currentDate.getMonth() - 1, 6).toISOString(),
-              origin: 'Calgary, AB',
-              destination: 'Seattle, WA',
-              distance: 720.80,
-              truck: {
-                unitNumber: 'TRK-001',
-                plateNumber: 'ABC-123',
-              },
-            },
-            {
-              _id: '6',
-              tripNumber: 'TORD003361',
-              startDate: new Date(currentDate.getFullYear(), currentDate.getMonth() - 1, 8).toISOString(),
-              endDate: new Date(currentDate.getFullYear(), currentDate.getMonth() - 1, 11).toISOString(),
-              origin: 'Seattle, WA',
-              destination: 'Portland, OR',
-              distance: 175.50,
-              truck: {
-                unitNumber: 'TRK-001',
-                plateNumber: 'ABC-123',
-              },
-            },
-            {
-              _id: '7',
-              tripNumber: 'TORD003362',
-              startDate: new Date(currentDate.getFullYear(), currentDate.getMonth() - 1, 14).toISOString(),
-              endDate: new Date(currentDate.getFullYear(), currentDate.getMonth() - 1, 17).toISOString(),
-              origin: 'Portland, OR',
-              destination: 'Los Angeles, CA',
-              distance: 960.25,
-              truck: {
-                unitNumber: 'TRK-002',
-                plateNumber: 'XYZ-789',
-              },
-            },
-            {
-              _id: '8',
-              tripNumber: 'TORD003363',
-              startDate: new Date(currentDate.getFullYear(), currentDate.getMonth() - 1, 20).toISOString(),
-              endDate: new Date(currentDate.getFullYear(), currentDate.getMonth() - 1, 24).toISOString(),
-              origin: 'Los Angeles, CA',
-              destination: 'Phoenix, AZ',
-              distance: 372.75,
-              truck: {
-                unitNumber: 'TRK-002',
-                plateNumber: 'XYZ-789',
-              },
-            },
-            {
-              _id: '9',
-              tripNumber: 'TORD003364',
-              startDate: new Date(currentDate.getFullYear(), currentDate.getMonth() - 1, 26).toISOString(),
-              endDate: new Date(currentDate.getFullYear(), currentDate.getMonth() - 1, 28).toISOString(),
-              origin: 'Phoenix, AZ',
-              destination: 'Denver, CO',
-              distance: 602.00,
-              truck: {
-                unitNumber: 'TRK-001',
-                plateNumber: 'ABC-123',
-              },
-            },
-          ],
-        },
-        {
-          month: twoMonthsAgo,
-          totalMiles: 7850.60,
-          loadedMiles: 6800.40,
-          emptyMiles: 1050.20,
-          iftaMiles: 7850.60,
-          trips: [
-            {
-              _id: '10',
-              tripNumber: 'TORD003350',
-              startDate: new Date(currentDate.getFullYear(), currentDate.getMonth() - 2, 2).toISOString(),
-              endDate: new Date(currentDate.getFullYear(), currentDate.getMonth() - 2, 5).toISOString(),
-              origin: 'Vancouver, BC',
-              destination: 'Spokane, WA',
-              distance: 380.30,
-              truck: {
-                unitNumber: 'TRK-001',
-                plateNumber: 'ABC-123',
-              },
-            },
-            {
-              _id: '11',
-              tripNumber: 'TORD003351',
-              startDate: new Date(currentDate.getFullYear(), currentDate.getMonth() - 2, 8).toISOString(),
-              endDate: new Date(currentDate.getFullYear(), currentDate.getMonth() - 2, 11).toISOString(),
-              origin: 'Spokane, WA',
-              destination: 'Minneapolis, MN',
-              distance: 1250.75,
-              truck: {
-                unitNumber: 'TRK-001',
-                plateNumber: 'ABC-123',
-              },
-            },
-            {
-              _id: '12',
-              tripNumber: 'TORD003352',
-              startDate: new Date(currentDate.getFullYear(), currentDate.getMonth() - 2, 15).toISOString(),
-              endDate: new Date(currentDate.getFullYear(), currentDate.getMonth() - 2, 18).toISOString(),
-              origin: 'Minneapolis, MN',
-              destination: 'Milwaukee, WI',
-              distance: 340.50,
-              truck: {
-                unitNumber: 'TRK-002',
-                plateNumber: 'XYZ-789',
-              },
-            },
-            {
-              _id: '13',
-              tripNumber: 'TORD003353',
-              startDate: new Date(currentDate.getFullYear(), currentDate.getMonth() - 2, 22).toISOString(),
-              endDate: new Date(currentDate.getFullYear(), currentDate.getMonth() - 2, 25).toISOString(),
-              origin: 'Milwaukee, WI',
-              destination: 'Cleveland, OH',
-              distance: 480.25,
-              truck: {
-                unitNumber: 'TRK-002',
-                plateNumber: 'XYZ-789',
-              },
-            },
-          ],
-        },
-      ];
+      // Build query parameters
+      const params: {
+        startDate?: string;
+        endDate?: string;
+        groupBy?: 'monthly' | 'weekly';
+      } = {
+        groupBy: filterType
+      };
       
-      setAllMileageData(sampleData);
+      if (startDate) {
+        params.startDate = startDate.toISOString();
+      }
+      if (endDate) {
+        params.endDate = endDate.toISOString();
+      }
       
-      logger.info('Mileage data loaded successfully');
+      // Fetch mileage data from API
+      logger.info('Fetching mileage data with params:', params);
+      const response = await apiService.getDriverMileage(params);
+      
+      logger.info('Mileage API response:', {
+        success: response.success,
+        hasData: !!response.data,
+        dataType: Array.isArray(response.data) ? 'array' : typeof response.data,
+        dataLength: Array.isArray(response.data) ? response.data.length : 'N/A',
+        error: response.error,
+        message: response.message
+      });
+      
+      if (response.success && response.data) {
+        // Handle nested data structure: backend returns {success: true, data: [...]}
+        // API service wraps it as {success: true, data: {success: true, data: [...]}}
+        let mileageData: MileageData[] = [];
+        
+        if (Array.isArray(response.data)) {
+          // Direct array
+          mileageData = response.data;
+        } else if (response.data && typeof response.data === 'object' && 'data' in response.data) {
+          const nestedData = (response.data as any).data;
+          if (Array.isArray(nestedData)) {
+            // Nested data structure
+            mileageData = nestedData;
+          } else if (nestedData && typeof nestedData === 'object' && 'data' in nestedData && Array.isArray(nestedData.data)) {
+            // Double nested
+            mileageData = nestedData.data;
+          }
+        }
+        
+        setAllMileageData(mileageData);
+        setFilteredMileageData(mileageData);
+        logger.info('Mileage data loaded successfully', { count: mileageData.length });
+        
+        if (mileageData.length === 0) {
+          logger.warn('No mileage data returned from API - check backend logs');
+        }
+      } else {
+        logger.warn('Failed to fetch mileage data', response);
+        setAllMileageData([]);
+        setFilteredMileageData([]);
+        if (response.error) {
+          Alert.alert('Error', response.error || 'Failed to load mileage data. Please try again.');
+        } else if (!response.success) {
+          Alert.alert('Error', response.message || 'Failed to load mileage data. Please try again.');
+        }
+      }
     } catch (error: any) {
       logger.error('Error fetching mileage data', error);
       Alert.alert('Error', 'Failed to load mileage data. Please try again.');
+      setAllMileageData([]);
+      setFilteredMileageData([]);
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -787,7 +651,7 @@ export default function MileageSheetScreen() {
           <ActivityIndicator size="large" color={Colors.primary} />
           <Text style={styles.loadingText}>Loading mileage data...</Text>
         </View>
-      ) : filteredMileageData.length === 0 ? (
+      ) : !Array.isArray(filteredMileageData) || filteredMileageData.length === 0 ? (
         <ScrollView
           contentContainerStyle={styles.emptyContainer}
           refreshControl={
