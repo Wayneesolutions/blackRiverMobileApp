@@ -27,7 +27,7 @@
         "ITSAppUsesNonExemptEncryption": false
       },
       "splash": {
-        "image": "./assets/app-icon.png",
+        "image": "./assets/splash.png",
         "resizeMode": "contain",
         "backgroundColor": "#FFFFFF"
       }
@@ -46,9 +46,9 @@
         "backgroundColor": "#E5E5E5"
       },
       "splash": {
-        "image": "./assets/app-icon.jpeg",
-        "resizeMode": "cover",
-        "backgroundColor": "#E5E5E5"
+        "image": "./assets/splash.png",
+        "resizeMode": "contain",
+        "backgroundColor": "#FFFFFF"
       },
       "permissions": [
         "ACCESS_FINE_LOCATION",

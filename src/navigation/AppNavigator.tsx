@@ -3,7 +3,7 @@ import React, { useState, useEffect } from 'react';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { Ionicons } from '@expo/vector-icons';
-import { View, Text, StyleSheet, ActivityIndicator } from 'react-native';
+import { View, Text, StyleSheet, ActivityIndicator, Image, Animated } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { NavigationProp } from '@react-navigation/native';
 import { authManager } from '../types/AuthManager';
@@ -46,6 +46,9 @@ import CertificatesScreen from "../screens/onboarding/CertificatesScreen";
 import HRApprovalScreen from "../screens/onboarding/HRApprovalScreen";
 import ELDDocumentsScreen from "../screens/eld/ELDDocumentsScreen";
 import MileageSheetScreen from "../screens/mileage/MileageSheetScreen";
+
+// Asset imports - using require for better compatibility with Expo
+const appLogo = require("../../assets/splash.png");
 
 // Constants for storage keys
 const STORAGE_KEYS = {
@@ -184,12 +187,52 @@ export const AuthService = {
 };
 
 // Loading Screen Component
-const LoadingScreen: React.FC = () => (
-    <View style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color="#906AD1" />
-        <Text style={styles.loadingText}>Loading...</Text>
-    </View>
-);
+const LoadingScreen: React.FC = () => {
+    const fadeAnim = React.useRef(new Animated.Value(0)).current;
+    const scaleAnim = React.useRef(new Animated.Value(0.8)).current;
+
+    React.useEffect(() => {
+        // Fade in and scale animation
+        Animated.parallel([
+            Animated.timing(fadeAnim, {
+                toValue: 1,
+                duration: 800,
+                useNativeDriver: true,
+            }),
+            Animated.spring(scaleAnim, {
+                toValue: 1,
+                tension: 50,
+                friction: 7,
+                useNativeDriver: true,
+            }),
+        ]).start();
+    }, []);
+
+    return (
+        <View style={styles.loadingContainer}>
+            <Animated.View
+                style={[
+                    styles.logoContainer,
+                    {
+                        opacity: fadeAnim,
+                        transform: [{ scale: scaleAnim }],
+                    },
+                ]}
+            >
+                <Image
+                    source={appLogo}
+                    style={styles.logoImage}
+                    resizeMode="contain"
+                />
+            </Animated.View>
+            <ActivityIndicator 
+                size="large" 
+                color="#906AD1" 
+                style={styles.loadingSpinner}
+            />
+        </View>
+    );
+};
 
 // Placeholder screens for new functionality
 const PlaceholderScreen: React.FC<PlaceholderScreenProps> = ({ title }) => (
@@ -648,7 +691,19 @@ const styles = StyleSheet.create({
         flex: 1,
         justifyContent: 'center',
         alignItems: 'center',
-        backgroundColor: '#F8FAFC',
+        backgroundColor: '#FFFFFF',
+    },
+    logoContainer: {
+        marginBottom: 40,
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    logoImage: {
+        width: 150,
+        height: 150,
+    },
+    loadingSpinner: {
+        marginTop: 20,
     },
     loadingText: {
         fontSize: 16,
