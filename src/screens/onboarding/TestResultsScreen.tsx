@@ -5,8 +5,9 @@ import {
   ScrollView,
   StyleSheet,
   TouchableOpacity,
-  SafeAreaView,
+  Platform,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation, useRoute } from '@react-navigation/native';
 
@@ -73,8 +74,12 @@ const TestResultsScreen = () => {
   const totalQuestions = testResult.answers.length;
 
   return (
-    <SafeAreaView style={styles.container}>
-      <ScrollView style={styles.scrollView} contentContainerStyle={styles.contentContainer}>
+    <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
+      <ScrollView 
+        style={styles.scrollView} 
+        contentContainerStyle={styles.contentContainer}
+        showsVerticalScrollIndicator={false}
+      >
         {/* Header */}
         <View style={styles.header}>
           <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
@@ -267,7 +272,8 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   contentContainer: {
-    paddingBottom: 32,
+    paddingBottom: Platform.OS === 'android' ? 80 : 32,
+    paddingTop: Platform.OS === 'android' ? 8 : 0,
   },
   header: {
     backgroundColor: '#FFFFFF',

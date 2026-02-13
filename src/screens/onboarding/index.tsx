@@ -7,11 +7,12 @@ import {
   TouchableOpacity,
   ActivityIndicator,
   RefreshControl,
-  SafeAreaView,
   Alert,
   Modal,
   FlatList,
+  Platform,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
 
@@ -190,7 +191,7 @@ const OnboardingScreen = () => {
 
   if (loading && !onboardingData) {
     return (
-      <SafeAreaView style={styles.container}>
+      <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
         <View style={styles.loadingContainer}>
           <ActivityIndicator size="large" color="#0ea3d8" />
           <Text style={styles.loadingText}>Loading onboarding status...</Text>
@@ -201,7 +202,7 @@ const OnboardingScreen = () => {
 
   if (!onboardingData) {
     return (
-      <SafeAreaView style={styles.container}>
+      <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
         <View style={styles.errorContainer}>
           <Ionicons name="alert-circle-outline" size={48} color="#EF4444" />
           <Text style={styles.errorText}>Failed to load onboarding data</Text>
@@ -214,10 +215,12 @@ const OnboardingScreen = () => {
   }
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
       <ScrollView
         style={styles.scrollView}
+        contentContainerStyle={styles.contentContainer}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
+        showsVerticalScrollIndicator={false}
       >
         {/* Header */}
         <View style={styles.header}>
@@ -469,6 +472,10 @@ const styles = StyleSheet.create({
   },
   scrollView: {
     flex: 1,
+  },
+  contentContainer: {
+    paddingBottom: Platform.OS === 'android' ? 80 : 32,
+    paddingTop: Platform.OS === 'android' ? 8 : 0,
   },
   loadingContainer: {
     flex: 1,

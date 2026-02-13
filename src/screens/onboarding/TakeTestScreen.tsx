@@ -5,10 +5,11 @@ import {
   ScrollView,
   StyleSheet,
   TouchableOpacity,
-  SafeAreaView,
   ActivityIndicator,
   Alert,
+  Platform,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation, useRoute } from '@react-navigation/native';
@@ -313,7 +314,7 @@ const TakeTestScreen = () => {
 
   if (loading) {
     return (
-      <SafeAreaView style={styles.container}>
+      <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
         <View style={styles.loadingContainer}>
           <ActivityIndicator size="large" color="#0ea3d8" />
           <Text style={styles.loadingText}>Loading test...</Text>
@@ -324,7 +325,7 @@ const TakeTestScreen = () => {
 
   if (!questionBank || questionBank.questions.length === 0) {
     return (
-      <SafeAreaView style={styles.container}>
+      <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
         <View style={styles.errorContainer}>
           <Ionicons name="alert-circle-outline" size={48} color="#EF4444" />
           <Text style={styles.errorText}>No questions available</Text>
@@ -367,7 +368,11 @@ const TakeTestScreen = () => {
         </View>
       </View>
 
-      <ScrollView style={styles.scrollView} contentContainerStyle={styles.contentContainer}>
+      <ScrollView 
+        style={styles.scrollView} 
+        contentContainerStyle={styles.contentContainer}
+        showsVerticalScrollIndicator={false}
+      >
         {/* Question */}
         <View style={styles.questionCard}>
           <Text style={styles.questionNumber}>Question {currentQuestionIndex + 1}</Text>
@@ -553,6 +558,8 @@ const styles = StyleSheet.create({
   },
   contentContainer: {
     padding: 16,
+    paddingBottom: Platform.OS === 'android' ? 80 : 32,
+    paddingTop: Platform.OS === 'android' ? 8 : 0,
   },
   questionCard: {
     backgroundColor: '#FFFFFF',
