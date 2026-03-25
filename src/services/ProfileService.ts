@@ -26,6 +26,7 @@ export interface DriverProfile {
     phone: string;
     country: string;
     profileImageUrl?: string | null;
+    profileImage?: string | null;
     status: string;
     createdAt: string;
     updatedAt: string;
@@ -196,7 +197,7 @@ class ProfileService {
             email: profile.email || 'Not specified',
             phone: profile.phone || 'Not specified',
             country: profile.country || 'Not specified',
-            profileImage: profile.profileImageUrl,
+            profileImage: profile.profileImage || profile.profileImageUrl,
             status: profile.status,
             memberSince: this.formatDate(profile.createdAt),
             lastUpdated: this.formatDate(profile.updatedAt),

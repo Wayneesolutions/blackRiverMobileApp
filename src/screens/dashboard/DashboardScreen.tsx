@@ -35,6 +35,7 @@ interface DriverProfile {
     email: string;
     phone?: string;
     profileImageUrl?: string;
+    profileImage?: string;
     status?: string;
     details?: {
         internalId?: string;
@@ -131,7 +132,7 @@ export default function DashboardScreen() {
 
             // Update profile
             if (profileRes.status === 'fulfilled' && profileRes.value.success && profileRes.value.data) {
-                const driverData = profileRes.value.data;
+                const driverData = profileRes.value.data?.data || profileRes.value.data;
                 setProfile(driverData);
                 
                 // Also update authManager with latest profile
@@ -321,9 +322,9 @@ export default function DashboardScreen() {
                                             {stats.active + stats.pending + stats.completed} Loads
                                         </Text>
                             </View>
-                                    {profile?.profileImageUrl ? (
+                                    {(profile?.profileImage || profile?.profileImageUrl) ? (
                             <Image
-                                            source={{ uri: profile.profileImageUrl }}
+                                            source={{ uri: profile.profileImage || profile.profileImageUrl }}
                                 style={styles.avatar}
                             />
                                     ) : (

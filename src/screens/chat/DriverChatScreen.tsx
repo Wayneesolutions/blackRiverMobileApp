@@ -304,7 +304,8 @@ const DriverChatScreen = () => {
     return () => {
       socketService.offNewChatMessage(handleNewMessage);
       socketService.offUserTyping(handleTyping);
-      socketService.leaveDriverChat(driverId);
+      // Do NOT call leaveDriverChat here — MainTabNavigator keeps the socket
+      // in the driver chat room for global dispatcher message notifications.
     };
   }, [driverId]);
 

@@ -599,6 +599,48 @@ const SettingsScreen = ({ route, navigation: navProp, onLogout }: SettingsScreen
           <Text style={styles.headerTitle}>Settings</Text>
         </View>
 
+        {/* Profile Hero */}
+        {driverProfile && (
+          <View style={styles.profileHero}>
+            <View style={styles.profileAvatarWrapper}>
+              {driverProfile.profileImage ? (
+                <Image
+                  source={{ uri: driverProfile.profileImage }}
+                  style={styles.profileAvatarImage}
+                />
+              ) : (
+                <View style={styles.profileAvatarFallback}>
+                  <Text style={styles.profileAvatarInitials}>
+                    {driverProfile.name
+                      .split(' ')
+                      .map((n: string) => n[0])
+                      .join('')
+                      .toUpperCase()
+                      .slice(0, 2)}
+                  </Text>
+                </View>
+              )}
+              <View style={[
+                styles.profileStatusDot,
+                { backgroundColor: driverProfile.status === 'active' ? '#10B981' : '#9CA3AF' }
+              ]} />
+            </View>
+            <Text style={styles.profileHeroName}>{driverProfile.name}</Text>
+            <Text style={styles.profileHeroEmail}>{driverProfile.email}</Text>
+            <View style={[
+              styles.profileStatusBadge,
+              { backgroundColor: driverProfile.status === 'active' ? '#D1FAE5' : '#F3F4F6' }
+            ]}>
+              <Text style={[
+                styles.profileStatusBadgeText,
+                { color: driverProfile.status === 'active' ? '#065F46' : '#6B7280' }
+              ]}>
+                {driverProfile.status?.toUpperCase() || 'ACTIVE'}
+              </Text>
+            </View>
+          </View>
+        )}
+
         {/* Action Buttons */}
         <View style={styles.actionsSection}>
           <TouchableOpacity
@@ -742,6 +784,72 @@ const styles = StyleSheet.create({
     fontSize: 28,
     fontWeight: 'bold',
     color: '#1F2937',
+  },
+  profileHero: {
+    alignItems: 'center',
+    paddingVertical: 28,
+    paddingHorizontal: 20,
+    backgroundColor: '#fff',
+    borderBottomWidth: 1,
+    borderBottomColor: '#f3f4f6',
+  },
+  profileAvatarWrapper: {
+    position: 'relative',
+    marginBottom: 14,
+  },
+  profileAvatarImage: {
+    width: 96,
+    height: 96,
+    borderRadius: 48,
+    borderWidth: 3,
+    borderColor: '#8B5CF6',
+  },
+  profileAvatarFallback: {
+    width: 96,
+    height: 96,
+    borderRadius: 48,
+    backgroundColor: '#8B5CF6',
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 3,
+    borderColor: '#DDD6FE',
+  },
+  profileAvatarInitials: {
+    fontSize: 32,
+    fontWeight: '700',
+    color: '#fff',
+    letterSpacing: 1,
+  },
+  profileStatusDot: {
+    position: 'absolute',
+    bottom: 4,
+    right: 4,
+    width: 18,
+    height: 18,
+    borderRadius: 9,
+    borderWidth: 2,
+    borderColor: '#fff',
+  },
+  profileHeroName: {
+    fontSize: 22,
+    fontWeight: '700',
+    color: '#1F2937',
+    marginBottom: 4,
+  },
+  profileHeroEmail: {
+    fontSize: 14,
+    color: '#6B7280',
+    marginBottom: 12,
+  },
+  profileStatusBadge: {
+    paddingHorizontal: 14,
+    paddingVertical: 4,
+    borderRadius: 20,
+  },
+  profileStatusBadgeText: {
+    fontSize: 12,
+    fontWeight: '600',
+    letterSpacing: 0.5,
   },
   actionsSection: {
     backgroundColor: '#fff',
