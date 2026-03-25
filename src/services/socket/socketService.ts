@@ -43,11 +43,21 @@ class SocketService {
   private isConnected: boolean = false;
   private reconnectAttempts: number = 0;
   private maxReconnectAttempts: number = 3; // Reduced to prevent endless retries
+  private messageCallbackWrappers = new Map<Function, Function>();
 
   async initialize(timeout: number = 10000): Promise<void> {
     if (this.socket?.connected) {
       logger.info('Socket already connected');
       return;
+    }
+
+    // Clean up a stale disconnected socket before creating a new one
+    if (this.socket && !this.socket.connected) {
+      this.socket.removeAllListeners();
+      this.socket.disconnect();
+      this.socket = null;
+      this.isConnected = false;
+      this.messageCallbackWrappers.clear();
     }
 
     try {
@@ -479,11 +489,15 @@ class SocketService {
       return;
     }
 
-    // Remove existing listener to avoid duplicates
-    this.socket.off('newChatMessage', callback);
-    
-    // Add new listener with logging
-    this.socket.on('newChatMessage', (message) => {
+    // Remove existing wrapper for this callback if previously registered
+    const existingWrapper = this.messageCallbackWrappers.get(callback);
+    if (existingWrapper) {
+      this.socket.off('newChatMessage', existingWrapper as any);
+      this.messageCallbackWrappers.delete(callback);
+    }
+
+    // Create wrapper with logging, store it so it can be removed by the original callback reference
+    const wrapper = (message: any) => {
       logger.info('📨 Socket received newChatMessage event', {
         messageId: message._id,
         orderId: message.orderId,
@@ -492,8 +506,10 @@ class SocketService {
         senderName: message.senderName
       });
       callback(message);
-    });
-    
+    };
+    this.messageCallbackWrappers.set(callback, wrapper);
+    this.socket.on('newChatMessage', wrapper);
+
     logger.info('✅ Registered newChatMessage listener');
   }
 
@@ -504,9 +520,14 @@ class SocketService {
     }
 
     if (callback) {
-      this.socket.off('newChatMessage', callback);
+      const wrapper = this.messageCallbackWrappers.get(callback);
+      if (wrapper) {
+        this.socket.off('newChatMessage', wrapper as any);
+        this.messageCallbackWrappers.delete(callback);
+      }
     } else {
       this.socket.off('newChatMessage');
+      this.messageCallbackWrappers.clear();
     }
   }
 
