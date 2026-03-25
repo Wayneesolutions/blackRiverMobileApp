@@ -814,16 +814,7 @@ export default function AppNavigator() {
                     />
                 )}
             </RootStack.Screen>
-            <RootStack.Screen name="DriverChat">
-                {(props) => (
-                    <ScreenWithHeaderFooter
-                        component={DriverChatScreen}
-                        navigation={props.navigation}
-                        route={props.route}
-                        onLogout={handleLogout}
-                    />
-                )}
-            </RootStack.Screen>
+            <RootStack.Screen name="DriverChat" component={DriverChatScreen} />
             <RootStack.Screen name="CrashLogs">
                 {(props) => (
                     <ScreenWithHeaderFooter

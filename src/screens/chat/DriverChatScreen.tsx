@@ -257,11 +257,9 @@ const DriverChatScreen = () => {
           throw new Error(`Authentication failed: ${authError.message}`);
         }
 
-        // Set up listeners after socket is connected and authenticated
-        if (socketService.isSocketConnected()) {
-          socketService.onNewChatMessage(handleNewMessage);
-          socketService.onUserTyping(handleTyping);
-        }
+        // Set up listeners (safe to register even before socket fully connected)
+        socketService.onNewChatMessage(handleNewMessage);
+        socketService.onUserTyping(handleTyping);
 
         // Wait a bit to ensure authentication is fully processed on backend
         // This gives the backend time to set socketUser
@@ -431,6 +429,47 @@ const DriverChatScreen = () => {
     return date.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true });
   };
 
+  // Format date label for date separators
+  const formatDateLabel = (dateString: string): string => {
+    const date = new Date(dateString);
+    const today = new Date();
+    const yesterday = new Date(today);
+    yesterday.setDate(yesterday.getDate() - 1);
+
+    const isSameDay = (a: Date, b: Date) =>
+      a.getDate() === b.getDate() &&
+      a.getMonth() === b.getMonth() &&
+      a.getFullYear() === b.getFullYear();
+
+    if (isSameDay(date, today)) return 'Today';
+    if (isSameDay(date, yesterday)) return 'Yesterday';
+    return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+  };
+
+  // Check if date separator should be shown between two messages
+  const shouldShowDateSeparator = (current: ChatMessage, previous?: ChatMessage): boolean => {
+    if (!previous) return true;
+    const a = new Date(current.createdAt);
+    const b = new Date(previous.createdAt);
+    return (
+      a.getDate() !== b.getDate() ||
+      a.getMonth() !== b.getMonth() ||
+      a.getFullYear() !== b.getFullYear()
+    );
+  };
+
+  // Get tick status for sent messages
+  const getTickIcon = (message: ChatMessage): { name: any; color: string } | null => {
+    if (message.senderType !== 'driver') return null;
+    const isOptimistic = message._id.startsWith('temp-');
+    if (isOptimistic) return { name: 'time-outline', color: 'rgba(255,255,255,0.6)' };
+    const isRead = message.readBy && message.readBy.length > 0;
+    return {
+      name: isRead ? 'checkmark-done' : 'checkmark-done',
+      color: isRead ? '#A5F3FC' : 'rgba(255,255,255,0.6)',
+    };
+  };
+
   // Format file size
   const formatFileSize = (bytes: number): string => {
     if (bytes < 1024) return bytes + ' B';
@@ -464,15 +503,16 @@ const DriverChatScreen = () => {
       >
         {/* Header */}
         <View style={styles.header}>
-          <TouchableOpacity
-            onPress={() => navigation.goBack()}
-            style={styles.backButton}
-          >
-            <Ionicons name="arrow-back" size={24} color="#fff" />
+          <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
+            <Ionicons name="arrow-back" size={22} color="#fff" />
           </TouchableOpacity>
+          <View style={styles.headerAvatar}>
+            <Text style={styles.headerAvatarText}>D</Text>
+            <View style={styles.headerOnlineDot} />
+          </View>
           <View style={styles.headerContent}>
-            <Text style={styles.headerTitle}>Chat with Dispatcher</Text>
-            <Text style={styles.headerSubtitle}>Global Chat</Text>
+            <Text style={styles.headerTitle}>Dispatcher</Text>
+            <Text style={styles.headerSubtitle}>● Online</Text>
           </View>
         </View>
 
@@ -497,91 +537,118 @@ const DriverChatScreen = () => {
           ) : (
             messages.map((message, index) => {
               const isRightSide = message.senderType === 'driver';
-              const isCurrentUser = currentUserId && String(message.senderId._id) === String(currentUserId);
-              const showAvatar = index === 0 || messages[index - 1].senderId._id !== message.senderId._id;
+              const prevMessage = index > 0 ? messages[index - 1] : undefined;
+              const showAvatar = !prevMessage || prevMessage.senderId._id !== message.senderId._id;
+              const isLastInGroup = index === messages.length - 1 || messages[index + 1].senderId._id !== message.senderId._id;
+              const showDateSep = shouldShowDateSeparator(message, prevMessage);
+              const tick = getTickIcon(message);
 
               return (
-                <View
-                  key={message._id}
-                  style={[
-                    styles.messageWrapper,
-                    isRightSide ? styles.messageWrapperRight : styles.messageWrapperLeft,
-                  ]}
-                >
-                  {!isRightSide && showAvatar && (
-                    <View style={styles.avatar}>
-                      <Text style={styles.avatarText}>
-                        {message.senderName.charAt(0).toUpperCase()}
-                      </Text>
+                <React.Fragment key={message._id}>
+                  {/* Date Separator */}
+                  {showDateSep && (
+                    <View style={styles.dateSeparator}>
+                      <View style={styles.dateSeparatorLine} />
+                      <Text style={styles.dateSeparatorText}>{formatDateLabel(message.createdAt)}</Text>
+                      <View style={styles.dateSeparatorLine} />
                     </View>
                   )}
-                  {!isRightSide && !showAvatar && <View style={styles.avatarPlaceholder} />}
-                  
+
                   <View
                     style={[
-                      styles.messageBubble,
-                      isRightSide ? styles.messageBubbleRight : styles.messageBubbleLeft,
+                      styles.messageWrapper,
+                      isRightSide ? styles.messageWrapperRight : styles.messageWrapperLeft,
+                      !isLastInGroup && { marginBottom: 2 },
                     ]}
                   >
                     {!isRightSide && showAvatar && (
-                      <Text style={styles.senderName}>{message.senderName}</Text>
-                    )}
-                    
-                    {message.message ? (
-                      <Text
-                        style={[
-                          styles.messageText,
-                          isRightSide ? styles.messageTextRight : styles.messageTextLeft,
-                        ]}
-                      >
-                        {message.message}
-                      </Text>
-                    ) : null}
-
-                    {message.fileUrl && (
-                      <TouchableOpacity
-                        onPress={() => handleOpenFile(message.fileUrl!, message._id)}
-                        style={[
-                          styles.fileButton,
-                          isRightSide ? styles.fileButtonRight : styles.fileButtonLeft,
-                        ]}
-                      >
-                        <Ionicons
-                          name={message.fileType === 'image' ? 'image' : 'document'}
-                          size={20}
-                          color={isRightSide ? '#fff' : '#8B5CF6'}
-                        />
-                        <Text
-                          style={[
-                            styles.fileName,
-                            isRightSide ? styles.fileNameRight : styles.fileNameLeft,
-                          ]}
-                        >
-                          {message.fileName || 'File'}
+                      <View style={styles.avatar}>
+                        <Text style={styles.avatarText}>
+                          {(message.senderName || 'D').charAt(0).toUpperCase()}
                         </Text>
-                        {message.fileSize && (
-                          <Text
-                            style={[
-                              styles.fileSize,
-                              isRightSide ? styles.fileSizeRight : styles.fileSizeLeft,
-                            ]}
-                          >
-                            {formatFileSize(message.fileSize)}
-                          </Text>
-                        )}
-                      </TouchableOpacity>
+                      </View>
                     )}
+                    {!isRightSide && !showAvatar && <View style={styles.avatarPlaceholder} />}
 
-                    <Text
+                    <View
                       style={[
-                        styles.messageTime,
-                        isRightSide ? styles.messageTimeRight : styles.messageTimeLeft,
+                        styles.messageBubble,
+                        isRightSide ? styles.messageBubbleRight : styles.messageBubbleLeft,
+                        isRightSide && isLastInGroup && styles.bubbleTailRight,
+                        !isRightSide && isLastInGroup && styles.bubbleTailLeft,
                       ]}
                     >
-                      {formatTime(message.createdAt)}
-                    </Text>
+                      {!isRightSide && showAvatar && (
+                        <Text style={styles.senderName}>{message.senderName}</Text>
+                      )}
+
+                      {message.message ? (
+                        <Text
+                          style={[
+                            styles.messageText,
+                            isRightSide ? styles.messageTextRight : styles.messageTextLeft,
+                          ]}
+                        >
+                          {message.message}
+                        </Text>
+                      ) : null}
+
+                      {message.fileUrl && (
+                        <TouchableOpacity
+                          onPress={() => handleOpenFile(message.fileUrl!, message._id)}
+                          style={[
+                            styles.fileButton,
+                            isRightSide ? styles.fileButtonRight : styles.fileButtonLeft,
+                          ]}
+                        >
+                          <Ionicons
+                            name={message.fileType === 'image' ? 'image' : 'document'}
+                            size={20}
+                            color={isRightSide ? '#fff' : '#8B5CF6'}
+                          />
+                          <Text
+                            style={[
+                              styles.fileName,
+                              isRightSide ? styles.fileNameRight : styles.fileNameLeft,
+                            ]}
+                          >
+                            {message.fileName || 'File'}
+                          </Text>
+                          {message.fileSize && (
+                            <Text
+                              style={[
+                                styles.fileSize,
+                                isRightSide ? styles.fileSizeRight : styles.fileSizeLeft,
+                              ]}
+                            >
+                              {formatFileSize(message.fileSize)}
+                            </Text>
+                          )}
+                        </TouchableOpacity>
+                      )}
+
+                      {/* Time + Ticks row */}
+                      <View style={[styles.messageFooter, isRightSide && styles.messageFooterRight]}>
+                        <Text
+                          style={[
+                            styles.messageTime,
+                            isRightSide ? styles.messageTimeRight : styles.messageTimeLeft,
+                          ]}
+                        >
+                          {formatTime(message.createdAt)}
+                        </Text>
+                        {tick && (
+                          <Ionicons
+                            name={tick.name}
+                            size={14}
+                            color={tick.color}
+                            style={styles.tickIcon}
+                          />
+                        )}
+                      </View>
+                    </View>
                   </View>
-                </View>
+                </React.Fragment>
               );
             })
           )}
@@ -676,46 +743,97 @@ const DriverChatScreen = () => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F9FAFB',
+    backgroundColor: '#EDE7F6',
   },
   keyboardView: {
     flex: 1,
   },
   header: {
-    backgroundColor: '#8B5CF6',
-    paddingTop: Platform.OS === 'ios' ? 0 : 20,
-    paddingBottom: 16,
+    backgroundColor: '#7C3AED',
+    paddingTop: Platform.OS === 'ios' ? 12 : 16,
+    paddingBottom: 14,
     paddingHorizontal: 16,
     flexDirection: 'row',
     alignItems: 'center',
-    elevation: 4,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
+    elevation: 6,
+    shadowColor: '#4C1D95',
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.25,
+    shadowRadius: 6,
   },
   backButton: {
-    marginRight: 12,
+    marginRight: 10,
+    padding: 4,
+  },
+  headerAvatar: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: 'rgba(255,255,255,0.25)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 10,
+  },
+  headerAvatarText: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: '700',
+  },
+  headerOnlineDot: {
+    position: 'absolute',
+    bottom: 1,
+    right: 1,
+    width: 11,
+    height: 11,
+    borderRadius: 6,
+    backgroundColor: '#4ADE80',
+    borderWidth: 2,
+    borderColor: '#7C3AED',
   },
   headerContent: {
     flex: 1,
   },
   headerTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
+    fontSize: 17,
+    fontWeight: '700',
     color: '#fff',
+    letterSpacing: 0.2,
   },
   headerSubtitle: {
-    fontSize: 14,
-    color: '#E1D5F7',
-    marginTop: 2,
+    fontSize: 12,
+    color: '#A5F3FC',
+    marginTop: 1,
+    fontWeight: '500',
   },
   messagesContainer: {
     flex: 1,
   },
   messagesContent: {
-    padding: 16,
+    padding: 12,
     paddingBottom: 8,
+  },
+  dateSeparator: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginVertical: 16,
+    paddingHorizontal: 4,
+  },
+  dateSeparatorLine: {
+    flex: 1,
+    height: 1,
+    backgroundColor: '#C4B5FD',
+    opacity: 0.5,
+  },
+  dateSeparatorText: {
+    marginHorizontal: 10,
+    fontSize: 12,
+    color: '#7C3AED',
+    fontWeight: '600',
+    backgroundColor: '#EDE7F6',
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 10,
+    overflow: 'hidden',
   },
   loadingContainer: {
     flex: 1,
@@ -748,7 +866,7 @@ const styles = StyleSheet.create({
   },
   messageWrapper: {
     flexDirection: 'row',
-    marginBottom: 12,
+    marginBottom: 8,
     alignItems: 'flex-end',
   },
   messageWrapperLeft: {
@@ -758,45 +876,67 @@ const styles = StyleSheet.create({
     justifyContent: 'flex-end',
   },
   avatar: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    backgroundColor: '#8B5CF6',
+    width: 34,
+    height: 34,
+    borderRadius: 17,
+    backgroundColor: '#7C3AED',
     justifyContent: 'center',
     alignItems: 'center',
-    marginRight: 8,
+    marginRight: 6,
+    shadowColor: '#4C1D95',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.2,
+    shadowRadius: 2,
+    elevation: 2,
   },
   avatarPlaceholder: {
-    width: 32,
-    marginRight: 8,
+    width: 34,
+    marginRight: 6,
   },
   avatarText: {
     color: '#fff',
-    fontSize: 14,
-    fontWeight: 'bold',
+    fontSize: 13,
+    fontWeight: '700',
   },
   messageBubble: {
-    maxWidth: '75%',
-    padding: 12,
-    borderRadius: 16,
+    maxWidth: '78%',
+    paddingHorizontal: 13,
+    paddingVertical: 9,
+    borderRadius: 18,
   },
   messageBubbleLeft: {
     backgroundColor: '#fff',
-    borderBottomLeftRadius: 4,
+    borderBottomLeftRadius: 18,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.08,
+    shadowRadius: 3,
+    elevation: 2,
   },
   messageBubbleRight: {
-    backgroundColor: '#8B5CF6',
+    backgroundColor: '#7C3AED',
+    borderBottomRightRadius: 18,
+    shadowColor: '#4C1D95',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.3,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  bubbleTailLeft: {
+    borderBottomLeftRadius: 4,
+  },
+  bubbleTailRight: {
     borderBottomRightRadius: 4,
   },
   senderName: {
     fontSize: 12,
-    fontWeight: '600',
-    color: '#6B7280',
-    marginBottom: 4,
+    fontWeight: '700',
+    color: '#7C3AED',
+    marginBottom: 3,
   },
   messageText: {
     fontSize: 15,
-    lineHeight: 20,
+    lineHeight: 21,
   },
   messageTextLeft: {
     color: '#1F2937',
@@ -807,15 +947,15 @@ const styles = StyleSheet.create({
   fileButton: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginTop: 8,
+    marginTop: 6,
     padding: 8,
-    borderRadius: 8,
+    borderRadius: 10,
   },
   fileButtonLeft: {
     backgroundColor: '#F3F4F6',
   },
   fileButtonRight: {
-    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    backgroundColor: 'rgba(255, 255, 255, 0.15)',
   },
   fileName: {
     fontSize: 14,
@@ -829,24 +969,34 @@ const styles = StyleSheet.create({
     color: '#fff',
   },
   fileSize: {
-    fontSize: 12,
-    marginLeft: 8,
+    fontSize: 11,
+    marginLeft: 6,
   },
   fileSizeLeft: {
     color: '#6B7280',
   },
   fileSizeRight: {
-    color: 'rgba(255, 255, 255, 0.8)',
+    color: 'rgba(255, 255, 255, 0.7)',
+  },
+  messageFooter: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 4,
+  },
+  messageFooterRight: {
+    justifyContent: 'flex-end',
   },
   messageTime: {
     fontSize: 11,
-    marginTop: 4,
   },
   messageTimeLeft: {
     color: '#9CA3AF',
   },
   messageTimeRight: {
-    color: 'rgba(255, 255, 255, 0.8)',
+    color: 'rgba(255,255,255,0.65)',
+  },
+  tickIcon: {
+    marginLeft: 3,
   },
   typingIndicator: {
     flexDirection: 'row',
@@ -869,10 +1019,11 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    padding: 12,
-    backgroundColor: '#fff',
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    backgroundColor: '#F5F3FF',
     borderTopWidth: 1,
-    borderTopColor: '#E5E7EB',
+    borderTopColor: '#DDD6FE',
   },
   filePreviewContent: {
     flexDirection: 'row',
@@ -880,12 +1031,12 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   filePreviewInfo: {
-    marginLeft: 12,
+    marginLeft: 10,
     flex: 1,
   },
   filePreviewName: {
     fontSize: 14,
-    fontWeight: '500',
+    fontWeight: '600',
     color: '#1F2937',
   },
   filePreviewSize: {
@@ -894,42 +1045,53 @@ const styles = StyleSheet.create({
     marginTop: 2,
   },
   filePreviewClose: {
-    marginLeft: 12,
+    marginLeft: 10,
   },
   inputContainer: {
     flexDirection: 'row',
     alignItems: 'flex-end',
-    padding: 12,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
     backgroundColor: '#fff',
     borderTopWidth: 1,
-    borderTopColor: '#E5E7EB',
+    borderTopColor: '#EDE9FE',
   },
   attachButton: {
-    marginRight: 8,
+    marginRight: 6,
     padding: 8,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   input: {
     flex: 1,
-    minHeight: 40,
+    minHeight: 42,
     maxHeight: 100,
     paddingHorizontal: 16,
     paddingVertical: 10,
-    backgroundColor: '#F3F4F6',
-    borderRadius: 20,
+    backgroundColor: '#F5F3FF',
+    borderRadius: 22,
     fontSize: 15,
     color: '#1F2937',
+    borderWidth: 1,
+    borderColor: '#DDD6FE',
   },
   sendButton: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: '#8B5CF6',
+    width: 42,
+    height: 42,
+    borderRadius: 21,
+    backgroundColor: '#7C3AED',
     justifyContent: 'center',
     alignItems: 'center',
     marginLeft: 8,
+    shadowColor: '#4C1D95',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.35,
+    shadowRadius: 4,
+    elevation: 4,
   },
   sendButtonDisabled: {
-    opacity: 0.5,
+    opacity: 0.45,
+    elevation: 0,
   },
 });
 
