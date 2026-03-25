@@ -195,7 +195,7 @@ const createENVConfig = async () => {
     return {
         development: {
             API_BASE_URL: `http://${devIP}:3000/api/v1`,
-            SOCKET_URL: `http://${devIP}:3000`,
+            SOCKET_URL: `http://192.168.1.3:3000`,
             NODE_ENV: 'development',
             DB_NAME: 'blackriver',
         },
