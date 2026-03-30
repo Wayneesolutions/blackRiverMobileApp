@@ -608,6 +608,17 @@ export default function AppNavigator() {
             screenOptions={{ headerShown: false }}
             initialRouteName="MainTabs"
         >
+            {/* Main Tabs - declared FIRST so it is always the initial screen */}
+            <RootStack.Screen name="MainTabs">
+                {(props) => (
+                    <MainTabNavigator
+                        {...props}
+                        onLogout={handleLogout}
+                        navigation={props.navigation}
+                    />
+                )}
+            </RootStack.Screen>
+
             {/* Onboarding Screens */}
             <RootStack.Screen name="OnboardingGuard">
                 {(props) => (
@@ -619,7 +630,9 @@ export default function AppNavigator() {
             <RootStack.Screen name="TakeTestScreen" component={TakeTestScreen} />
             <RootStack.Screen name="TestResultsScreen" component={TestResultsScreen} />
             <RootStack.Screen name="CertificatesScreen" component={CertificatesScreen} />
-            <RootStack.Screen name="HRApprovalScreen" component={HRApprovalScreen} />
+            <RootStack.Screen name="HRApprovalScreen">
+                {(props) => <HRApprovalScreen {...props} onLogout={handleLogout} />}
+            </RootStack.Screen>
             <RootStack.Screen name="ELDDocuments">
                 {(props) => (
                     <ScreenWithHeaderFooter
@@ -640,17 +653,6 @@ export default function AppNavigator() {
                     />
                 )}
             </RootStack.Screen>
-            {/* Main Tabs - These will have Header and Footer */}
-            <RootStack.Screen name="MainTabs">
-                {(props) => (
-                    <MainTabNavigator
-                        {...props}
-                        onLogout={handleLogout}
-                        navigation={props.navigation}
-                    />
-                )}
-            </RootStack.Screen>
-
             {/* Additional Stack Screens for direct access (with Header/Footer) */}
             <RootStack.Screen name="NewTrip">
                 {(props) => (

@@ -17,7 +17,11 @@ import { apiService } from '../../services/api/apiService';
 
 type OnboardingStatus = 'PENDING_TESTS' | 'IN_PROGRESS' | 'WAITING_FOR_HR_APPROVAL' | 'APPROVED' | 'REJECTED';
 
-const HRApprovalScreen = () => {
+interface HRApprovalScreenProps {
+  onLogout?: () => void;
+}
+
+const HRApprovalScreen = ({ onLogout }: HRApprovalScreenProps) => {
   const navigation = useNavigation();
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -109,9 +113,10 @@ const HRApprovalScreen = () => {
     fetchApprovalStatus();
   };
 
-  const handleLogout = () => {
-    // TODO: Implement logout
-    navigation.navigate('Login' as never);
+  const handleLogout = async () => {
+    if (onLogout) {
+      onLogout();
+    }
   };
 
   if (loading && !submittedDate) {
