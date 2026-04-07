@@ -1,8 +1,8 @@
 {
   "expo": {
     "name": "Logistiq Innovations",
-    "slug": "logistiq-innovations",
-    "version": "1.0.0",
+    "slug": "black-river-logistics",
+    "version": "1.0.3",
     "orientation": "portrait",
     "icon": "./assets/app-icon.png",
     "userInterfaceStyle": "light",
@@ -18,7 +18,7 @@
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.logistiqinnovations.app",
-      "buildNumber": "7",
+      "buildNumber": "10",
       "infoPlist": {
         "NSLocationWhenInUseUsageDescription": "This app needs access to your location to show your current position on the map.",
         "NSLocationAlwaysUsageDescription": "This app needs access to your location for live tracking of your trips.",
@@ -78,7 +78,16 @@
       ]
     },
     "plugins": [
-      "expo-font"
+      "expo-font",
+      [
+        "expo-notifications",
+        {
+          "icon": "./assets/app-icon.png",
+          "color": "#8B5CF6",
+          "defaultChannel": "logistiq-default",
+          "sounds": []
+        }
+      ]
     ],
     "web": {
       "favicon": "./assets/app-icon.png",

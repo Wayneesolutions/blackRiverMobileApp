@@ -10,6 +10,8 @@ import {
     Dimensions,
     ActivityIndicator,
     RefreshControl,
+    Linking,
+    Alert,
 } from "react-native";
 import { SafeAreaView } from "react-native";
 import { Ionicons, FontAwesome5, MaterialIcons } from "@expo/vector-icons"
@@ -46,6 +48,7 @@ interface DriverProfile {
 interface LoadStats {
     active: number;
     pending: number;
+    accepted: number;
     completed: number;
     totalMiles: number;
 }
@@ -58,11 +61,62 @@ export default function DashboardScreen() {
     const [stats, setStats] = useState<LoadStats>({
         active: 0,
         pending: 0,
+        accepted: 0,
         completed: 0,
         totalMiles: 0,
     });
     const [loading, setLoading] = useState(true);
     const [refreshing, setRefreshing] = useState(false);
+
+    const callNumber = (phone: string) => {
+        const url = `tel:${phone.replace(/\s+/g, '')}`;
+        Linking.canOpenURL(url).then(supported => {
+            if (supported) {
+                Linking.openURL(url);
+            } else {
+                Alert.alert('Call Failed', `Cannot place a call to ${phone}`);
+            }
+        });
+    };
+
+    const handleCallDispatch = async () => {
+        try {
+            const res = await apiService.getCompanyDispatchers();
+
+            if (!res.success) {
+                Alert.alert('Error', res.error || 'Failed to fetch dispatcher information.');
+                return;
+            }
+
+            const rawData = res.data as any;
+            const dispatchers: Array<{ _id: string; name: string; phone?: string; email?: string }> =
+                Array.isArray(rawData?.data) ? rawData.data :
+                Array.isArray(rawData) ? rawData : [];
+
+            const withPhone = dispatchers.filter(d => !!d.phone);
+
+            if (withPhone.length === 0) {
+                Alert.alert('No Dispatcher', 'No dispatcher with a phone number found. Please contact your administrator.');
+                return;
+            }
+
+            if (withPhone.length === 1) {
+                callNumber(withPhone[0].phone!);
+                return;
+            }
+
+            // Multiple dispatchers — show each as a separate alert button
+            const buttons: any[] = withPhone.map(d => ({
+                text: `${d.name} — ${d.phone}`,
+                onPress: () => callNumber(d.phone!),
+            }));
+            buttons.push({ text: 'Cancel', style: 'cancel' });
+            Alert.alert('Call Dispatcher', 'Select a dispatcher:', buttons);
+        } catch (error: any) {
+            console.error('handleCallDispatch error:', error);
+            Alert.alert('Error', `Failed to load dispatchers: ${error?.message || 'Unknown error'}`);
+        }
+    };
 
     const wishListItems = [
         // { id: 1, name: "Vehicle", icon: <Ionicons name="car-sport" size={28} color="#fff" />, color: "#906AD1", route: "Vehicle" },
@@ -75,6 +129,7 @@ export default function DashboardScreen() {
         { id: 4, name: "Verification", icon: <Ionicons name="shield-checkmark" size={28} color="#fff" />, color: "#0ea3d8", route: "OnboardingGuard" },
         { id: 5, name: "ELD Documents", icon: <Ionicons name="document-text" size={28} color="#fff" />, color: "#8B5CF6", route: "ELDDocuments" },
         { id: 6, name: "Mileage Sheet", icon: <Ionicons name="speedometer" size={28} color="#fff" />, color: "#FF6B35", route: "MileageSheet" },
+        { id: 7, name: "Call Dispatch", icon: <Ionicons name="call" size={28} color="#fff" />, color: "#16a34a", onPress: handleCallDispatch },
         // { id: 8, name: "Transfer", icon: <Ionicons name="swap-horizontal" size={28} color="#fff" />, color: "#E61DCC", route: "Transfer" },
         // { id: 9, name: "Fuel", icon: <FontAwesome5 name="gas-pump" size={28} color="#fff" />, color: "#04AA30", route: "Fuel" },
     ];
@@ -123,9 +178,10 @@ export default function DashboardScreen() {
             setLoading(true);
             
             // Fetch profile and trips in parallel
-            const [profileRes, activeRes, pendingRes, completedRes] = await Promise.allSettled([
+            const [profileRes, activeRes, requestsRes, acceptedRes, completedRes] = await Promise.allSettled([
                 apiService.getProfile(),
                 apiService.getActiveTrips(),
+                apiService.getAssignmentRequests(),
                 apiService.getPendingTrips(),
                 apiService.getCompletedTrips(),
             ]);
@@ -157,14 +213,17 @@ export default function DashboardScreen() {
 
             // Update statistics
             const newStats: LoadStats = {
-                active: activeRes.status === 'fulfilled' && activeRes.value.success 
-                    ? activeRes.value.data?.count || activeRes.value.data?.data?.length || 0 
+                active: activeRes.status === 'fulfilled' && activeRes.value.success
+                    ? activeRes.value.data?.count || activeRes.value.data?.data?.length || 0
                     : 0,
-                pending: pendingRes.status === 'fulfilled' && pendingRes.value.success 
-                    ? pendingRes.value.data?.count || pendingRes.value.data?.data?.length || 0 
+                pending: requestsRes.status === 'fulfilled' && requestsRes.value.success
+                    ? requestsRes.value.data?.count || requestsRes.value.data?.data?.length || 0
                     : 0,
-                completed: completedRes.status === 'fulfilled' && completedRes.value.success 
-                    ? completedRes.value.data?.count || completedRes.value.data?.data?.length || 0 
+                accepted: acceptedRes.status === 'fulfilled' && acceptedRes.value.success
+                    ? acceptedRes.value.data?.count || acceptedRes.value.data?.data?.length || 0
+                    : 0,
+                completed: completedRes.status === 'fulfilled' && completedRes.value.success
+                    ? completedRes.value.data?.count || completedRes.value.data?.data?.length || 0
                     : 0,
                 totalMiles: 0, // Calculate from completed trips if needed
             };
@@ -198,6 +257,10 @@ export default function DashboardScreen() {
     };
 
     const handleWishItemPress = (item: any) => {
+        if (item.onPress) {
+            item.onPress();
+            return;
+        }
         if (item.route) {
             navigation.navigate(item.route);
         }
@@ -319,7 +382,7 @@ export default function DashboardScreen() {
                                         )}
                                         <Text style={styles.tripLabel}>Total Trips</Text>
                                         <Text style={styles.miles}>
-                                            {stats.active + stats.pending + stats.completed} Loads
+                                            {stats.active + stats.pending + stats.accepted + stats.completed} Loads
                                         </Text>
                             </View>
                                     {(profile?.profileImage || profile?.profileImageUrl) ? (
@@ -375,14 +438,39 @@ export default function DashboardScreen() {
 
                             <TouchableOpacity
                                 style={styles.taskCard}
-                                onPress={() => navigation.navigate("PendingTrips")}
+                                onPress={() => navigation.navigate("PendingTrips", { initialTab: 'requests' })}
                             >
-                                <View style={[styles.taskIconContainer, { backgroundColor: "#8B4513" }]}>
-                                    <Image source={pendingTrip} style={styles.taskIcon} />
+                                <View style={[styles.taskIconContainer, { backgroundColor: "#F59E0B" }]}>
+                                    <Ionicons name="notifications" size={22} color="#fff" />
                                 </View>
                                 <View style={styles.taskContent}>
-                                    <Text style={styles.taskText}>Pending Trips</Text>
-                                    <Text style={styles.taskCount}>{stats.pending}</Text>
+                                    <Text style={styles.taskText}>Assignment Requests</Text>
+                                    {stats.pending > 0 ? (
+                                        <View style={styles.pendingCountRow}>
+                                            <Text style={[styles.taskCount, { color: "#F59E0B" }]}>{stats.pending}</Text>
+                                            <Text style={styles.pendingCountLabel}> awaiting</Text>
+                                        </View>
+                                    ) : (
+                                        <Text style={styles.taskCount}>{stats.pending}</Text>
+                                    )}
+                                </View>
+                                {stats.pending > 0 && (
+                                    <View style={styles.pendingBadge}>
+                                        <Text style={styles.pendingBadgeText}>{stats.pending}</Text>
+                                    </View>
+                                )}
+                            </TouchableOpacity>
+
+                            <TouchableOpacity
+                                style={styles.taskCard}
+                                onPress={() => navigation.navigate("PendingTrips", { initialTab: 'accepted' })}
+                            >
+                                <View style={[styles.taskIconContainer, { backgroundColor: "#10B981" }]}>
+                                    <Ionicons name="checkmark-circle" size={22} color="#fff" />
+                                </View>
+                                <View style={styles.taskContent}>
+                                    <Text style={styles.taskText}>Accepted Trips</Text>
+                                    <Text style={styles.taskCount}>{stats.accepted}</Text>
                                 </View>
                             </TouchableOpacity>
                         </View>
@@ -624,5 +712,29 @@ const styles = StyleSheet.create({
         fontWeight: "bold",
         color: "#1F2937",
         marginTop: 4,
+    },
+    pendingCountRow: {
+        flexDirection: "row",
+        alignItems: "baseline",
+        marginTop: 4,
+    },
+    pendingCountLabel: {
+        fontSize: 13,
+        color: "#6B7280",
+        fontWeight: "500",
+    },
+    pendingBadge: {
+        backgroundColor: "#F59E0B",
+        borderRadius: 12,
+        minWidth: 24,
+        height: 24,
+        alignItems: "center",
+        justifyContent: "center",
+        paddingHorizontal: 6,
+    },
+    pendingBadgeText: {
+        color: "#fff",
+        fontSize: 12,
+        fontWeight: "700",
     },
 });

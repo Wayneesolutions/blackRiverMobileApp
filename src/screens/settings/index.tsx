@@ -19,6 +19,7 @@ import { useNavigation, NavigationProp, CommonActions } from '@react-navigation/
 import { profileService, FormattedDriverProfile } from '../../services/ProfileService';
 import { apiService } from '../../services/api/apiService';
 import { authManager } from '../../types/AuthManager';
+import { notificationService } from '../../services/notificationService';
 import { logger } from '../../utils/loggerHelper';
 import { RootStackParamList } from '../../navigation/AppNavigator';
 import { AuthService } from '../../navigation/AppNavigator';
@@ -707,8 +708,8 @@ const SettingsScreen = ({ route, navigation: navProp, onLogout }: SettingsScreen
         {/* Debug Section */}
         <Text style={styles.sectionTitle}>Debug</Text>
         <View style={styles.actionsSection}>
-          <TouchableOpacity 
-            style={styles.actionBtn} 
+          <TouchableOpacity
+            style={styles.actionBtn}
             onPress={() => navigation.navigate('CrashLogs' as never)}
             activeOpacity={0.7}
           >
@@ -718,11 +719,81 @@ const SettingsScreen = ({ route, navigation: navProp, onLogout }: SettingsScreen
               </View>
               <View style={styles.actionTextContainer}>
                 <Text style={styles.actionTitle}>View Crash Logs</Text>
-                <Text style={styles.actionSubtitle}>
-                  View app crash logs and errors
-                </Text>
+                <Text style={styles.actionSubtitle}>View app crash logs and errors</Text>
               </View>
               <Ionicons name="chevron-forward" size={20} color="#999" />
+            </View>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={styles.actionBtn}
+            onPress={async () => {
+              await notificationService.sendLocalNotification(
+                'New Trip Assigned',
+                'Pick up from Warehouse A — Order #1234',
+                { type: 'trip_assigned' }
+              );
+              Alert.alert('Scheduled', 'Notification sent! Swipe down from top of iPhone to see it.');
+            }}
+            activeOpacity={0.7}
+          >
+            <View style={styles.actionContent}>
+              <View style={styles.actionIconContainer}>
+                <Ionicons name="car" size={24} color="#10B981" />
+              </View>
+              <View style={styles.actionTextContainer}>
+                <Text style={styles.actionTitle}>Test Trip Notification</Text>
+                <Text style={styles.actionSubtitle}>Tap → swipe down from top to see it</Text>
+              </View>
+              <Ionicons name="notifications-outline" size={20} color="#999" />
+            </View>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={styles.actionBtn}
+            onPress={async () => {
+              await notificationService.sendLocalNotification(
+                'Dispatcher',
+                'Your next load is ready. Please confirm.',
+                { type: 'chat' }
+              );
+              Alert.alert('Scheduled', 'Notification sent! Swipe down from top of iPhone to see it.');
+            }}
+            activeOpacity={0.7}
+          >
+            <View style={styles.actionContent}>
+              <View style={styles.actionIconContainer}>
+                <Ionicons name="chatbubble-ellipses" size={24} color="#3B82F6" />
+              </View>
+              <View style={styles.actionTextContainer}>
+                <Text style={styles.actionTitle}>Test Chat Notification</Text>
+                <Text style={styles.actionSubtitle}>Tap → swipe down from top to see it</Text>
+              </View>
+              <Ionicons name="notifications-outline" size={20} color="#999" />
+            </View>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={[styles.actionBtn, { borderBottomWidth: 0 }]}
+            onPress={async () => {
+              await notificationService.sendLocalNotification(
+                'Logistiq Innovations',
+                'You have a new update from dispatch.',
+                { type: 'notification' }
+              );
+              Alert.alert('Scheduled', 'Notification sent! Swipe down from top of iPhone to see it.');
+            }}
+            activeOpacity={0.7}
+          >
+            <View style={styles.actionContent}>
+              <View style={styles.actionIconContainer}>
+                <Ionicons name="notifications" size={24} color="#8B5CF6" />
+              </View>
+              <View style={styles.actionTextContainer}>
+                <Text style={styles.actionTitle}>Test General Notification</Text>
+                <Text style={styles.actionSubtitle}>Tap → swipe down from top to see it</Text>
+              </View>
+              <Ionicons name="notifications-outline" size={20} color="#999" />
             </View>
           </TouchableOpacity>
         </View>

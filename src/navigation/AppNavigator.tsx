@@ -1,14 +1,15 @@
 // src/navigation/AppNavigator.tsx
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect } from 'react';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { Ionicons } from '@expo/vector-icons';
-import { View, Text, StyleSheet, ActivityIndicator, Image, Animated, Modal, TouchableOpacity } from 'react-native';
+import { View, Text, StyleSheet, ActivityIndicator, Image, Animated, TouchableOpacity } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { NavigationProp } from '@react-navigation/native';
 import { authManager } from '../types/AuthManager';
 import { apiService } from '../services/api/apiService';
 import { socketService } from '../services/socket/socketService';
+import { notificationService } from '../services/notificationService';
 
 // Import screens
 import DashboardScreen from '../screens/dashboard/DashboardScreen';
@@ -95,7 +96,7 @@ export type MainTabParamList = {
     Fuel: undefined;
     ActiveTrips: undefined;
     CompleteTrips: undefined;
-    PendingTrips: undefined;
+    PendingTrips: { initialTab?: 'requests' | 'accepted' } | undefined;
     Notifications: undefined;
     Help: undefined;
     Search: undefined;
@@ -119,7 +120,7 @@ export type RootStackParamList = {
     Fuel: undefined;
     ActiveTrips: undefined;
     CompleteTrips: undefined;
-    PendingTrips: undefined;
+    PendingTrips: { initialTab?: 'requests' | 'accepted' } | undefined;
     Notifications: undefined;
     Help: undefined;
     TripInfo: undefined;
@@ -262,11 +263,6 @@ const ScreenWithHeaderFooter: React.FC<{
 
 // Main Tab Navigator with Authentication Context
 function MainTabNavigator({ onLogout, navigation }: MainTabNavigatorProps) {
-    const [dispatcherNotif, setDispatcherNotif] = useState<{
-        senderName: string;
-        message: string;
-    } | null>(null);
-    const notifTimerRef = useRef<NodeJS.Timeout | null>(null);
 
     useEffect(() => {
         const currentUser = authManager.getCurrentUser();
@@ -275,81 +271,44 @@ function MainTabNavigator({ onLogout, navigation }: MainTabNavigatorProps) {
 
         let isMounted = true;
 
-        const handleDispatcherMessage = (message: any) => {
-            console.log('[NotifSocket] newChatMessage received:', {
-                senderType: message.senderType,
-                senderName: message.senderName,
-                driverId: message.driverId,
-                message: message.message?.substring(0, 50),
-            });
-            if (!isMounted) return;
-            // Only show notifications for dispatcher messages (not driver or system)
-            if (
-                message.senderType === 'driver' ||
-                message.senderType === 'system' ||
-                message.forDispatchersOnly ||
-                message.isSystemMessage
-            ) {
-                console.log('[NotifSocket] message filtered out, senderType:', message.senderType);
-                return;
+        // Register push token with server
+        const registerToken = async () => {
+            const token = await notificationService.registerForPushNotifications();
+            if (token) {
+                try {
+                    await apiService.registerPushToken(token);
+                    console.log('[Notifications] Push token registered with server');
+                } catch (e) {
+                    console.warn('[Notifications] Could not register token with server:', e);
+                }
             }
-
-            // Verify message belongs to this driver
-            let messageDriverId = '';
-            if (message.driverId) {
-                messageDriverId = typeof message.driverId === 'object'
-                    ? message.driverId._id?.toString() || ''
-                    : String(message.driverId);
-            }
-            if (messageDriverId && messageDriverId !== String(driverId)) return;
-
-            const senderName = message.senderName || message.senderId?.name || 'Dispatcher';
-            const text = message.message || 'New message';
-
-            setDispatcherNotif({ senderName, message: text });
-
-            if (notifTimerRef.current) clearTimeout(notifTimerRef.current);
-            notifTimerRef.current = setTimeout(() => {
-                if (isMounted) setDispatcherNotif(null);
-            }, 5000);
         };
+        registerToken();
 
+        // Keep socket connected for real-time chat updates (no in-app banner)
         const initSocketAndListen = async () => {
-            console.log('[NotifSocket] initSocketAndListen started');
             try {
                 const token = await apiService.getStoredToken();
-                console.log('[NotifSocket] token:', token ? 'found' : 'MISSING');
                 if (!token || !isMounted) return;
 
                 const alreadyConnected = socketService.isSocketConnected();
-                console.log('[NotifSocket] already connected:', alreadyConnected);
                 if (!alreadyConnected) {
-                    console.log('[NotifSocket] calling initialize...');
                     await socketService.initialize();
-                    console.log('[NotifSocket] initialize done, connected:', socketService.isSocketConnected());
                 }
                 if (!isMounted) return;
 
-                console.log('[NotifSocket] authenticating...');
                 await socketService.authenticateChat(token);
-                console.log('[NotifSocket] authenticated');
                 if (!isMounted) return;
 
                 await new Promise(resolve => setTimeout(resolve, 500));
                 if (!isMounted) return;
 
-                // Register listener before join so it's ready the moment the socket enters the room
-                socketService.onNewChatMessage(handleDispatcherMessage);
-                console.log('[NotifSocket] newChatMessage listener registered');
-
-                // Join the driver chat room — required for backend to route messages here
                 console.log('[NotifSocket] joining driver chat room for driverId:', driverId);
                 try {
                     await socketService.joinDriverChat(driverId);
                     console.log('[NotifSocket] joined driver chat room ✅');
                 } catch (joinErr: any) {
                     console.warn('[NotifSocket] join attempt 1 failed:', joinErr?.message);
-                    // First attempt failed — retry once after a short delay
                     await new Promise(resolve => setTimeout(resolve, 1500));
                     if (!isMounted) return;
                     try {
@@ -360,17 +319,14 @@ function MainTabNavigator({ onLogout, navigation }: MainTabNavigatorProps) {
                     }
                 }
 
-                // Re-run the full init sequence if the socket drops (e.g. nginx proxy timeout)
                 const rawSocket = socketService.getSocket();
                 if (rawSocket) {
                     rawSocket.once('disconnect', (reason: string) => {
-                        console.log('[NotifSocket] socket disconnected, reason:', reason, '— will reconnect in 3s');
                         if (!isMounted) return;
                         setTimeout(() => {
                             if (isMounted) initSocketAndListen();
                         }, 3000);
                     });
-                    console.log('[NotifSocket] disconnect→reconnect handler attached, socketId:', rawSocket.id);
                 }
             } catch (err: any) {
                 console.error('[NotifSocket] initSocketAndListen error:', err?.message);
@@ -381,52 +337,11 @@ function MainTabNavigator({ onLogout, navigation }: MainTabNavigatorProps) {
 
         return () => {
             isMounted = false;
-            socketService.offNewChatMessage(handleDispatcherMessage);
-            if (notifTimerRef.current) clearTimeout(notifTimerRef.current);
         };
     }, []);
 
-    const handleOpenChat = () => {
-        setDispatcherNotif(null);
-        navigation.navigate('DriverChat');
-    };
-
     return (
         <View style={{ flex: 1 }}>
-            {/* Dispatcher message notification banner */}
-            <Modal
-                visible={!!dispatcherNotif}
-                transparent
-                animationType="slide"
-                statusBarTranslucent
-                onRequestClose={() => setDispatcherNotif(null)}
-            >
-                <View style={styles.notifOverlay} pointerEvents="box-none">
-                    <View style={styles.notifBanner}>
-                        <View style={styles.notifLeft}>
-                            <View style={styles.notifIconCircle}>
-                                <Ionicons name="chatbubble-ellipses" size={18} color="#fff" />
-                            </View>
-                            <View style={styles.notifTextBlock}>
-                                <Text style={styles.notifSender} numberOfLines={1}>
-                                    {dispatcherNotif?.senderName}
-                                </Text>
-                                <Text style={styles.notifMessage} numberOfLines={2}>
-                                    {dispatcherNotif?.message}
-                                </Text>
-                            </View>
-                        </View>
-                        <View style={styles.notifActions}>
-                            <TouchableOpacity onPress={handleOpenChat} style={styles.notifOpenBtn}>
-                                <Text style={styles.notifOpenText}>Open</Text>
-                            </TouchableOpacity>
-                            <TouchableOpacity onPress={() => setDispatcherNotif(null)} style={styles.notifDismissBtn}>
-                                <Ionicons name="close" size={18} color="#6B7280" />
-                            </TouchableOpacity>
-                        </View>
-                    </View>
-                </View>
-            </Modal>
             <Header />
             <View style={{ flex: 1 }}>
                 <MainTab.Navigator
@@ -888,75 +803,5 @@ const styles = StyleSheet.create({
         marginTop: 8,
         textAlign: 'center',
         lineHeight: 22,
-    },
-    notifOverlay: {
-        flex: 1,
-        justifyContent: 'flex-start',
-        alignItems: 'stretch',
-        paddingTop: 48,
-        paddingHorizontal: 12,
-    },
-    notifBanner: {
-        backgroundColor: '#fff',
-        borderRadius: 12,
-        padding: 14,
-        flexDirection: 'row',
-        alignItems: 'center',
-        justifyContent: 'space-between',
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 4 },
-        shadowOpacity: 0.15,
-        shadowRadius: 8,
-        elevation: 8,
-        borderLeftWidth: 4,
-        borderLeftColor: '#8B5CF6',
-    },
-    notifLeft: {
-        flex: 1,
-        flexDirection: 'row',
-        alignItems: 'center',
-        marginRight: 8,
-    },
-    notifIconCircle: {
-        width: 36,
-        height: 36,
-        borderRadius: 18,
-        backgroundColor: '#8B5CF6',
-        justifyContent: 'center',
-        alignItems: 'center',
-        marginRight: 10,
-    },
-    notifTextBlock: {
-        flex: 1,
-    },
-    notifSender: {
-        fontSize: 13,
-        fontWeight: '700',
-        color: '#1F2937',
-        marginBottom: 2,
-    },
-    notifMessage: {
-        fontSize: 13,
-        color: '#6B7280',
-        lineHeight: 18,
-    },
-    notifActions: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        gap: 6,
-    },
-    notifOpenBtn: {
-        backgroundColor: '#8B5CF6',
-        paddingHorizontal: 12,
-        paddingVertical: 6,
-        borderRadius: 8,
-    },
-    notifOpenText: {
-        color: '#fff',
-        fontSize: 13,
-        fontWeight: '600',
-    },
-    notifDismissBtn: {
-        padding: 4,
     },
 });

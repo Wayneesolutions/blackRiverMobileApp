@@ -647,8 +647,16 @@ class ApiService {
     }
 
     // Driver Trips endpoints
+    async getAssignmentRequests(): Promise<ApiResponse<{ count: number; data: any[] }>> {
+        return this.request('/driver/trips/assignment-requests', { method: 'GET' }, true);
+    }
+
     async getPendingTrips(): Promise<ApiResponse<{ count: number; data: any[] }>> {
         return this.request('/driver/trips?status=planned', { method: 'GET' }, true);
+    }
+
+    async getCompanyDispatchers(): Promise<ApiResponse<{ data: Array<{ _id: string; name: string; phone?: string; email?: string }> }>> {
+        return this.request('/driver/dispatchers', { method: 'GET' }, true);
     }
 
     async getActiveTrips(): Promise<ApiResponse<{ count: number; data: any[] }>> {
@@ -689,6 +697,32 @@ class ApiService {
     async completeTrip(tripId: string): Promise<ApiResponse> {
         return this.request(`/driver/trips/${tripId}/complete`, {
             method: 'POST'
+        }, true);
+    }
+
+    async acceptTrip(tripId: string): Promise<ApiResponse> {
+        return this.request(`/driver/trips/${tripId}/accept`, {
+            method: 'POST'
+        }, true);
+    }
+
+    async rejectTrip(tripId: string, reason?: string): Promise<ApiResponse> {
+        return this.request(`/driver/trips/${tripId}/reject`, {
+            method: 'POST',
+            body: JSON.stringify({ reason: reason || '' })
+        }, true);
+    }
+
+    async acceptOrder(orderId: string): Promise<ApiResponse> {
+        return this.request(`/driver/orders/${orderId}/accept`, {
+            method: 'POST'
+        }, true);
+    }
+
+    async rejectOrder(orderId: string, reason?: string): Promise<ApiResponse> {
+        return this.request(`/driver/orders/${orderId}/reject`, {
+            method: 'POST',
+            body: JSON.stringify({ reason: reason || '' })
         }, true);
     }
 
@@ -806,6 +840,13 @@ class ApiService {
 
     async getNotifications(): Promise<ApiResponse> {
         return this.request('/driver/notifications', { method: 'GET' }, true);
+    }
+
+    async registerPushToken(expoPushToken: string): Promise<ApiResponse> {
+        return this.request('/driver/push-token', {
+            method: 'POST',
+            body: JSON.stringify({ expoPushToken, platform: 'expo' })
+        }, true);
     }
 
     async changePassword(currentPassword: string, newPassword: string): Promise<ApiResponse> {
