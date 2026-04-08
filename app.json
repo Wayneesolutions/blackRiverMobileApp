@@ -18,13 +18,18 @@
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.logistiqinnovations.app",
-      "buildNumber": "10",
+      "buildNumber": "11",
       "infoPlist": {
         "NSLocationWhenInUseUsageDescription": "This app needs access to your location to show your current position on the map.",
+        "NSLocationAlwaysAndWhenInUseUsageDescription": "This app needs access to your location for live tracking of your trips.",
         "NSLocationAlwaysUsageDescription": "This app needs access to your location for live tracking of your trips.",
         "NSPhotoLibraryUsageDescription": "This app needs access to your photos to upload document images.",
         "NSCameraUsageDescription": "This app needs access to your camera to take photos of documents.",
-        "ITSAppUsesNonExemptEncryption": false
+        "ITSAppUsesNonExemptEncryption": false,
+        "UIBackgroundModes": ["location", "remote-notification", "fetch"]
+      },
+      "entitlements": {
+        "aps-environment": "production"
       },
       "splash": {
         "image": "./assets/splash.png",
