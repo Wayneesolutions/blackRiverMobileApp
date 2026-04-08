@@ -18,7 +18,7 @@
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.logistiqinnovations.app",
-      "buildNumber": "11",
+      "buildNumber": "12",
       "infoPlist": {
         "NSLocationWhenInUseUsageDescription": "This app needs access to your location to show your current position on the map.",
         "NSLocationAlwaysAndWhenInUseUsageDescription": "This app needs access to your location for live tracking of your trips.",
