@@ -6,7 +6,7 @@ import {
   StyleSheet,
   Modal,
   Alert,
-  Dimensions,
+  useWindowDimensions,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { SafeAreaView } from "react-native-safe-area-context";
@@ -17,8 +17,6 @@ import { AuthService } from "../../navigation/AppNavigator";
 import { COLORS, SPACING, RADIUS, FONT_SIZE, FONT_WEIGHT } from "../../theme";
 
 type NavigationProp = NativeStackNavigationProp<RootStackParamList>;
-
-const { width } = Dimensions.get("window");
 
 interface FooterProps {
   onLogout?: () => void;
@@ -37,8 +35,17 @@ const TABS = [
 export default function Footer({ onLogout }: FooterProps) {
   const navigation = useNavigation<NavigationProp>();
   const route = useRoute();
+  const { width } = useWindowDimensions();
+  const isTablet = width >= 600;
   const [showMoreMenu, setShowMoreMenu] = useState(false);
   const [showLogoutModal, setShowLogoutModal] = useState(false);
+
+  // Responsive scaling
+  const iconSize  = isTablet ? 27 : 22;
+  const btnSize   = isTablet ? 66 : 56;
+  const ringSize  = btnSize + 10;
+  const barHeight = isTablet ? 78 : 66;
+  const btnBottom = isTablet ? 24 : 22;
 
   // Derive active tab from current route name
   const currentRoute = route.name;
@@ -91,18 +98,18 @@ export default function Footer({ onLogout }: FooterProps) {
       {/* Top glow line */}
       <View style={styles.glowLine} />
 
-      <View style={styles.footer}>
+      <View style={[styles.footer, { height: barHeight }]}>
         {/* Trips */}
         <TouchableOpacity style={styles.tab} onPress={handleTripsNavigation} activeOpacity={0.7}>
-          <Ionicons name="timer-outline" size={22} color={tabColor("Trips")} />
-          <Text style={[styles.tabText, isActive("Trips") && styles.tabTextActive]}>Trips</Text>
+          <Ionicons name="timer-outline" size={iconSize} color={tabColor("Trips")} />
+          <Text style={[styles.tabText, isActive("Trips") && styles.tabTextActive, isTablet && styles.tabTextTablet]}>Trips</Text>
           {isActive("Trips") && <View style={styles.activeDot} />}
         </TouchableOpacity>
 
         {/* Search */}
         <TouchableOpacity style={styles.tab} onPress={handleSearchNavigation} activeOpacity={0.7}>
-          <Ionicons name="search-outline" size={22} color={tabColor("Search")} />
-          <Text style={[styles.tabText, isActive("Search") && styles.tabTextActive]}>Search</Text>
+          <Ionicons name="search-outline" size={iconSize} color={tabColor("Search")} />
+          <Text style={[styles.tabText, isActive("Search") && styles.tabTextActive, isTablet && styles.tabTextTablet]}>Search</Text>
           {isActive("Search") && <View style={styles.activeDot} />}
         </TouchableOpacity>
 
@@ -111,8 +118,8 @@ export default function Footer({ onLogout }: FooterProps) {
 
         {/* Notifications */}
         <TouchableOpacity style={styles.tab} onPress={handleNotificationsNavigation} activeOpacity={0.7}>
-          <Ionicons name="notifications-outline" size={22} color={tabColor("Notifications")} />
-          <Text style={[styles.tabText, isActive("Notifications") && styles.tabTextActive]}>
+          <Ionicons name="notifications-outline" size={iconSize} color={tabColor("Notifications")} />
+          <Text style={[styles.tabText, isActive("Notifications") && styles.tabTextActive, isTablet && styles.tabTextTablet]}>
             Notifications
           </Text>
           {isActive("Notifications") && <View style={styles.activeDot} />}
@@ -120,19 +127,28 @@ export default function Footer({ onLogout }: FooterProps) {
 
         {/* More */}
         <TouchableOpacity style={styles.tab} onPress={handleMorePress} activeOpacity={0.7}>
-          <Ionicons name="ellipsis-horizontal" size={22} color={COLORS.textSecondary} />
-          <Text style={styles.tabText}>More</Text>
+          <Ionicons name="ellipsis-horizontal" size={iconSize} color={COLORS.textSecondary} />
+          <Text style={[styles.tabText, isTablet && styles.tabTextTablet]}>More</Text>
         </TouchableOpacity>
 
         {/* Floating center Home button */}
         <TouchableOpacity
-          style={styles.centerButton}
+          style={[
+            styles.centerButton,
+            {
+              width: btnSize,
+              height: btnSize,
+              borderRadius: btnSize / 2,
+              left: width / 2 - btnSize / 2,
+              bottom: btnBottom,
+            },
+          ]}
           onPress={handleDashboardNavigation}
           activeOpacity={0.8}
         >
           {/* Outer glow ring */}
-          <View style={styles.centerButtonRing} />
-          <Ionicons name="home" size={26} color={COLORS.black} />
+          <View style={[styles.centerButtonRing, { width: ringSize, height: ringSize, borderRadius: ringSize / 2 }]} />
+          <Ionicons name="home" size={isTablet ? 30 : 26} color={COLORS.black} />
         </TouchableOpacity>
       </View>
 
@@ -152,22 +168,22 @@ export default function Footer({ onLogout }: FooterProps) {
             {/* Glow accent top */}
             <View style={styles.moreMenuGlow} />
 
-            <TouchableOpacity style={styles.menuItem} onPress={handleHelpPress} activeOpacity={0.7}>
-              <View style={[styles.menuIconBox, { backgroundColor: "rgba(0,209,255,0.1)" }]}>
-                <Ionicons name="help-circle-outline" size={18} color={COLORS.accentBlue} />
+            <TouchableOpacity style={[styles.menuItem, isTablet && styles.menuItemTablet]} onPress={handleHelpPress} activeOpacity={0.7}>
+              <View style={[styles.menuIconBox, isTablet && styles.menuIconBoxTablet, { backgroundColor: "rgba(0,209,255,0.1)" }]}>
+                <Ionicons name="help-circle-outline" size={isTablet ? 22 : 18} color={COLORS.accentBlue} />
               </View>
-              <Text style={styles.menuItemText}>Help & Support</Text>
-              <Ionicons name="chevron-forward" size={14} color={COLORS.textSecondary} />
+              <Text style={[styles.menuItemText, isTablet && styles.menuItemTextTablet]}>Help & Support</Text>
+              <Ionicons name="chevron-forward" size={isTablet ? 17 : 14} color={COLORS.textSecondary} />
             </TouchableOpacity>
 
             <View style={styles.menuDivider} />
 
-            <TouchableOpacity style={styles.menuItem} onPress={handleLogoutPress} activeOpacity={0.7}>
-              <View style={[styles.menuIconBox, { backgroundColor: "rgba(244,63,94,0.1)" }]}>
-                <Ionicons name="log-out-outline" size={18} color={COLORS.accentRed} />
+            <TouchableOpacity style={[styles.menuItem, isTablet && styles.menuItemTablet]} onPress={handleLogoutPress} activeOpacity={0.7}>
+              <View style={[styles.menuIconBox, isTablet && styles.menuIconBoxTablet, { backgroundColor: "rgba(244,63,94,0.1)" }]}>
+                <Ionicons name="log-out-outline" size={isTablet ? 22 : 18} color={COLORS.accentRed} />
               </View>
-              <Text style={[styles.menuItemText, { color: COLORS.accentRed }]}>Logout</Text>
-              <Ionicons name="chevron-forward" size={14} color={COLORS.accentRed} />
+              <Text style={[styles.menuItemText, isTablet && styles.menuItemTextTablet, { color: COLORS.accentRed }]}>Logout</Text>
+              <Ionicons name="chevron-forward" size={isTablet ? 17 : 14} color={COLORS.accentRed} />
             </TouchableOpacity>
           </View>
         </TouchableOpacity>
@@ -186,32 +202,32 @@ export default function Footer({ onLogout }: FooterProps) {
             <View style={styles.logoutModalGlow} />
 
             <View style={styles.modalHeader}>
-              <View style={styles.warningIconBox}>
-                <Ionicons name="warning-outline" size={28} color={COLORS.accentOrange} />
+              <View style={[styles.warningIconBox, isTablet && styles.warningIconBoxTablet]}>
+                <Ionicons name="warning-outline" size={isTablet ? 36 : 28} color={COLORS.accentOrange} />
               </View>
-              <Text style={styles.modalTitle}>Confirm Logout</Text>
+              <Text style={[styles.modalTitle, isTablet && styles.modalTitleTablet]}>Confirm Logout</Text>
             </View>
 
-            <Text style={styles.modalMessage}>
+            <Text style={[styles.modalMessage, isTablet && styles.modalMessageTablet]}>
               Are you sure you want to log out?{"\n"}You'll need to sign in again to access your account.
             </Text>
 
-            <View style={styles.modalButtons}>
+            <View style={[styles.modalButtons, isTablet && styles.modalButtonsTablet]}>
               <TouchableOpacity
-                style={styles.cancelButton}
+                style={[styles.cancelButton, isTablet && styles.modalBtnTablet]}
                 onPress={cancelLogout}
                 activeOpacity={0.8}
               >
-                <Text style={styles.cancelButtonText}>Cancel</Text>
+                <Text style={[styles.cancelButtonText, isTablet && styles.btnTextTablet]}>Cancel</Text>
               </TouchableOpacity>
 
               <TouchableOpacity
-                style={styles.logoutButton}
+                style={[styles.logoutButton, isTablet && styles.modalBtnTablet]}
                 onPress={confirmLogout}
                 activeOpacity={0.8}
               >
-                <Ionicons name="log-out-outline" size={16} color={COLORS.white} style={{ marginRight: 6 }} />
-                <Text style={styles.logoutButtonText}>Logout</Text>
+                <Ionicons name="log-out-outline" size={isTablet ? 20 : 16} color={COLORS.white} style={{ marginRight: 6 }} />
+                <Text style={[styles.logoutButtonText, isTablet && styles.btnTextTablet]}>Logout</Text>
               </TouchableOpacity>
             </View>
           </View>
@@ -257,6 +273,10 @@ const styles = StyleSheet.create({
     marginTop: 3,
     fontWeight: FONT_WEIGHT.medium,
   },
+  tabTextTablet: {
+    fontSize: FONT_SIZE.sm,
+    marginTop: 5,
+  },
   tabTextActive: {
     color: COLORS.accentBlue,
   },
@@ -275,12 +295,7 @@ const styles = StyleSheet.create({
   // ── Floating center button ─────────────────────────────────────────────────
   centerButton: {
     position: "absolute",
-    bottom: 22,
-    left: width / 2 - 28,
     backgroundColor: COLORS.accentBlue,
-    width: 56,
-    height: 56,
-    borderRadius: RADIUS.full,
     alignItems: "center",
     justifyContent: "center",
     shadowColor: COLORS.accentBlue,
@@ -291,9 +306,6 @@ const styles = StyleSheet.create({
   },
   centerButtonRing: {
     position: "absolute",
-    width: 64,
-    height: 64,
-    borderRadius: RADIUS.full,
     borderWidth: 1.5,
     borderColor: "rgba(0,209,255,0.30)",
   },
@@ -334,6 +346,11 @@ const styles = StyleSheet.create({
     paddingVertical: SPACING.md,
     gap: SPACING.md,
   },
+  menuItemTablet: {
+    paddingHorizontal: SPACING.lg,
+    paddingVertical: SPACING.base,
+    gap: SPACING.base,
+  },
   menuIconBox: {
     width: 32,
     height: 32,
@@ -341,11 +358,19 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
+  menuIconBoxTablet: {
+    width: 42,
+    height: 42,
+    borderRadius: RADIUS.lg,
+  },
   menuItemText: {
     flex: 1,
     fontSize: FONT_SIZE.base,
     color: COLORS.textPrimary,
     fontWeight: FONT_WEIGHT.medium,
+  },
+  menuItemTextTablet: {
+    fontSize: FONT_SIZE.md,
   },
   menuDivider: {
     height: 1,
@@ -389,11 +414,18 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: "rgba(245,158,11,0.25)",
   },
+  warningIconBoxTablet: {
+    width: 72,
+    height: 72,
+  },
   modalTitle: {
     fontSize: FONT_SIZE.xl,
     fontWeight: FONT_WEIGHT.bold,
     color: COLORS.textPrimary,
     textAlign: "center",
+  },
+  modalTitleTablet: {
+    fontSize: FONT_SIZE["2xl"],
   },
   modalMessage: {
     fontSize: FONT_SIZE.base,
@@ -403,11 +435,20 @@ const styles = StyleSheet.create({
     paddingHorizontal: SPACING.xl,
     paddingBottom: SPACING.xl,
   },
+  modalMessageTablet: {
+    fontSize: FONT_SIZE.md,
+    lineHeight: 26,
+  },
   modalButtons: {
     flexDirection: "row",
     paddingHorizontal: SPACING.base,
     paddingBottom: SPACING.xl,
     gap: SPACING.md,
+  },
+  modalButtonsTablet: {
+    paddingHorizontal: SPACING.xl,
+    paddingBottom: SPACING["2xl"],
+    gap: SPACING.base,
   },
   cancelButton: {
     flex: 1,
@@ -442,5 +483,12 @@ const styles = StyleSheet.create({
     fontSize: FONT_SIZE.base,
     fontWeight: FONT_WEIGHT.semibold,
     color: COLORS.white,
+  },
+  modalBtnTablet: {
+    paddingVertical: SPACING.base,
+    borderRadius: RADIUS.lg,
+  },
+  btnTextTablet: {
+    fontSize: FONT_SIZE.md,
   },
 });

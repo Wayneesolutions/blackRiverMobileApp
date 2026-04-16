@@ -249,7 +249,7 @@ export default function LoginScreen({ navigation, onAuthSuccess }: Props) {
                 <View
                   style={[
                     styles.inputWrap,
-                    { borderColor: inputBorder(emailFocused, errors.email) },
+                    { borderColor: inputBorder(emailFocused, errors.email), height: isTablet ? 60 : INPUT_HEIGHT },
                     emailFocused && styles.inputWrapFocused,
                     !!errors.email && styles.inputWrapError,
                   ]}
@@ -295,7 +295,7 @@ export default function LoginScreen({ navigation, onAuthSuccess }: Props) {
                 <View
                   style={[
                     styles.inputWrap,
-                    { borderColor: inputBorder(passFocused, errors.password) },
+                    { borderColor: inputBorder(passFocused, errors.password), height: isTablet ? 60 : INPUT_HEIGHT },
                     passFocused && styles.inputWrapFocused,
                     !!errors.password && styles.inputWrapError,
                   ]}
@@ -350,6 +350,7 @@ export default function LoginScreen({ navigation, onAuthSuccess }: Props) {
               <TouchableOpacity
                 style={[
                   styles.signInBtn,
+                  { height: isTablet ? 60 : INPUT_HEIGHT },
                   isLoading && styles.signInBtnDisabled,
                 ]}
                 onPress={handleLogin}
@@ -367,11 +368,11 @@ export default function LoginScreen({ navigation, onAuthSuccess }: Props) {
                   <View style={styles.btnContent}>
                     <Ionicons
                       name="log-in-outline"
-                      size={19}
+                      size={isTablet ? 24 : 19}
                       color={COLORS.white}
                       style={{ marginRight: 6 }}
                     />
-                    <Text style={styles.signInText}>Sign In</Text>
+                    <Text style={[styles.signInText, isTablet && styles.signInTextTablet]}>Sign In</Text>
                   </View>
                 )}
               </TouchableOpacity>
@@ -663,6 +664,9 @@ const styles = StyleSheet.create({
     fontWeight: FONT_WEIGHT.bold,
     color: COLORS.white,
     letterSpacing: 0.4,
+  },
+  signInTextTablet: {
+    fontSize: FONT_SIZE.lg,
   },
 
   // ── Footer note ───────────────────────────────────────────────────────────────

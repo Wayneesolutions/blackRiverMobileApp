@@ -5,15 +5,16 @@ import {
   StyleSheet,
   ScrollView,
   TouchableOpacity,
-  SafeAreaView,
   ActivityIndicator,
   RefreshControl,
   Alert,
   Linking,
 } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from '@expo/vector-icons';
 import { apiService } from '../../services/api/apiService';
 import { logger } from '../../utils/loggerHelper';
+import { COLORS, SPACING, RADIUS, FONT_SIZE, FONT_WEIGHT } from '../../theme';
 
 interface Trip {
   _id: string;
@@ -243,7 +244,7 @@ const CompleteTrips = () => {
     return (
       <SafeAreaView style={styles.container}>
         <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color="#2563eb" />
+          <ActivityIndicator size="large" color={COLORS.accentBlue} />
           <Text style={styles.loadingText}>Loading completed trips...</Text>
         </View>
       </SafeAreaView>
@@ -251,11 +252,31 @@ const CompleteTrips = () => {
   }
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={styles.container} edges={["bottom"]}>
+      {/* ── Compact Header ─────────────────────────────────────────────────── */}
+      <View style={styles.header}>
+        <View style={styles.headerGlowLine} />
+        <View style={styles.headerContent}>
+          <View>
+            <Text style={styles.headerTitle}>Completed Trips</Text>
+            <Text style={styles.headerSubtitle}>Your trip history</Text>
+          </View>
+          <View style={styles.countBadge}>
+            <Ionicons name="checkmark-circle" size={14} color={COLORS.accentGreen} />
+            <Text style={styles.countBadgeText}>{trips.length}</Text>
+          </View>
+        </View>
+      </View>
+
         <ScrollView
           style={styles.scrollView}
           refreshControl={
-          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={onRefresh}
+            colors={[COLORS.accentBlue]}
+            tintColor={COLORS.accentBlue}
+          />
         }
       >
         {trips.length === 0 ? (
@@ -630,248 +651,344 @@ const CompleteTrips = () => {
 };
 
 const styles = StyleSheet.create({
+
+  // ── Layout ──────────────────────────────────────────────────────────────────
   container: {
     flex: 1,
-    backgroundColor: '#f5f5f5',
+    backgroundColor: COLORS.bgMain,
   },
   scrollView: {
     flex: 1,
   },
+
+  // ── Compact Header ───────────────────────────────────────────────────────────
+  header: {
+    backgroundColor: COLORS.bgCard,
+    overflow: 'hidden',
+    borderBottomWidth: 1,
+    borderBottomColor: COLORS.borderSubtle,
+  },
+  headerGlowLine: {
+    height: 2,
+    backgroundColor: COLORS.accentGreen,
+    opacity: 0.6,
+  },
+  headerContent: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: SPACING.base,
+    paddingVertical: SPACING.md,
+  },
+  headerTitle: {
+    fontSize: FONT_SIZE.lg,
+    fontWeight: FONT_WEIGHT.bold,
+    color: COLORS.textPrimary,
+  },
+  headerSubtitle: {
+    fontSize: FONT_SIZE.xs,
+    color: COLORS.textSecondary,
+    marginTop: 2,
+  },
+  countBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: SPACING.xs,
+    backgroundColor: 'rgba(0,255,163,0.10)',
+    paddingHorizontal: SPACING.md,
+    paddingVertical: SPACING.xs,
+    borderRadius: RADIUS.full,
+    borderWidth: 1,
+    borderColor: COLORS.accentGreen,
+  },
+  countBadgeText: {
+    fontSize: FONT_SIZE.sm,
+    fontWeight: FONT_WEIGHT.bold,
+    color: COLORS.accentGreen,
+  },
+
+  // ── Loading / Empty ──────────────────────────────────────────────────────────
   loadingContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
   },
   loadingText: {
-    marginTop: 10,
-    color: '#666',
+    marginTop: SPACING.md,
+    fontSize: FONT_SIZE.base,
+    color: COLORS.textSecondary,
   },
   emptyContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    padding: 40,
-    marginTop: 100,
+    padding: SPACING['3xl'],
+    marginTop: 80,
   },
   emptyText: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: '#333',
-    marginBottom: 8,
+    fontSize: FONT_SIZE.lg,
+    fontWeight: FONT_WEIGHT.semibold,
+    color: COLORS.textPrimary,
+    marginBottom: SPACING.sm,
   },
   emptySubtext: {
-    fontSize: 14,
-    color: '#666',
+    fontSize: FONT_SIZE.base,
+    color: COLORS.textSecondary,
     textAlign: 'center',
   },
+
+  // ── Trip Card ────────────────────────────────────────────────────────────────
   tripCard: {
-    backgroundColor: '#fff',
-    margin: 12,
-    padding: 16,
-    borderRadius: 12,
+    backgroundColor: COLORS.bgCard,
+    margin: SPACING.md,
+    borderRadius: RADIUS.lg,
+    borderWidth: 1,
+    borderColor: COLORS.borderSubtle,
+    overflow: 'hidden',
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
+    shadowOpacity: 0.15,
+    shadowRadius: 6,
+    elevation: 4,
   },
   tripHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'flex-start',
-    marginBottom: 12,
+    padding: SPACING.base,
+    borderBottomWidth: 1,
+    borderBottomColor: COLORS.borderSubtle,
   },
   tripNumber: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: '#2563eb',
-    marginBottom: 4,
+    fontSize: FONT_SIZE.md,
+    fontWeight: FONT_WEIGHT.bold,
+    color: COLORS.accentBlue,
+    marginBottom: 3,
   },
   tripDate: {
-    fontSize: 12,
-    color: '#666',
+    fontSize: FONT_SIZE.xs,
+    color: COLORS.textSecondary,
   },
   statusBadge: {
-    backgroundColor: '#2ecc71',
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: 'rgba(0,255,163,0.12)',
+    paddingHorizontal: SPACING.md,
+    paddingVertical: 5,
+    borderRadius: RADIUS.full,
+    borderWidth: 1,
+    borderColor: COLORS.accentGreen,
   },
   statusText: {
-    color: '#fff',
-    fontSize: 12,
-    fontWeight: '600',
+    color: COLORS.accentGreen,
+    fontSize: FONT_SIZE.xs,
+    fontWeight: FONT_WEIGHT.semibold,
   },
+
+  // ── Info rows ────────────────────────────────────────────────────────────────
   infoRow: {
     flexDirection: 'row',
-    marginBottom: 8,
+    marginBottom: SPACING.sm,
+    paddingHorizontal: SPACING.base,
   },
   infoLabel: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#333',
+    fontSize: FONT_SIZE.sm,
+    fontWeight: FONT_WEIGHT.semibold,
+    color: COLORS.textSecondary,
     width: 80,
   },
   infoValue: {
-    fontSize: 14,
-    color: '#666',
+    fontSize: FONT_SIZE.sm,
+    color: COLORS.textPrimary,
     flex: 1,
   },
+
+  // ── Orders section ───────────────────────────────────────────────────────────
   ordersSection: {
-    marginTop: 12,
-    paddingTop: 12,
+    marginTop: SPACING.sm,
+    paddingTop: SPACING.md,
+    paddingHorizontal: SPACING.base,
     borderTopWidth: 1,
-    borderTopColor: '#e5e5e5',
+    borderTopColor: COLORS.borderSubtle,
   },
   ordersTitle: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#333',
-    marginBottom: 8,
+    fontSize: FONT_SIZE.base,
+    fontWeight: FONT_WEIGHT.semibold,
+    color: COLORS.textPrimary,
+    marginBottom: SPACING.md,
   },
   orderItem: {
-    backgroundColor: '#f9f9f9',
-    padding: 12,
-    borderRadius: 8,
-    marginBottom: 8,
+    backgroundColor: COLORS.bgCardLight,
+    padding: SPACING.md,
+    borderRadius: RADIUS.md,
+    marginBottom: SPACING.sm,
+    borderWidth: 1,
+    borderColor: COLORS.borderSubtle,
   },
   orderNumber: {
-    fontSize: 15,
-    fontWeight: '600',
-    color: '#2563eb',
-    marginBottom: 4,
+    fontSize: FONT_SIZE.base,
+    fontWeight: FONT_WEIGHT.semibold,
+    color: COLORS.accentBlue,
+    marginBottom: SPACING.xs,
   },
   customerOrderNo: {
-    fontSize: 12,
-    color: '#666',
-    marginBottom: 4,
+    fontSize: FONT_SIZE.xs,
+    color: COLORS.textSecondary,
+    marginBottom: SPACING.xs,
   },
   customerName: {
-    fontSize: 12,
-    color: '#666',
-    marginBottom: 4,
+    fontSize: FONT_SIZE.xs,
+    color: COLORS.textSecondary,
+    marginBottom: SPACING.xs,
   },
   locationRow: {
     flexDirection: 'row',
-    marginBottom: 4,
+    marginBottom: SPACING.xs,
   },
   locationLabel: {
-    fontSize: 12,
-    fontWeight: '600',
-    color: '#333',
+    fontSize: FONT_SIZE.xs,
+    fontWeight: FONT_WEIGHT.semibold,
+    color: COLORS.textSecondary,
+    width: 60,
   },
   locationValue: {
-    fontSize: 12,
-    color: '#666',
+    fontSize: FONT_SIZE.xs,
+    color: COLORS.textPrimary,
     flex: 1,
   },
+
+  // ── Notes ────────────────────────────────────────────────────────────────────
   notesSection: {
-    marginTop: 12,
-    paddingTop: 12,
+    marginTop: SPACING.sm,
+    paddingTop: SPACING.md,
+    paddingHorizontal: SPACING.base,
+    paddingBottom: SPACING.md,
     borderTopWidth: 1,
-    borderTopColor: '#e5e5e5',
+    borderTopColor: COLORS.borderSubtle,
   },
   notesLabel: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#333',
-    marginBottom: 4,
+    fontSize: FONT_SIZE.sm,
+    fontWeight: FONT_WEIGHT.semibold,
+    color: COLORS.textSecondary,
+    marginBottom: SPACING.xs,
   },
   notesText: {
-    fontSize: 14,
-    color: '#666',
+    fontSize: FONT_SIZE.sm,
+    color: COLORS.textPrimary,
+    lineHeight: 20,
   },
+
+  // ── Documents ────────────────────────────────────────────────────────────────
   documentsSection: {
-    marginTop: 12,
-    paddingTop: 12,
+    marginTop: SPACING.sm,
+    paddingTop: SPACING.md,
+    paddingHorizontal: SPACING.base,
+    paddingBottom: SPACING.base,
     borderTopWidth: 1,
-    borderTopColor: '#e5e5e5',
+    borderTopColor: COLORS.borderSubtle,
   },
   documentsTitle: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#333',
-    marginBottom: 8,
+    fontSize: FONT_SIZE.base,
+    fontWeight: FONT_WEIGHT.semibold,
+    color: COLORS.textPrimary,
+    marginBottom: SPACING.md,
   },
   documentItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#f9f9f9',
-    padding: 12,
-    borderRadius: 8,
-    marginBottom: 8,
-    gap: 12,
+    backgroundColor: COLORS.bgCardLight,
+    padding: SPACING.md,
+    borderRadius: RADIUS.md,
+    marginBottom: SPACING.sm,
+    borderWidth: 1,
+    borderColor: COLORS.borderSubtle,
+    gap: SPACING.md,
   },
   documentInfo: {
     flex: 1,
     minWidth: 0,
   },
   documentName: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#2563eb',
-    marginBottom: 4,
+    fontSize: FONT_SIZE.sm,
+    fontWeight: FONT_WEIGHT.semibold,
+    color: COLORS.accentBlue,
+    marginBottom: 3,
   },
   documentDescription: {
-    fontSize: 12,
-    color: '#666',
-    marginBottom: 4,
+    fontSize: FONT_SIZE.xs,
+    color: COLORS.textSecondary,
+    marginBottom: 3,
   },
   documentMeta: {
-    fontSize: 11,
-    color: '#999',
+    fontSize: FONT_SIZE.xs,
+    color: COLORS.textSecondary,
+    opacity: 0.7,
   },
+
+  // ── Section divider ──────────────────────────────────────────────────────────
   sectionDivider: {
-    marginTop: 12,
-    marginBottom: 8,
-    paddingTop: 12,
+    marginTop: SPACING.md,
+    marginBottom: SPACING.sm,
+    paddingTop: SPACING.md,
     borderTopWidth: 1,
-    borderTopColor: '#e0e0e0',
+    borderTopColor: COLORS.borderSubtle,
   },
   sectionTitle: {
-    fontSize: 14,
-    fontWeight: '700',
-    color: '#2563eb',
-    marginBottom: 8,
+    fontSize: FONT_SIZE.sm,
+    fontWeight: FONT_WEIGHT.bold,
+    color: COLORS.accentNavyBlue,
+    marginBottom: SPACING.sm,
+    letterSpacing: 0.3,
   },
+
+  // ── Appointment ──────────────────────────────────────────────────────────────
   appointmentSection: {
-    backgroundColor: '#f0f7ff',
-    padding: 10,
-    borderRadius: 6,
-    marginTop: 8,
-    marginBottom: 8,
+    backgroundColor: 'rgba(0,209,255,0.05)',
+    padding: SPACING.md,
+    borderRadius: RADIUS.md,
+    marginTop: SPACING.sm,
+    marginBottom: SPACING.sm,
+    borderWidth: 1,
+    borderColor: COLORS.borderSubtle,
   },
   appointmentTitle: {
-    fontSize: 13,
-    fontWeight: '600',
-    color: '#333',
-    marginBottom: 6,
+    fontSize: FONT_SIZE.xs,
+    fontWeight: FONT_WEIGHT.semibold,
+    color: COLORS.accentBlue,
+    marginBottom: SPACING.sm,
+    letterSpacing: 0.3,
+    textTransform: 'uppercase',
   },
+
+  // ── Stops ────────────────────────────────────────────────────────────────────
   stopsSection: {
-    marginTop: 12,
-    padding: 8,
-    backgroundColor: '#f9f9f9',
-    borderRadius: 6,
+    marginTop: SPACING.md,
+    padding: SPACING.md,
+    backgroundColor: COLORS.bgCardLight,
+    borderRadius: RADIUS.md,
+    borderWidth: 1,
+    borderColor: COLORS.borderSubtle,
   },
   stopsTitle: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#333',
-    marginBottom: 8,
+    fontSize: FONT_SIZE.sm,
+    fontWeight: FONT_WEIGHT.semibold,
+    color: COLORS.textSecondary,
+    marginBottom: SPACING.md,
   },
   stopItem: {
-    marginBottom: 12,
-    padding: 8,
-    backgroundColor: '#fff',
-    borderRadius: 6,
+    marginBottom: SPACING.md,
+    padding: SPACING.sm,
+    backgroundColor: COLORS.bgCard,
+    borderRadius: RADIUS.sm,
     borderLeftWidth: 3,
-    borderLeftColor: '#2563eb',
+    borderLeftColor: COLORS.accentBlue,
   },
   stopNumber: {
-    fontSize: 13,
-    fontWeight: '600',
-    color: '#2563eb',
-    marginBottom: 6,
+    fontSize: FONT_SIZE.xs,
+    fontWeight: FONT_WEIGHT.semibold,
+    color: COLORS.accentBlue,
+    marginBottom: SPACING.sm,
   },
 });
 
