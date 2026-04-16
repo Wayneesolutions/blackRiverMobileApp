@@ -21,6 +21,7 @@ import { RootStackParamList } from '../../navigation/AppNavigator';
 import { apiService } from '../../services/api/apiService';
 import { logger } from '../../utils/loggerHelper';
 import MapViewWithLiveTracking from '../../components/MapViewWithLiveTracking';
+import { COLORS, SPACING, RADIUS, FONT_SIZE, FONT_WEIGHT } from "../../theme";
 
 // Conditionally import DocumentPicker
 let DocumentPicker: any = null;
@@ -1107,7 +1108,7 @@ const ActiveTrips = () => {
     return (
       <SafeAreaView style={styles.container}>
         <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color="#2563eb" />
+          <ActivityIndicator size="large" color={COLORS.accentBlue} />
           <Text style={styles.loadingText}>Loading active trips...</Text>
         </View>
       </SafeAreaView>
@@ -1116,18 +1117,23 @@ const ActiveTrips = () => {
 
   return (
     <SafeAreaView style={styles.container}>
+      {/* ── Compact header ── */}
       <View style={styles.header}>
+        <View style={styles.headerGlowLine} />
         <View style={styles.headerContent}>
-          <Text style={styles.headerTitle}>My Trips</Text>
-          <Text style={styles.headerSubtitle}>Monitor your trips in real-time</Text>
+          <View>
+            <Text style={styles.headerTitle}>My Trips</Text>
+            <Text style={styles.headerSubtitle}>Monitor your trips in real-time</Text>
+          </View>
           <View style={styles.statsContainer}>
             <View style={styles.statItem}>
               <Text style={styles.statNumber}>{activeTrips.length}</Text>
               <Text style={styles.statLabel}>Active</Text>
             </View>
+            <View style={styles.statDivider} />
             <View style={styles.statItem}>
-              <Text style={styles.statNumber}>{pendingApprovalTrips.length}</Text>
-              <Text style={styles.statLabel}>Pending Approval</Text>
+              <Text style={[styles.statNumber, { color: COLORS.accentOrange }]}>{pendingApprovalTrips.length}</Text>
+              <Text style={styles.statLabel}>Pending</Text>
             </View>
           </View>
         </View>
@@ -1856,10 +1862,17 @@ const ActiveTrips = () => {
 };
 
 const styles = StyleSheet.create({
+
+  // ── Layout ──────────────────────────────────────────────────────────────────
   container: {
     flex: 1,
-    backgroundColor: '#f5f5f5',
+    backgroundColor: COLORS.bgMain,
   },
+  scrollView: {
+    flex: 1,
+  },
+
+  // ── Loading ─────────────────────────────────────────────────────────────────
   loadingContainer: {
     flex: 1,
     justifyContent: 'center',
@@ -1867,557 +1880,618 @@ const styles = StyleSheet.create({
   },
   loadingText: {
     marginTop: 10,
-    color: '#666',
+    color: COLORS.textSecondary,
+    fontSize: FONT_SIZE.sm,
   },
+
+  // ── Header (compact row) ────────────────────────────────────────────────────
   header: {
-    backgroundColor: '#fff',
-    padding: 16,
+    backgroundColor: COLORS.bgCard,
+    paddingHorizontal: SPACING.base,
+    paddingVertical: SPACING.sm + 2,
     borderBottomWidth: 1,
-    borderBottomColor: '#e5e5e5',
+    borderBottomColor: COLORS.borderSubtle,
+    overflow: 'hidden',
+  },
+  headerGlowLine: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    height: 2,
+    backgroundColor: COLORS.accentBlue,
+    opacity: 0.5,
   },
   headerContent: {
+    flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'space-between',
   },
   headerTitle: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    color: '#333',
-    marginBottom: 4,
+    fontSize: FONT_SIZE.lg,
+    fontWeight: FONT_WEIGHT.bold,
+    color: COLORS.textPrimary,
   },
   headerSubtitle: {
-    fontSize: 14,
-    color: '#666',
-    marginBottom: 12,
+    fontSize: FONT_SIZE.xs,
+    color: COLORS.textSecondary,
+    marginTop: 1,
   },
   statsContainer: {
     flexDirection: 'row',
-    gap: 16,
+    alignItems: 'center',
+    gap: SPACING.sm,
   },
   statItem: {
     alignItems: 'center',
+    minWidth: 44,
   },
   statNumber: {
-    fontSize: 20,
-    fontWeight: 'bold',
-    color: '#2563eb',
+    fontSize: FONT_SIZE.lg,
+    fontWeight: FONT_WEIGHT.bold,
+    color: COLORS.accentBlue,
   },
   statLabel: {
-    fontSize: 12,
-    color: '#666',
+    fontSize: 9,
+    color: COLORS.textSecondary,
+    textTransform: 'uppercase',
+    letterSpacing: 0.4,
   },
+  statDivider: {
+    width: 1,
+    height: 28,
+    backgroundColor: COLORS.borderSubtle,
+  },
+
+  // ── Empty state ─────────────────────────────────────────────────────────────
   emptyContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    padding: 40,
+    padding: SPACING['2xl'],
   },
   emptyIcon: {
-    fontSize: 64,
-    marginBottom: 16,
+    fontSize: 56,
+    marginBottom: SPACING.base,
   },
   emptyText: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: '#333',
-    marginBottom: 8,
+    fontSize: FONT_SIZE.md,
+    fontWeight: FONT_WEIGHT.semibold,
+    color: COLORS.textPrimary,
+    marginBottom: SPACING.sm,
   },
   emptySubtext: {
-    fontSize: 14,
-    color: '#666',
+    fontSize: FONT_SIZE.sm,
+    color: COLORS.textSecondary,
     textAlign: 'center',
   },
-  scrollView: {
+
+  // ── Section container / header ───────────────────────────────────────────────
+  sectionContainer: {
+    marginBottom: SPACING.base,
+  },
+  sectionHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: SPACING.base,
+    paddingVertical: SPACING.sm,
+    gap: SPACING.sm,
+  },
+  sectionTitle: {
+    fontSize: FONT_SIZE.sm,
+    fontWeight: FONT_WEIGHT.semibold,
+    color: COLORS.accentNavyBlue,
     flex: 1,
   },
+  sectionSubtitle: {
+    fontSize: FONT_SIZE.xs,
+    color: COLORS.textSecondary,
+  },
+
+  // ── Trip card ────────────────────────────────────────────────────────────────
   tripCard: {
-    backgroundColor: '#fff',
-    margin: 12,
-    padding: 16,
-    borderRadius: 12,
+    backgroundColor: COLORS.bgCard,
+    marginHorizontal: SPACING.md,
+    marginBottom: SPACING.md,
+    padding: SPACING.base,
+    borderRadius: RADIUS.lg,
+    borderWidth: 1,
+    borderColor: COLORS.borderSubtle,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
+    shadowOpacity: 0.15,
     shadowRadius: 4,
     elevation: 3,
+  },
+  pendingCard: {
+    borderLeftWidth: 3,
+    borderLeftColor: COLORS.accentOrange,
   },
   cardHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'flex-start',
-    marginBottom: 12,
+    marginBottom: SPACING.md,
   },
   headerInfo: {
     flex: 1,
   },
   tripNumber: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: '#2563eb',
-    marginBottom: 4,
+    fontSize: FONT_SIZE.md,
+    fontWeight: FONT_WEIGHT.bold,
+    color: COLORS.accentBlue,
+    marginBottom: 2,
   },
   tripDate: {
-    fontSize: 12,
-    color: '#666',
+    fontSize: FONT_SIZE.xs,
+    color: COLORS.textSecondary,
   },
   statusBadge: {
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingHorizontal: SPACING.sm + 2,
+    paddingVertical: 4,
+    borderRadius: RADIUS.full,
   },
   statusText: {
-    color: '#fff',
-    fontSize: 12,
-    fontWeight: '600',
+    color: COLORS.white,
+    fontSize: FONT_SIZE.xs,
+    fontWeight: FONT_WEIGHT.semibold,
   },
+
+  // ── Info rows ────────────────────────────────────────────────────────────────
   infoRow: {
     flexDirection: 'row',
-    marginBottom: 8,
+    marginBottom: SPACING.xs + 2,
   },
   infoLabel: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#333',
-    width: 80,
+    fontSize: FONT_SIZE.sm,
+    fontWeight: FONT_WEIGHT.semibold,
+    color: COLORS.textSecondary,
+    width: 76,
   },
   infoValue: {
-    fontSize: 14,
-    color: '#666',
+    fontSize: FONT_SIZE.sm,
+    color: COLORS.textPrimary,
     flex: 1,
-  },
-  ordersSection: {
-    marginTop: 12,
-    paddingTop: 12,
-    borderTopWidth: 1,
-    borderTopColor: '#e5e5e5',
-  },
-  ordersTitle: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#333',
-    marginBottom: 8,
-  },
-  orderItem: {
-    backgroundColor: '#f9f9f9',
-    padding: 12,
-    borderRadius: 8,
-    marginBottom: 8,
-  },
-  orderNumber: {
-    fontSize: 15,
-    fontWeight: '600',
-    color: '#2563eb',
-    marginBottom: 4,
-  },
-  customerOrderNo: {
-    fontSize: 12,
-    color: '#666',
-    marginBottom: 4,
-  },
-  customerName: {
-    fontSize: 12,
-    color: '#666',
-    marginBottom: 4,
   },
   locationRow: {
     flexDirection: 'row',
-    marginBottom: 4,
+    marginBottom: SPACING.xs,
   },
   locationLabel: {
-    fontSize: 12,
-    fontWeight: '600',
-    color: '#333',
+    fontSize: FONT_SIZE.xs,
+    fontWeight: FONT_WEIGHT.semibold,
+    color: COLORS.textSecondary,
   },
   locationValue: {
-    fontSize: 12,
-    color: '#666',
+    fontSize: FONT_SIZE.xs,
+    color: COLORS.textPrimary,
     flex: 1,
+  },
+
+  // ── Orders section ───────────────────────────────────────────────────────────
+  ordersSection: {
+    marginTop: SPACING.md,
+    paddingTop: SPACING.md,
+    borderTopWidth: 1,
+    borderTopColor: COLORS.borderSubtle,
+  },
+  ordersTitle: {
+    fontSize: FONT_SIZE.sm,
+    fontWeight: FONT_WEIGHT.semibold,
+    color: COLORS.textSecondary,
+    marginBottom: SPACING.sm,
+  },
+  orderItem: {
+    backgroundColor: COLORS.bgCardLight,
+    padding: SPACING.md,
+    borderRadius: RADIUS.md,
+    marginBottom: SPACING.sm,
+    borderWidth: 1,
+    borderColor: COLORS.borderSubtle,
+  },
+  orderNumber: {
+    fontSize: FONT_SIZE.base,
+    fontWeight: FONT_WEIGHT.semibold,
+    color: COLORS.accentBlue,
+    marginBottom: 4,
+  },
+  customerOrderNo: {
+    fontSize: FONT_SIZE.xs,
+    color: COLORS.textSecondary,
+    marginBottom: 2,
+  },
+  customerName: {
+    fontSize: FONT_SIZE.xs,
+    color: COLORS.textSecondary,
+    marginBottom: 4,
   },
   orderStatusRow: {
     flexDirection: 'row',
-    marginTop: 4,
+    marginTop: SPACING.xs,
   },
   orderStatusLabel: {
-    fontSize: 12,
-    fontWeight: '600',
-    color: '#333',
+    fontSize: FONT_SIZE.xs,
+    fontWeight: FONT_WEIGHT.semibold,
+    color: COLORS.textSecondary,
   },
   orderStatusValue: {
-    fontSize: 12,
-    fontWeight: '600',
+    fontSize: FONT_SIZE.xs,
+    fontWeight: FONT_WEIGHT.semibold,
   },
-  notesSection: {
-    marginTop: 12,
-    paddingTop: 12,
+
+  // ── Inner section divider (Shipper / Receiver) ───────────────────────────────
+  sectionDivider: {
+    marginTop: SPACING.md,
+    marginBottom: SPACING.sm,
+    paddingTop: SPACING.md,
     borderTopWidth: 1,
-    borderTopColor: '#e5e5e5',
+    borderTopColor: COLORS.borderSubtle,
+  },
+
+  // ── Appointment block ────────────────────────────────────────────────────────
+  appointmentSection: {
+    backgroundColor: 'rgba(0,209,255,0.05)',
+    padding: SPACING.sm + 2,
+    borderRadius: RADIUS.sm,
+    marginTop: SPACING.sm,
+    marginBottom: SPACING.sm,
+    borderWidth: 1,
+    borderColor: COLORS.borderSubtle,
+  },
+  appointmentTitle: {
+    fontSize: FONT_SIZE.xs,
+    fontWeight: FONT_WEIGHT.semibold,
+    color: COLORS.accentBlue,
+    marginBottom: SPACING.xs,
+  },
+
+  // ── Stops ────────────────────────────────────────────────────────────────────
+  stopsSection: {
+    marginTop: SPACING.md,
+    padding: SPACING.sm,
+    backgroundColor: 'rgba(255,255,255,0.03)',
+    borderRadius: RADIUS.sm,
+    borderWidth: 1,
+    borderColor: COLORS.borderSubtle,
+  },
+  stopsTitle: {
+    fontSize: FONT_SIZE.xs,
+    fontWeight: FONT_WEIGHT.semibold,
+    color: COLORS.textSecondary,
+    marginBottom: SPACING.sm,
+  },
+  stopItem: {
+    marginBottom: SPACING.md,
+    padding: SPACING.sm,
+    backgroundColor: COLORS.bgCard,
+    borderRadius: RADIUS.sm,
+    borderLeftWidth: 2,
+    borderLeftColor: COLORS.accentBlue,
+  },
+  stopNumber: {
+    fontSize: FONT_SIZE.xs,
+    fontWeight: FONT_WEIGHT.semibold,
+    color: COLORS.accentBlue,
+    marginBottom: SPACING.xs,
+  },
+
+  // ── Notes ────────────────────────────────────────────────────────────────────
+  notesSection: {
+    marginTop: SPACING.md,
+    paddingTop: SPACING.md,
+    borderTopWidth: 1,
+    borderTopColor: COLORS.borderSubtle,
   },
   notesLabel: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#333',
-    marginBottom: 4,
+    fontSize: FONT_SIZE.sm,
+    fontWeight: FONT_WEIGHT.semibold,
+    color: COLORS.textSecondary,
+    marginBottom: SPACING.xs,
   },
   notesText: {
-    fontSize: 14,
-    color: '#666',
+    fontSize: FONT_SIZE.sm,
+    color: COLORS.textPrimary,
   },
-  buttonContainer: {
-    flexDirection: 'row',
-    gap: 8,
-    marginTop: 12,
+
+  // ── Pending note ─────────────────────────────────────────────────────────────
+  pendingNote: {
+    fontSize: FONT_SIZE.xs,
+    color: COLORS.accentOrange,
+    marginTop: SPACING.sm,
+    paddingHorizontal: SPACING.sm,
+    paddingVertical: SPACING.xs + 2,
+    backgroundColor: 'rgba(245,158,11,0.10)',
+    borderRadius: RADIUS.sm,
+    borderWidth: 1,
+    borderColor: 'rgba(245,158,11,0.25)',
   },
-  chatButton: {
-    flex: 1,
-    backgroundColor: '#2563eb',
-    paddingVertical: 12,
-    paddingHorizontal: 6,
-    borderRadius: 8,
-    alignItems: 'center',
-    flexDirection: 'row',
-    justifyContent: 'center',
-    gap: 4,
-    shadowColor: '#2563eb',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.3,
-    shadowRadius: 4,
-    elevation: 3,
-    minHeight: 44,
-  },
-  chatButtonText: {
-    color: '#fff',
-    fontSize: 12,
-    fontWeight: '700',
-    textAlign: 'center',
-    flexShrink: 1,
-  },
-  mapButton: {
-    flex: 1,
-    backgroundColor: '#3498db',
-    paddingVertical: 12,
-    paddingHorizontal: 6,
-    borderRadius: 8,
-    alignItems: 'center',
-    justifyContent: 'center',
-    minHeight: 44,
-  },
-  mapButtonText: {
-    color: '#fff',
-    fontSize: 12,
-    fontWeight: '600',
-    textAlign: 'center',
-    flexShrink: 1,
-  },
-  completeButton: {
-    flex: 1,
-    backgroundColor: '#2ecc71',
-    paddingVertical: 12,
-    paddingHorizontal: 6,
-    borderRadius: 8,
-    alignItems: 'center',
-    justifyContent: 'center',
-    minHeight: 44,
-  },
-  completeButtonText: {
-    color: '#fff',
-    fontSize: 12,
-    fontWeight: '600',
-    textAlign: 'center',
-    flexShrink: 1,
-  },
+
+  // ── Documents ────────────────────────────────────────────────────────────────
   documentsSection: {
-    marginTop: 12,
-    paddingTop: 12,
+    marginTop: SPACING.md,
+    paddingTop: SPACING.md,
     borderTopWidth: 1,
-    borderTopColor: '#e5e5e5',
+    borderTopColor: COLORS.borderSubtle,
   },
   documentsTitle: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#333',
-    marginBottom: 8,
+    fontSize: FONT_SIZE.sm,
+    fontWeight: FONT_WEIGHT.semibold,
+    color: COLORS.textSecondary,
+    marginBottom: SPACING.sm,
   },
   documentItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#f9f9f9',
-    padding: 12,
-    borderRadius: 8,
-    marginBottom: 8,
-    gap: 12,
+    backgroundColor: COLORS.bgCardLight,
+    padding: SPACING.md,
+    borderRadius: RADIUS.md,
+    marginBottom: SPACING.sm,
+    gap: SPACING.md,
+    borderWidth: 1,
+    borderColor: COLORS.borderSubtle,
   },
   documentInfo: {
     flex: 1,
     minWidth: 0,
   },
   documentName: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#2563eb',
-    marginBottom: 4,
+    fontSize: FONT_SIZE.sm,
+    fontWeight: FONT_WEIGHT.semibold,
+    color: COLORS.accentBlue,
+    marginBottom: 2,
   },
   documentDescription: {
-    fontSize: 12,
-    color: '#666',
-    marginBottom: 4,
+    fontSize: FONT_SIZE.xs,
+    color: COLORS.textSecondary,
+    marginBottom: 2,
   },
   documentMeta: {
-    fontSize: 11,
-    color: '#999',
+    fontSize: 10,
+    color: COLORS.textSecondary,
   },
-  // Completion Modal Styles
+
+  // ── Action buttons ────────────────────────────────────────────────────────────
+  buttonContainer: {
+    flexDirection: 'row',
+    gap: SPACING.sm,
+    marginTop: SPACING.md,
+  },
+  chatButton: {
+    flex: 1,
+    backgroundColor: COLORS.accentBlue,
+    paddingVertical: SPACING.sm + 2,
+    paddingHorizontal: SPACING.sm,
+    borderRadius: RADIUS.md,
+    alignItems: 'center',
+    flexDirection: 'row',
+    justifyContent: 'center',
+    gap: 4,
+    shadowColor: COLORS.accentBlue,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.3,
+    shadowRadius: 4,
+    elevation: 3,
+    minHeight: 40,
+  },
+  chatButtonText: {
+    color: COLORS.black,
+    fontSize: FONT_SIZE.xs,
+    fontWeight: FONT_WEIGHT.bold,
+    textAlign: 'center',
+    flexShrink: 1,
+  },
+  mapButton: {
+    flex: 1,
+    backgroundColor: 'rgba(0,209,255,0.12)',
+    paddingVertical: SPACING.sm + 2,
+    paddingHorizontal: SPACING.sm,
+    borderRadius: RADIUS.md,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: COLORS.accentBlue,
+    minHeight: 40,
+  },
+  mapButtonText: {
+    color: COLORS.accentBlue,
+    fontSize: FONT_SIZE.xs,
+    fontWeight: FONT_WEIGHT.semibold,
+    textAlign: 'center',
+    flexShrink: 1,
+  },
+  completeButton: {
+    flex: 1,
+    backgroundColor: COLORS.accentGreen,
+    paddingVertical: SPACING.sm + 2,
+    paddingHorizontal: SPACING.sm,
+    borderRadius: RADIUS.md,
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: COLORS.accentGreen,
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.3,
+    shadowRadius: 6,
+    elevation: 3,
+    minHeight: 40,
+  },
+  completeButtonText: {
+    color: COLORS.black,
+    fontSize: FONT_SIZE.xs,
+    fontWeight: FONT_WEIGHT.semibold,
+    textAlign: 'center',
+    flexShrink: 1,
+  },
+
+  // ── Completion modal ──────────────────────────────────────────────────────────
   modalOverlay: {
     flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    backgroundColor: 'rgba(0,0,0,0.65)',
     justifyContent: 'flex-end',
   },
   completionModalContent: {
-    backgroundColor: '#fff',
-    borderTopLeftRadius: 20,
-    borderTopRightRadius: 20,
+    backgroundColor: COLORS.bgCard,
+    borderTopLeftRadius: RADIUS['2xl'],
+    borderTopRightRadius: RADIUS['2xl'],
     maxHeight: '90%',
-    paddingBottom: 20,
+    paddingBottom: SPACING.xl,
+    borderWidth: 1,
+    borderColor: COLORS.borderSubtle,
+    borderBottomWidth: 0,
   },
   modalHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    padding: 20,
+    padding: SPACING.base,
     borderBottomWidth: 1,
-    borderBottomColor: '#e5e5e5',
+    borderBottomColor: COLORS.borderSubtle,
   },
   modalTitle: {
-    fontSize: 20,
-    fontWeight: 'bold',
-    color: '#333',
+    fontSize: FONT_SIZE.lg,
+    fontWeight: FONT_WEIGHT.bold,
+    color: COLORS.textPrimary,
   },
   modalScrollView: {
-    padding: 20,
+    padding: SPACING.base,
   },
   modalSubtitle: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#2563eb',
-    marginBottom: 8,
+    fontSize: FONT_SIZE.base,
+    fontWeight: FONT_WEIGHT.semibold,
+    color: COLORS.accentBlue,
+    marginBottom: SPACING.sm,
   },
   modalDescription: {
-    fontSize: 14,
-    color: '#666',
-    marginBottom: 20,
+    fontSize: FONT_SIZE.sm,
+    color: COLORS.textSecondary,
+    marginBottom: SPACING.base,
     lineHeight: 20,
   },
+
+  // ── Upload sections ───────────────────────────────────────────────────────────
   documentUploadSection: {
-    marginBottom: 24,
-    padding: 16,
-    backgroundColor: '#f9f9f9',
-    borderRadius: 12,
+    marginBottom: SPACING.base,
+    padding: SPACING.base,
+    backgroundColor: COLORS.bgCardLight,
+    borderRadius: RADIUS.lg,
     borderWidth: 1,
-    borderColor: '#e5e5e5',
+    borderColor: COLORS.borderSubtle,
   },
   documentHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 12,
+    marginBottom: SPACING.md,
   },
   documentTitle: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#333',
-  },
-  statusBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    backgroundColor: '#d1fae5',
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 12,
-  },
-  statusText: {
-    fontSize: 12,
-    fontWeight: '600',
-    color: '#065f46',
+    fontSize: FONT_SIZE.base,
+    fontWeight: FONT_WEIGHT.semibold,
+    color: COLORS.textPrimary,
   },
   requiredText: {
-    fontSize: 12,
-    fontWeight: '600',
-    color: '#ef4444',
+    fontSize: FONT_SIZE.xs,
+    fontWeight: FONT_WEIGHT.semibold,
+    color: COLORS.accentRed,
   },
   uploadButton: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 8,
-    backgroundColor: '#eff6ff',
-    padding: 12,
-    borderRadius: 8,
+    gap: SPACING.sm,
+    backgroundColor: 'rgba(0,209,255,0.06)',
+    padding: SPACING.md,
+    borderRadius: RADIUS.md,
     borderWidth: 1,
-    borderColor: '#2563eb',
+    borderColor: COLORS.accentBlue,
     borderStyle: 'dashed',
   },
   uploadButtonText: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#2563eb',
+    fontSize: FONT_SIZE.sm,
+    fontWeight: FONT_WEIGHT.semibold,
+    color: COLORS.accentBlue,
   },
   selectedFileContainer: {
-    marginTop: 12,
-    padding: 12,
-    backgroundColor: '#fff',
-    borderRadius: 8,
+    marginTop: SPACING.md,
+    padding: SPACING.md,
+    backgroundColor: COLORS.bgCard,
+    borderRadius: RADIUS.md,
     borderWidth: 1,
-    borderColor: '#d1d5db',
+    borderColor: COLORS.borderSubtle,
   },
   selectedFileName: {
-    fontSize: 14,
-    color: '#333',
-    marginBottom: 8,
+    fontSize: FONT_SIZE.sm,
+    color: COLORS.textPrimary,
+    marginBottom: SPACING.sm,
   },
   uploadSubmitButton: {
-    backgroundColor: '#2563eb',
-    padding: 10,
-    borderRadius: 8,
+    backgroundColor: COLORS.accentBlue,
+    padding: SPACING.sm + 2,
+    borderRadius: RADIUS.md,
     alignItems: 'center',
   },
   uploadSubmitText: {
-    color: '#fff',
-    fontWeight: '600',
-    fontSize: 14,
+    color: COLORS.black,
+    fontWeight: FONT_WEIGHT.semibold,
+    fontSize: FONT_SIZE.sm,
   },
   uploadedDocumentList: {
-    marginTop: 12,
+    marginTop: SPACING.md,
   },
   uploadedDocumentItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
-    padding: 8,
-    backgroundColor: '#fff',
-    borderRadius: 8,
-    marginBottom: 8,
+    gap: SPACING.sm,
+    padding: SPACING.sm,
+    backgroundColor: COLORS.bgCard,
+    borderRadius: RADIUS.md,
+    marginBottom: SPACING.sm,
+    borderWidth: 1,
+    borderColor: COLORS.borderSubtle,
   },
   uploadedDocumentName: {
-    fontSize: 14,
-    color: '#333',
+    fontSize: FONT_SIZE.sm,
+    color: COLORS.textPrimary,
     flex: 1,
   },
   allDocumentsSection: {
-    marginTop: 20,
-    marginBottom: 20,
+    marginTop: SPACING.base,
+    marginBottom: SPACING.base,
   },
   allDocumentsTitle: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#333',
-    marginBottom: 12,
+    fontSize: FONT_SIZE.base,
+    fontWeight: FONT_WEIGHT.semibold,
+    color: COLORS.textPrimary,
+    marginBottom: SPACING.md,
   },
   documentType: {
-    fontSize: 12,
-    color: '#666',
-    marginTop: 4,
+    fontSize: FONT_SIZE.xs,
+    color: COLORS.textSecondary,
+    marginTop: SPACING.xs,
   },
   submitButton: {
-    backgroundColor: '#2ecc71',
-    padding: 16,
-    borderRadius: 12,
+    backgroundColor: COLORS.accentGreen,
+    padding: SPACING.base,
+    borderRadius: RADIUS.lg,
     alignItems: 'center',
-    marginTop: 20,
+    marginTop: SPACING.base,
+    shadowColor: COLORS.accentGreen,
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 4,
   },
   submitButtonDisabled: {
-    backgroundColor: '#95a5a6',
+    backgroundColor: COLORS.statusNeutral,
+    shadowOpacity: 0,
+    elevation: 0,
     opacity: 0.6,
   },
   submitButtonText: {
-    color: '#fff',
-    fontSize: 16,
-    fontWeight: 'bold',
-  },
-  sectionDivider: {
-    marginTop: 12,
-    marginBottom: 8,
-    paddingTop: 12,
-    borderTopWidth: 1,
-    borderTopColor: '#e0e0e0',
-  },
-  sectionTitle: {
-    fontSize: 14,
-    fontWeight: '700',
-    color: '#2563eb',
-    marginBottom: 8,
-  },
-  appointmentSection: {
-    backgroundColor: '#f0f7ff',
-    padding: 10,
-    borderRadius: 6,
-    marginTop: 8,
-    marginBottom: 8,
-  },
-  appointmentTitle: {
-    fontSize: 13,
-    fontWeight: '600',
-    color: '#333',
-    marginBottom: 6,
-  },
-  stopsSection: {
-    marginTop: 12,
-    padding: 8,
-    backgroundColor: '#f9f9f9',
-    borderRadius: 6,
-  },
-  stopsTitle: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#333',
-    marginBottom: 8,
-  },
-  stopItem: {
-    marginBottom: 12,
-    padding: 8,
-    backgroundColor: '#fff',
-    borderRadius: 6,
-    borderLeftWidth: 3,
-    borderLeftColor: '#2563eb',
-  },
-  stopNumber: {
-    fontSize: 13,
-    fontWeight: '600',
-    color: '#2563eb',
-    marginBottom: 6,
-  },
-  sectionContainer: {
-    marginBottom: 24,
-  },
-  sectionHeader: {
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    backgroundColor: '#fff',
-    borderBottomWidth: 2,
-    borderBottomColor: '#2563eb',
-    marginBottom: 12,
-  },
-  sectionTitle: {
-    fontSize: 18,
-    fontWeight: '700',
-    color: '#1e3a8a',
-    marginBottom: 4,
-  },
-  sectionSubtitle: {
-    fontSize: 13,
-    color: '#64748b',
-  },
-  pendingCard: {
-    borderLeftWidth: 4,
-    borderLeftColor: '#f39c12',
-  },
-  pendingNote: {
-    fontSize: 12,
-    color: '#f39c12',
-    fontStyle: 'italic',
-    marginTop: 8,
-    paddingHorizontal: 8,
-    paddingVertical: 6,
-    backgroundColor: '#fef3cd',
-    borderRadius: 4,
+    color: COLORS.black,
+    fontSize: FONT_SIZE.base,
+    fontWeight: FONT_WEIGHT.bold,
   },
 });
 
