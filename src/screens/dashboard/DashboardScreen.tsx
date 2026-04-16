@@ -14,11 +14,11 @@ import {
     Alert,
 } from "react-native";
 import { SafeAreaView } from "react-native";
-import { Ionicons, FontAwesome5, MaterialIcons } from "@expo/vector-icons"
-// Asset imports - using require for better compatibility with Expo Go
-const activeTrip = require("../../../assets/icons/active trip.png");
+import { Ionicons, FontAwesome5, MaterialIcons } from "@expo/vector-icons";
+
+const activeTrip  = require("../../../assets/icons/active trip.png");
 const completeTrip = require("../../../assets/icons/complete trip.png");
-const pendingTrip = require("../../../assets/icons/pending trip.png");
+const pendingTrip  = require("../../../assets/icons/pending trip.png");
 
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
@@ -26,6 +26,9 @@ import { RootStackParamList } from '../../navigation/AppNavigator';
 import { apiService } from '../../services/api/apiService';
 import { authManager } from '../../types/AuthManager';
 import { logger } from '../../utils/loggerHelper';
+
+// ─── Global Theme ─────────────────────────────────────────────────────────────
+import { COLORS, SPACING, RADIUS, FONT_SIZE, FONT_WEIGHT, SHADOWS } from '../../theme';
 
 type NavigationProp = NativeStackNavigationProp<RootStackParamList>;
 
@@ -52,6 +55,47 @@ interface LoadStats {
     completed: number;
     totalMiles: number;
 }
+
+// ─── Trip stat card config ────────────────────────────────────────────────────
+const STAT_CARDS = [
+    {
+        key: 'active',
+        label: 'Active Trips',
+        icon: activeTrip,
+        isImage: true,
+        accentColor: COLORS.accentBlue,
+        route: 'ActiveTrips' as keyof RootStackParamList,
+    },
+    {
+        key: 'completed',
+        label: 'Completed Trips',
+        icon: completeTrip,
+        isImage: true,
+        accentColor: COLORS.accentGreen,
+        route: 'CompleteTrips' as keyof RootStackParamList,
+    },
+    {
+        key: 'pending',
+        label: 'Assignment Requests',
+        icon: null,
+        ionicon: 'notifications' as const,
+        isImage: false,
+        accentColor: COLORS.accentOrange,
+        route: 'PendingTrips' as keyof RootStackParamList,
+        routeParams: { initialTab: 'requests' as const },
+        hasBadge: true,
+    },
+    {
+        key: 'accepted',
+        label: 'Accepted Trips',
+        icon: null,
+        ionicon: 'checkmark-circle' as const,
+        isImage: false,
+        accentColor: COLORS.accentTeal,
+        route: 'PendingTrips' as keyof RootStackParamList,
+        routeParams: { initialTab: 'accepted' as const },
+    },
+];
 
 export default function DashboardScreen() {
     const navigation = useNavigation<NavigationProp>();
@@ -82,30 +126,23 @@ export default function DashboardScreen() {
     const handleCallDispatch = async () => {
         try {
             const res = await apiService.getCompanyDispatchers();
-
             if (!res.success) {
                 Alert.alert('Error', res.error || 'Failed to fetch dispatcher information.');
                 return;
             }
-
             const rawData = res.data as any;
             const dispatchers: Array<{ _id: string; name: string; phone?: string; email?: string }> =
                 Array.isArray(rawData?.data) ? rawData.data :
                 Array.isArray(rawData) ? rawData : [];
-
             const withPhone = dispatchers.filter(d => !!d.phone);
-
             if (withPhone.length === 0) {
                 Alert.alert('No Dispatcher', 'No dispatcher with a phone number found. Please contact your administrator.');
                 return;
             }
-
             if (withPhone.length === 1) {
                 callNumber(withPhone[0].phone!);
                 return;
             }
-
-            // Multiple dispatchers — show each as a separate alert button
             const buttons: any[] = withPhone.map(d => ({
                 text: `${d.name} — ${d.phone}`,
                 onPress: () => callNumber(d.phone!),
@@ -119,29 +156,21 @@ export default function DashboardScreen() {
     };
 
     const wishListItems = [
-        // { id: 1, name: "Vehicle", icon: <Ionicons name="car-sport" size={28} color="#fff" />, color: "#906AD1", route: "Vehicle" },
-        // { id: 2, name: "Trailer", icon: <FontAwesome5 name="truck-moving" size={28} color="#fff" />, color: "#FF9797", route: "Trailer" },
-        // { id: 3, name: "HOS", icon: <MaterialIcons name="schedule" size={28} color="#fff" />, color: "#FFCC00", route: "HOS" },
-        // { id: 4, name: "Asset Inspection", icon: <MaterialIcons name="report-problem" size={28} color="#fff" />, color: "#D74848", route: "AssetIncidents" },
-        { id: 1, name: "Chat", icon: <Ionicons name="chatbubbles" size={28} color="#fff" />, color: "#00C2A6", route: "DriverChat" },
-        { id: 2, name: "Settings", icon: <Ionicons name="settings" size={28} color="#fff" />, color: "#2CDBFA", route: "Settings" },
-        { id: 3, name: "Load Map", icon: <Ionicons name="map" size={28} color="#fff" />, color: "#831775", route: "LoadMap" },
-        { id: 4, name: "Verification", icon: <Ionicons name="shield-checkmark" size={28} color="#fff" />, color: "#0ea3d8", route: "OnboardingGuard" },
-        { id: 5, name: "ELD Documents", icon: <Ionicons name="document-text" size={28} color="#fff" />, color: "#8B5CF6", route: "ELDDocuments" },
-        { id: 6, name: "Mileage Sheet", icon: <Ionicons name="speedometer" size={28} color="#fff" />, color: "#FF6B35", route: "MileageSheet" },
-        { id: 7, name: "Call Dispatch", icon: <Ionicons name="call" size={28} color="#fff" />, color: "#16a34a", onPress: handleCallDispatch },
-        // { id: 8, name: "Transfer", icon: <Ionicons name="swap-horizontal" size={28} color="#fff" />, color: "#E61DCC", route: "Transfer" },
-        // { id: 9, name: "Fuel", icon: <FontAwesome5 name="gas-pump" size={28} color="#fff" />, color: "#04AA30", route: "Fuel" },
+        { id: 1, name: "Chat",          icon: <Ionicons name="chatbubbles"     size={26} color="#fff" />, color: "#00C2A6", route: "DriverChat" },
+        { id: 2, name: "Settings",      icon: <Ionicons name="settings"        size={26} color="#fff" />, color: "#2CDBFA", route: "Settings" },
+        { id: 3, name: "Load Map",      icon: <Ionicons name="map"             size={26} color="#fff" />, color: "#831775", route: "LoadMap" },
+        { id: 4, name: "Verification",  icon: <Ionicons name="shield-checkmark" size={26} color="#fff" />, color: "#0ea3d8", route: "OnboardingGuard" },
+        { id: 5, name: "ELD Documents", icon: <Ionicons name="document-text"   size={26} color="#fff" />, color: "#8B5CF6", route: "ELDDocuments" },
+        { id: 6, name: "Mileage Sheet", icon: <Ionicons name="speedometer"     size={26} color="#fff" />, color: "#FF6B35", route: "MileageSheet" },
+        { id: 7, name: "Call Dispatch", icon: <Ionicons name="call"            size={26} color="#fff" />, color: "#16a34a", onPress: handleCallDispatch },
     ];
 
-    // Fetch driver profile and statistics on mount
     useEffect(() => {
         fetchDashboardData();
     }, []);
 
-    // Track last refresh time to avoid duplicate calls
     const lastRefreshRef = React.useRef<number>(0);
-    const REFRESH_DEBOUNCE_MS = 500; // Minimum time between refreshes
+    const REFRESH_DEBOUNCE_MS = 500;
 
     const refreshDashboardIfNeeded = React.useCallback(() => {
         const now = Date.now();
@@ -154,30 +183,22 @@ export default function DashboardScreen() {
         }
     }, []);
 
-    // Refresh dashboard data when screen comes into focus
     useFocusEffect(
         React.useCallback(() => {
             refreshDashboardIfNeeded();
         }, [refreshDashboardIfNeeded])
     );
 
-    // Also listen for navigation focus events as a backup to ensure refresh
     useEffect(() => {
         const unsubscribe = navigation.addListener('focus', () => {
-            // Small delay to ensure any navigation transitions are complete
-            setTimeout(() => {
-                refreshDashboardIfNeeded();
-            }, 200);
+            setTimeout(() => { refreshDashboardIfNeeded(); }, 200);
         });
-
         return unsubscribe;
     }, [navigation, refreshDashboardIfNeeded]);
 
     const fetchDashboardData = async () => {
         try {
             setLoading(true);
-            
-            // Fetch profile and trips in parallel
             const [profileRes, activeRes, requestsRes, acceptedRes, completedRes] = await Promise.allSettled([
                 apiService.getProfile(),
                 apiService.getActiveTrips(),
@@ -186,12 +207,9 @@ export default function DashboardScreen() {
                 apiService.getCompletedTrips(),
             ]);
 
-            // Update profile
             if (profileRes.status === 'fulfilled' && profileRes.value.success && profileRes.value.data) {
                 const driverData = profileRes.value.data?.data || profileRes.value.data;
                 setProfile(driverData);
-                
-                // Also update authManager with latest profile
                 const currentUser = authManager.getCurrentUser();
                 if (currentUser) {
                     await authManager.updateUserData({
@@ -200,50 +218,26 @@ export default function DashboardScreen() {
                     });
                 }
             } else {
-                // Fallback to authManager data
                 const currentUser = authManager.getCurrentUser();
                 if (currentUser) {
-                    setProfile({
-                        _id: currentUser.id,
-                        name: currentUser.name,
-                        email: currentUser.email,
-                    });
+                    setProfile({ _id: currentUser.id, name: currentUser.name, email: currentUser.email });
                 }
             }
 
-            // Update statistics
             const newStats: LoadStats = {
-                active: activeRes.status === 'fulfilled' && activeRes.value.success
-                    ? activeRes.value.data?.count || activeRes.value.data?.data?.length || 0
-                    : 0,
-                pending: requestsRes.status === 'fulfilled' && requestsRes.value.success
-                    ? requestsRes.value.data?.count || requestsRes.value.data?.data?.length || 0
-                    : 0,
-                accepted: acceptedRes.status === 'fulfilled' && acceptedRes.value.success
-                    ? acceptedRes.value.data?.count || acceptedRes.value.data?.data?.length || 0
-                    : 0,
-                completed: completedRes.status === 'fulfilled' && completedRes.value.success
-                    ? completedRes.value.data?.count || completedRes.value.data?.data?.length || 0
-                    : 0,
-                totalMiles: 0, // Calculate from completed trips if needed
+                active:    activeRes.status    === 'fulfilled' && activeRes.value.success    ? activeRes.value.data?.count    || activeRes.value.data?.data?.length    || 0 : 0,
+                pending:   requestsRes.status  === 'fulfilled' && requestsRes.value.success  ? requestsRes.value.data?.count  || requestsRes.value.data?.data?.length  || 0 : 0,
+                accepted:  acceptedRes.status  === 'fulfilled' && acceptedRes.value.success  ? acceptedRes.value.data?.count  || acceptedRes.value.data?.data?.length  || 0 : 0,
+                completed: completedRes.status === 'fulfilled' && completedRes.value.success ? completedRes.value.data?.count || completedRes.value.data?.data?.length || 0 : 0,
+                totalMiles: 0,
             };
             setStats(newStats);
-
-            logger.info('Dashboard data loaded', {
-                hasProfile: !!profile,
-                stats: newStats
-            });
-
+            logger.info('Dashboard data loaded', { hasProfile: !!profile, stats: newStats });
         } catch (error) {
             logger.error('Failed to fetch dashboard data', error);
-            // Use cached data from authManager as fallback
             const currentUser = authManager.getCurrentUser();
             if (currentUser) {
-                setProfile({
-                    _id: currentUser.id,
-                    name: currentUser.name,
-                    email: currentUser.email,
-                });
+                setProfile({ _id: currentUser.id, name: currentUser.name, email: currentUser.email });
             }
         } finally {
             setLoading(false);
@@ -257,52 +251,25 @@ export default function DashboardScreen() {
     };
 
     const handleWishItemPress = (item: any) => {
-        if (item.onPress) {
-            item.onPress();
-            return;
-        }
-        if (item.route) {
-            navigation.navigate(item.route);
-        }
-        // You can add other navigation logic here for other items
-        // Example:
-        // switch (item.name) {
-        //     case "Trailer":
-        //         navigation.navigate("Trailer");
-        //         break;
-        //     case "Settings":
-        //         navigation.navigate("Settings");
-        //         break;
-        //     // Add more cases as needed
-        // }
+        if (item.onPress) { item.onPress(); return; }
+        if (item.route) { navigation.navigate(item.route as any); }
     };
+
+    // ─── Render helpers ────────────────────────────────────────────────────────
 
     const renderWishItem = (item: any, isGrid: boolean = false) => (
         <TouchableOpacity
             key={item.id}
-            style={[
-                styles.wishItem,
-                { backgroundColor: item.color },
-                isGrid && styles.wishItemGrid
-            ]}
+            style={[styles.wishItem, { backgroundColor: item.color }, isGrid && styles.wishItemGrid]}
             onPress={() => handleWishItemPress(item)}
-            activeOpacity={0.7}
+            activeOpacity={0.75}
         >
-            <View style={styles.iconWrapper}>
-                {item.icon}
-            </View>
-            <Text 
-                style={[
-                    styles.wishText,
-                    isGrid && styles.wishTextGrid
-                ]}
-                numberOfLines={2}
-            >
+            <View style={styles.iconWrapper}>{item.icon}</View>
+            <Text style={[styles.wishText, isGrid && styles.wishTextGrid]} numberOfLines={2}>
                 {item.name}
             </Text>
         </TouchableOpacity>
     );
-
 
     const renderHorizontalWishList = () => (
         <ScrollView
@@ -318,24 +285,25 @@ export default function DashboardScreen() {
     const renderGridWishList = () => {
         const itemsPerRow = 3;
         const rows = [];
-        
         for (let i = 0; i < wishListItems.length; i += itemsPerRow) {
             const rowItems = wishListItems.slice(i, i + itemsPerRow);
             rows.push(
                 <View key={i} style={styles.wishGrid}>
                     {rowItems.map((item) => renderWishItem(item, true))}
-                    {/* Add empty spaces if row has less than 3 items */}
-                    {rowItems.length < itemsPerRow && 
+                    {rowItems.length < itemsPerRow &&
                         Array.from({ length: itemsPerRow - rowItems.length }).map((_, idx) => (
                             <View key={`empty-${idx}`} style={styles.wishItemGrid} />
                         ))
                     }
-        </View>
-    );
+                </View>
+            );
         }
-        
         return <View style={styles.wishGridContainer}>{rows}</View>;
     };
+
+    const getStatValue = (key: string) => stats[key as keyof LoadStats] as number;
+
+    // ─── Main render ───────────────────────────────────────────────────────────
 
     return (
         <SafeAreaView style={styles.container}>
@@ -347,394 +315,437 @@ export default function DashboardScreen() {
                     <RefreshControl
                         refreshing={refreshing}
                         onRefresh={onRefresh}
-                        colors={['#8B5CF6']}
-                        tintColor="#8B5CF6"
+                        colors={[COLORS.accentBlue]}
+                        tintColor={COLORS.accentBlue}
                     />
                 }
             >
                 <View style={styles.content}>
+
+                    {/* ── Loading skeleton ─────────────────────────────────── */}
                     {loading && !profile ? (
                         <View style={styles.loadingContainer}>
-                            <ActivityIndicator size="large" color="#8B5CF6" />
-                            <Text style={styles.loadingText}>Loading dashboard...</Text>
+                            <ActivityIndicator size="large" color={COLORS.accentBlue} />
+                            <Text style={styles.loadingText}>Loading dashboard…</Text>
                         </View>
                     ) : (
-                        <>
-                    {/* Profile Card */}
-                    <View style={styles.profileCard}>
-                        <View style={styles.profileContent}>
-                            <View style={styles.profileInfo}>
-                                <Text style={styles.driverLabel}>Driver</Text>
-                                <View style={styles.nameRow}>
-                                            <Text style={styles.driverName}>
-                                                {profile?.name || authManager.getCurrentUser()?.name || 'Driver'}
-                                            </Text>
-                                    <View style={styles.statusBadge}>
-                                                <Text style={styles.statusText}>
-                                                    {profile?.status || 'Active'}
-                                                </Text>
-                                    </View>
-                                </View>
-                                        {profile?.details?.internalId && (
-                                            <Text style={styles.internalIdLabel}>
-                                                ID: {profile.details.internalId}
-                                            </Text>
-                                        )}
-                                        <Text style={styles.tripLabel}>Total Trips</Text>
-                                        <Text style={styles.miles}>
-                                            {stats.active + stats.pending + stats.accepted + stats.completed} Loads
+
+                        /* ── Profile Card ────────────────────────────────────── */
+                        <View style={styles.profileCard}>
+                            {/* Subtle neon glow line at top */}
+                            <View style={styles.profileGlowBar} />
+
+                            <View style={styles.profileContent}>
+                                <View style={styles.profileInfo}>
+                                    <Text style={styles.driverLabel}>Driver</Text>
+                                    <View style={styles.nameRow}>
+                                        <Text style={styles.driverName} numberOfLines={1}>
+                                            {profile?.name || authManager.getCurrentUser()?.name || 'Driver'}
                                         </Text>
-                            </View>
-                                    {(profile?.profileImage || profile?.profileImageUrl) ? (
-                            <Image
-                                            source={{ uri: profile.profileImage || profile.profileImageUrl }}
-                                style={styles.avatar}
-                            />
-                                    ) : (
-                                        <View style={[styles.avatar, styles.avatarPlaceholder]}>
-                                            <Ionicons name="person" size={40} color="#fff" />
+                                        <View style={styles.statusBadge}>
+                                            <View style={styles.statusDot} />
+                                            <Text style={styles.statusText}>
+                                                {profile?.status || 'Active'}
+                                            </Text>
                                         </View>
+                                    </View>
+
+                                    {profile?.details?.internalId && (
+                                        <Text style={styles.internalIdLabel}>
+                                            ID: {profile.details.internalId}
+                                        </Text>
                                     )}
-                        </View>
-                    </View>
-                        </>
-                    )}
 
-                    {/* Daily Task Report */}
-                    <View style={styles.section}>
-                        {/* <View style={styles.sectionHeader}>
-                            <Text style={styles.sectionTitle}>Daily task report</Text>
-                            <TouchableOpacity onPress={() => navigation.navigate("NewTrip")}>
-                                <Text style={styles.linkText}>+ New Trip</Text>
-                            </TouchableOpacity>
-                        </View> */}
+                                    <Text style={styles.tripLabel}>Total Loads</Text>
+                                    <Text style={styles.totalLoads}>
+                                        {stats.active + stats.pending + stats.accepted + stats.completed}
+                                    </Text>
+                                </View>
 
-                        <View style={styles.taskContainer}>
-                            <TouchableOpacity
-                                style={styles.taskCard}
-                                onPress={() => navigation.navigate("ActiveTrips")}
-                            >
-                                <View style={styles.taskIconContainer}>
-                                    <Image source={activeTrip} style={styles.taskIcon} />
-                                </View>
-                                <View style={styles.taskContent}>
-                                    <Text style={styles.taskText}>Active Trips</Text>
-                                    <Text style={styles.taskCount}>{stats.active}</Text>
-                                </View>
-                            </TouchableOpacity>
-
-                            <TouchableOpacity
-                                style={styles.taskCard}
-                                onPress={() => navigation.navigate("CompleteTrips")}
-                            >
-                                <View style={[styles.taskIconContainer, { backgroundColor: "#FF6B6B" }]}>
-                                    <Image source={completeTrip} style={styles.taskIcon} />
-                                </View>
-                                <View style={styles.taskContent}>
-                                    <Text style={styles.taskText}>Completed Trips</Text>
-                                    <Text style={styles.taskCount}>{stats.completed}</Text>
-                                </View>
-                            </TouchableOpacity>
-
-                            <TouchableOpacity
-                                style={styles.taskCard}
-                                onPress={() => navigation.navigate("PendingTrips", { initialTab: 'requests' })}
-                            >
-                                <View style={[styles.taskIconContainer, { backgroundColor: "#F59E0B" }]}>
-                                    <Ionicons name="notifications" size={22} color="#fff" />
-                                </View>
-                                <View style={styles.taskContent}>
-                                    <Text style={styles.taskText}>Assignment Requests</Text>
-                                    {stats.pending > 0 ? (
-                                        <View style={styles.pendingCountRow}>
-                                            <Text style={[styles.taskCount, { color: "#F59E0B" }]}>{stats.pending}</Text>
-                                            <Text style={styles.pendingCountLabel}> awaiting</Text>
-                                        </View>
-                                    ) : (
-                                        <Text style={styles.taskCount}>{stats.pending}</Text>
-                                    )}
-                                </View>
-                                {stats.pending > 0 && (
-                                    <View style={styles.pendingBadge}>
-                                        <Text style={styles.pendingBadgeText}>{stats.pending}</Text>
+                                {(profile?.profileImage || profile?.profileImageUrl) ? (
+                                    <Image
+                                        source={{ uri: profile.profileImage || profile.profileImageUrl }}
+                                        style={styles.avatar}
+                                    />
+                                ) : (
+                                    <View style={[styles.avatar, styles.avatarPlaceholder]}>
+                                        <Ionicons name="person" size={38} color={COLORS.accentBlue} />
                                     </View>
                                 )}
-                            </TouchableOpacity>
+                            </View>
+                        </View>
+                    )}
 
-                            <TouchableOpacity
-                                style={styles.taskCard}
-                                onPress={() => navigation.navigate("PendingTrips", { initialTab: 'accepted' })}
-                            >
-                                <View style={[styles.taskIconContainer, { backgroundColor: "#10B981" }]}>
-                                    <Ionicons name="checkmark-circle" size={22} color="#fff" />
-                                </View>
-                                <View style={styles.taskContent}>
-                                    <Text style={styles.taskText}>Accepted Trips</Text>
-                                    <Text style={styles.taskCount}>{stats.accepted}</Text>
-                                </View>
-                            </TouchableOpacity>
+                    {/* ── Stat Cards ──────────────────────────────────────────── */}
+                    <View style={styles.section}>
+                        <View style={styles.sectionHeader}>
+                            <Text style={styles.sectionTitle}>Trip Overview</Text>
+                        </View>
+
+                        <View style={styles.taskContainer}>
+                            {STAT_CARDS.map((card, idx) => {
+                                const value = getStatValue(card.key);
+                                const isLast = idx === STAT_CARDS.length - 1;
+                                return (
+                                    <TouchableOpacity
+                                        key={card.key}
+                                        style={[styles.taskCard, isLast && styles.taskCardLast]}
+                                        onPress={() => navigation.navigate(card.route as any, (card as any).routeParams)}
+                                        activeOpacity={0.75}
+                                    >
+                                        {/* Accent left border */}
+                                        <View style={[styles.taskAccentBar, { backgroundColor: card.accentColor }]} />
+
+                                        {/* Icon */}
+                                        <View style={[styles.taskIconContainer, { backgroundColor: `${card.accentColor}22` }]}>
+                                            {card.isImage ? (
+                                                <Image source={card.icon} style={[styles.taskIcon, { tintColor: card.accentColor }]} />
+                                            ) : (
+                                                <Ionicons name={card.ionicon!} size={20} color={card.accentColor} />
+                                            )}
+                                        </View>
+
+                                        {/* Label + count */}
+                                        <View style={styles.taskContent}>
+                                            <Text style={styles.taskText}>{card.label}</Text>
+                                            <View style={styles.taskCountRow}>
+                                                <Text style={[styles.taskCount, { color: card.accentColor }]}>
+                                                    {value}
+                                                </Text>
+                                                {(card as any).hasBadge && value > 0 && (
+                                                    <Text style={styles.awaitingLabel}> awaiting</Text>
+                                                )}
+                                            </View>
+                                        </View>
+
+                                        {/* Pending badge */}
+                                        {(card as any).hasBadge && value > 0 && (
+                                            <View style={[styles.pendingBadge, { backgroundColor: card.accentColor }]}>
+                                                <Text style={styles.pendingBadgeText}>{value}</Text>
+                                            </View>
+                                        )}
+
+                                        <Ionicons name="chevron-forward" size={16} color={COLORS.textSecondary} />
+                                    </TouchableOpacity>
+                                );
+                            })}
                         </View>
                     </View>
 
-                    {/* Wish List */}
+                    {/* ── Quick Access ────────────────────────────────────────── */}
                     <View style={styles.section}>
                         <View style={styles.sectionHeader}>
-                            <Text style={styles.sectionTitle}>Wish List</Text>
+                            <Text style={styles.sectionTitle}>Quick Access</Text>
                             <TouchableOpacity onPress={() => setShowAllWishList(!showAllWishList)}>
                                 <Text style={styles.linkText}>
-                                    {showAllWishList ? "Hide" : "See All"}
+                                    {showAllWishList ? "Collapse" : "See All"}
                                 </Text>
                             </TouchableOpacity>
                         </View>
 
                         {showAllWishList ? renderGridWishList() : renderHorizontalWishList()}
                     </View>
+
                 </View>
             </ScrollView>
         </SafeAreaView>
     );
 }
 
+// ─── Styles ───────────────────────────────────────────────────────────────────
+
 const styles = StyleSheet.create({
+
+    // Layout
     container: {
         flex: 1,
-        backgroundColor: '#f5f5f5',
+        backgroundColor: COLORS.bgMain,
     },
     scrollContainer: {
         flex: 1,
     },
     scrollContent: {
         flexGrow: 1,
-        paddingBottom: 80, // Add padding to account for footer
+        paddingBottom: 80,
     },
     content: {
         flex: 1,
-        paddingHorizontal: 20,
-        paddingTop: 20,
+        paddingHorizontal: SPACING.base,
+        paddingTop: SPACING.base,
     },
+
+    // ── Loading ──────────────────────────────────────────────────────────────
+    loadingContainer: {
+        paddingVertical: SPACING['3xl'],
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    loadingText: {
+        marginTop: SPACING.md,
+        fontSize: FONT_SIZE.base,
+        color: COLORS.textSecondary,
+    },
+
+    // ── Profile Card ─────────────────────────────────────────────────────────
     profileCard: {
-        backgroundColor: "#8B5CF6",
-        borderRadius: 20,
-        padding: 20,
-        marginBottom: 20,
-        elevation: 4,
-        shadowColor: "#000",
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.1,
-        shadowRadius: 4,
+        backgroundColor: COLORS.bgCard,
+        borderRadius: RADIUS.xl,
+        padding: SPACING.base,
+        marginBottom: SPACING.base,
+        borderWidth: 1,
+        borderColor: COLORS.borderGlow,
+        overflow: 'hidden',
+        // shadow
+        shadowColor: COLORS.accentBlue,
+        shadowOffset: { width: 0, height: 0 },
+        shadowOpacity: 0.18,
+        shadowRadius: 10,
+        elevation: 6,
+    },
+    profileGlowBar: {
+        position: 'absolute',
+        top: 0,
+        left: 0,
+        right: 0,
+        height: 2,
+        backgroundColor: COLORS.accentBlue,
+        opacity: 0.7,
     },
     profileContent: {
-        flexDirection: "row",
-        justifyContent: "space-between",
-        alignItems: "center",
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
     },
     profileInfo: {
         flex: 1,
+        paddingRight: SPACING.md,
     },
     driverLabel: {
-        color: "#E1D5F7",
-        fontSize: 14,
-        marginBottom: 4,
+        color: COLORS.textSecondary,
+        fontSize: FONT_SIZE.xs,
+        fontWeight: FONT_WEIGHT.medium,
+        letterSpacing: 1,
+        textTransform: 'uppercase',
+        marginBottom: SPACING.xs,
     },
     nameRow: {
-        flexDirection: "row",
-        alignItems: "center",
-        marginBottom: 8,
+        flexDirection: 'row',
+        alignItems: 'center',
+        flexWrap: 'wrap',
+        marginBottom: SPACING.sm,
+        gap: SPACING.sm,
     },
     driverName: {
-        fontSize: 20,
-        color: "#fff",
-        fontWeight: "bold",
-        marginRight: 10,
+        fontSize: FONT_SIZE.xl,
+        color: COLORS.textPrimary,
+        fontWeight: FONT_WEIGHT.bold,
+        flexShrink: 1,
     },
     statusBadge: {
-        backgroundColor: "#10B981",
-        paddingHorizontal: 8,
-        paddingVertical: 2,
-        borderRadius: 12,
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: 'rgba(0,255,163,0.12)',
+        paddingHorizontal: SPACING.sm,
+        paddingVertical: 3,
+        borderRadius: RADIUS.full,
+        borderWidth: 1,
+        borderColor: COLORS.accentGreen,
+        gap: 4,
+    },
+    statusDot: {
+        width: 6,
+        height: 6,
+        borderRadius: RADIUS.full,
+        backgroundColor: COLORS.accentGreen,
     },
     statusText: {
-        color: "#fff",
-        fontSize: 12,
-        fontWeight: "600",
+        color: COLORS.accentGreen,
+        fontSize: FONT_SIZE.xs,
+        fontWeight: FONT_WEIGHT.semibold,
+        textTransform: 'capitalize',
+    },
+    internalIdLabel: {
+        color: COLORS.textSecondary,
+        fontSize: FONT_SIZE.xs,
+        marginBottom: SPACING.sm,
     },
     tripLabel: {
-        color: "#E1D5F7",
-        fontSize: 14,
-        marginBottom: 4,
+        color: COLORS.textSecondary,
+        fontSize: FONT_SIZE.xs,
+        letterSpacing: 0.5,
+        textTransform: 'uppercase',
+        marginBottom: 2,
     },
-    miles: {
-        color: "#fff",
-        fontSize: 18,
-        fontWeight: "600"
+    totalLoads: {
+        color: COLORS.accentBlue,
+        fontSize: FONT_SIZE.lg,
+        fontWeight: FONT_WEIGHT.bold,
     },
     avatar: {
-        width: 80,
-        height: 80,
-        borderRadius: 20,
-        borderWidth: 3,
-        borderColor: "#fff",
+        width: 78,
+        height: 78,
+        borderRadius: RADIUS.lg,
+        borderWidth: 2,
+        borderColor: COLORS.accentBlue,
     },
+    avatarPlaceholder: {
+        backgroundColor: 'rgba(0,209,255,0.08)',
+        justifyContent: 'center',
+        alignItems: 'center',
+    },
+
+    // ── Section ──────────────────────────────────────────────────────────────
     section: {
-        marginBottom: 20
+        marginBottom: SPACING.base,
     },
     sectionHeader: {
-        flexDirection: "row",
-        justifyContent: "space-between",
-        alignItems: "center",
-        marginBottom: 16
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        marginBottom: SPACING.md,
     },
     sectionTitle: {
-        fontSize: 18,
-        fontWeight: "bold",
-        color: "#1F2937"
+        fontSize: FONT_SIZE.md,
+        fontWeight: FONT_WEIGHT.semibold,
+        color: COLORS.accentNavyBlue,
     },
     linkText: {
-        color: "#10B981",
-        fontWeight: "600",
-        fontSize: 14,
+        color: COLORS.accentBlue,
+        fontWeight: FONT_WEIGHT.medium,
+        fontSize: FONT_SIZE.sm,
     },
+
+    // ── Task / Stat Cards ────────────────────────────────────────────────────
     taskContainer: {
-        backgroundColor: "#fff",
-        borderRadius: 16,
-        padding: 16,
-        elevation: 2,
-        shadowColor: "#000",
-        shadowOffset: { width: 0, height: 1 },
-        shadowOpacity: 0.05,
-        shadowRadius: 2,
+        backgroundColor: COLORS.bgCard,
+        borderRadius: RADIUS.lg,
+        borderWidth: 1,
+        borderColor: COLORS.borderSubtle,
+        overflow: 'hidden',
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.12,
+        shadowRadius: 4,
+        elevation: 3,
     },
     taskCard: {
-        flexDirection: "row",
-        alignItems: "center",
-        paddingVertical: 12,
+        flexDirection: 'row',
+        alignItems: 'center',
+        paddingVertical: SPACING.md,
+        paddingHorizontal: SPACING.md,
         borderBottomWidth: 1,
-        borderBottomColor: "#F3F4F6",
+        borderBottomColor: COLORS.borderSubtle,
+    },
+    taskCardLast: {
+        borderBottomWidth: 0,
+    },
+    taskAccentBar: {
+        width: 3,
+        height: 36,
+        borderRadius: RADIUS.full,
+        marginRight: SPACING.md,
     },
     taskIconContainer: {
         width: 40,
         height: 40,
-        borderRadius: 12,
-        backgroundColor: "#FFB3B3",
-        justifyContent: "center",
-        alignItems: "center",
-        marginRight: 16,
-    },
-    taskText: {
-        fontSize: 16,
-        fontWeight: "500",
-        color: "#1F2937",
-        flex: 1,
-    },
-    horizontalScrollContent: {
-        paddingRight: 20,
-        paddingVertical: 8,
-    },
-    wishGridContainer: {
-        paddingVertical: 8,
-    },
-    wishGrid: {
-        flexDirection: "row",
-        justifyContent: "space-between",
-        marginBottom: 16,
-        paddingHorizontal: 4,
-    },
-    wishItem: {
-        width: (width - 60) / 3.5,
-        minWidth: 90,
-        aspectRatio: 1,
-        borderRadius: 16,
-        justifyContent: "center",
-        alignItems: "center",
-        paddingVertical: 12,
-        paddingHorizontal: 8,
-        marginRight: 12,
-        elevation: 3,
-        shadowColor: "#000",
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.15,
-        shadowRadius: 4,
-    },
-    wishItemGrid: {
-        width: (width - 80) / 3,
-        minWidth: 100,
-        marginRight: 8,
-        marginLeft: 0,
-    },
-    wishText: {
-        color: "#fff",
-        fontSize: 11,
-        marginTop: 8,
-        fontWeight: "600",
-        textAlign: "center",
-        paddingHorizontal: 4,
-    },
-    wishTextGrid: {
-        fontSize: 12,
-        marginTop: 10,
+        borderRadius: RADIUS.md,
+        justifyContent: 'center',
+        alignItems: 'center',
+        marginRight: SPACING.md,
     },
     taskIcon: {
-        width: 24,
-        height: 24,
-        tintColor: "#fff",
-    },
-    iconWrapper: {
-        justifyContent: "center",
-        alignItems: "center",
-        marginBottom: 4,
-    },
-    loadingContainer: {
-        padding: 40,
-        alignItems: "center",
-        justifyContent: "center",
-    },
-    loadingText: {
-        marginTop: 12,
-        fontSize: 16,
-        color: "#6B7280",
-    },
-    internalIdLabel: {
-        color: "#E1D5F7",
-        fontSize: 12,
-        marginBottom: 4,
-    },
-    avatarPlaceholder: {
-        backgroundColor: "rgba(255, 255, 255, 0.2)",
-        justifyContent: "center",
-        alignItems: "center",
+        width: 22,
+        height: 22,
     },
     taskContent: {
         flex: 1,
-        marginLeft: 16,
+    },
+    taskText: {
+        fontSize: FONT_SIZE.sm,
+        fontWeight: FONT_WEIGHT.medium,
+        color: COLORS.textSecondary,
+        marginBottom: 2,
+    },
+    taskCountRow: {
+        flexDirection: 'row',
+        alignItems: 'baseline',
     },
     taskCount: {
-        fontSize: 20,
-        fontWeight: "bold",
-        color: "#1F2937",
-        marginTop: 4,
+        fontSize: FONT_SIZE.xl,
+        fontWeight: FONT_WEIGHT.bold,
     },
-    pendingCountRow: {
-        flexDirection: "row",
-        alignItems: "baseline",
-        marginTop: 4,
-    },
-    pendingCountLabel: {
-        fontSize: 13,
-        color: "#6B7280",
-        fontWeight: "500",
+    awaitingLabel: {
+        fontSize: FONT_SIZE.xs,
+        color: COLORS.textSecondary,
+        fontWeight: FONT_WEIGHT.medium,
     },
     pendingBadge: {
-        backgroundColor: "#F59E0B",
-        borderRadius: 12,
-        minWidth: 24,
-        height: 24,
-        alignItems: "center",
-        justifyContent: "center",
-        paddingHorizontal: 6,
+        borderRadius: RADIUS.full,
+        minWidth: 22,
+        height: 22,
+        alignItems: 'center',
+        justifyContent: 'center',
+        paddingHorizontal: SPACING.xs + 2,
+        marginRight: SPACING.sm,
     },
     pendingBadgeText: {
-        color: "#fff",
-        fontSize: 12,
-        fontWeight: "700",
+        color: COLORS.black,
+        fontSize: FONT_SIZE.xs,
+        fontWeight: FONT_WEIGHT.bold,
+    },
+
+    // ── Wish / Quick Access ──────────────────────────────────────────────────
+    horizontalScrollContent: {
+        paddingRight: SPACING.base,
+        paddingVertical: SPACING.xs,
+    },
+    wishGridContainer: {
+        paddingVertical: SPACING.xs,
+    },
+    wishGrid: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        marginBottom: SPACING.md,
+        paddingHorizontal: 2,
+    },
+    wishItem: {
+        width: (width - 60) / 3.5,
+        minWidth: 86,
+        aspectRatio: 1,
+        borderRadius: RADIUS.lg,
+        justifyContent: 'center',
+        alignItems: 'center',
+        paddingVertical: SPACING.md,
+        paddingHorizontal: SPACING.sm,
+        marginRight: SPACING.md,
+        // shadow
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.18,
+        shadowRadius: 4,
+        elevation: 3,
+    },
+    wishItemGrid: {
+        width: (width - 80) / 3,
+        minWidth: 96,
+        marginRight: SPACING.sm,
+        marginLeft: 0,
+    },
+    iconWrapper: {
+        justifyContent: 'center',
+        alignItems: 'center',
+        marginBottom: SPACING.xs,
+    },
+    wishText: {
+        color: COLORS.white,
+        fontSize: FONT_SIZE.xs,
+        marginTop: SPACING.xs,
+        fontWeight: FONT_WEIGHT.semibold,
+        textAlign: 'center',
+        paddingHorizontal: 2,
+    },
+    wishTextGrid: {
+        fontSize: FONT_SIZE.sm,
+        marginTop: SPACING.sm,
     },
 });

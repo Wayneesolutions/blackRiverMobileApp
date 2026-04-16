@@ -1,6 +1,7 @@
 import React from "react";
 import { View, Image, StyleSheet } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { COLORS, SPACING } from "../../theme";
 
 const logo = require("../../../assets/FleetGo.png");
 
@@ -10,20 +11,30 @@ export default function Header() {
       <View style={styles.header}>
         <Image source={logo} style={styles.logo} resizeMode="contain" />
       </View>
+      {/* Neon glow line — mirrors the web's --accent-blue border */}
+      <View style={styles.glowLine} />
     </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
   safeArea: {
-    backgroundColor: "white",
+    backgroundColor: COLORS.bgCard,
   },
   header: {
-    paddingVertical: 8,
+    paddingVertical: SPACING.sm + 2,
+    paddingHorizontal: SPACING.base,
     alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: COLORS.bgCard,
   },
   logo: {
-    width: 100,
-    height: 35,
+    width: 110,
+    height: 36,
+  },
+  glowLine: {
+    height: 1,
+    backgroundColor: COLORS.accentBlue,
+    opacity: 0.45,
   },
 });
