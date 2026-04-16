@@ -573,7 +573,7 @@ const styles = StyleSheet.create({
   testButton: {
     marginTop: 8,
     padding: 8,
-    // backgroundColor: "#906AD1",
+    backgroundColor: "#906AD1",
     borderRadius: 4,
     alignItems: 'center',
   },
