@@ -14,6 +14,7 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { apiService } from '../../services/api/apiService';
 import { logger } from '../../utils/loggerHelper';
+import { COLORS, SPACING, RADIUS, FONT_SIZE, FONT_WEIGHT, SHADOWS } from '../../theme';
 
 interface ELDDocument {
   _id: string;
@@ -36,7 +37,7 @@ export default function ELDDocumentsScreen() {
     try {
       setLoading(true);
       const response = await apiService.getELDDocuments();
-      
+
       if (response.success && response.data) {
         setDocuments(Array.isArray(response.data) ? response.data : response.data.data || []);
       } else {
@@ -60,23 +61,23 @@ export default function ELDDocumentsScreen() {
   const handleViewDocument = async (document: ELDDocument) => {
     try {
       logger.info('Opening ELD document for viewing', { documentId: document._id, fileName: document.fileName });
-      
+
       // Always get a fresh signed URL - never reuse old URLs to prevent expiration
       const response = await apiService.getELDDocumentSignedUrl(document._id, 'inline');
-      
+
       if (response.success && response.data?.url) {
         const signedUrl = response.data.url;
-        logger.info('Got fresh signed URL for viewing', { 
+        logger.info('Got fresh signed URL for viewing', {
           url: signedUrl.substring(0, 100) + '...',
-          expiresIn: response.data.expiresIn 
+          expiresIn: response.data.expiresIn
         });
-        
+
         // Check if URL is valid before trying to open
         if (!signedUrl || signedUrl.length === 0) {
           Alert.alert('Error', 'Invalid document URL. Please try again.');
           return;
         }
-        
+
         const canOpen = await Linking.canOpenURL(signedUrl);
         if (canOpen) {
           // Open URL immediately - should display inline in browser
@@ -99,7 +100,7 @@ export default function ELDDocumentsScreen() {
   const handleDownloadDocument = async (document: ELDDocument) => {
     try {
       const response = await apiService.getELDDocumentSignedUrl(document._id, 'attachment');
-      
+
       if (response.success && response.data?.url) {
         const canOpen = await Linking.canOpenURL(response.data.url);
         if (canOpen) {
@@ -193,23 +194,23 @@ export default function ELDDocumentsScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F9FAFB',
+    backgroundColor: COLORS.bgMain,
   },
   header: {
-    backgroundColor: '#FFFFFF',
+    backgroundColor: COLORS.bgCardLight,
     padding: 20,
     borderBottomWidth: 1,
-    borderBottomColor: '#E5E7EB',
+    borderBottomColor: COLORS.borderGlow,
   },
   headerTitle: {
     fontSize: 24,
     fontWeight: 'bold',
-    color: '#111827',
+    color: COLORS.textPrimary,
     marginBottom: 4,
   },
   headerSubtitle: {
     fontSize: 14,
-    color: '#6B7280',
+    color: COLORS.textSecondary,
   },
   loadingContainer: {
     flex: 1,
@@ -247,12 +248,12 @@ const styles = StyleSheet.create({
     lineHeight: 20,
   },
   documentCard: {
-    backgroundColor: '#FFFFFF',
+    backgroundColor: COLORS.bgCardLight,
     borderRadius: 12,
     padding: 16,
     marginBottom: 12,
     borderWidth: 1,
-    borderColor: '#E5E7EB',
+    borderColor: COLORS.borderGlow,
     shadowColor: '#000',
     shadowOffset: {
       width: 0,
@@ -270,7 +271,7 @@ const styles = StyleSheet.create({
     width: 48,
     height: 48,
     borderRadius: 8,
-    backgroundColor: '#EFF6FF',
+    backgroundColor: COLORS.bgCardLight,
     justifyContent: 'center',
     alignItems: 'center',
     marginRight: 12,
@@ -281,19 +282,19 @@ const styles = StyleSheet.create({
   documentTitle: {
     fontSize: 16,
     fontWeight: '600',
-    color: '#111827',
+    color: COLORS.textPrimary,
     marginBottom: 4,
   },
   documentDescription: {
     fontSize: 14,
-    color: '#6B7280',
+    color: COLORS.textSecondary,
     marginBottom: 8,
   },
   documentActions: {
     flexDirection: 'row',
     gap: 8,
     borderTopWidth: 1,
-    borderTopColor: '#F3F4F6',
+    borderTopColor: COLORS.borderGlow,
     paddingTop: 12,
   },
   actionButton: {
@@ -306,9 +307,9 @@ const styles = StyleSheet.create({
     gap: 6,
   },
   viewButton: {
-    backgroundColor: '#EFF6FF',
+    backgroundColor: COLORS.bgCardLight,
     borderWidth: 1,
-    borderColor: '#DBEAFE',
+    borderColor: COLORS.borderGlow,
   },
   viewButtonText: {
     fontSize: 14,
@@ -316,14 +317,14 @@ const styles = StyleSheet.create({
     color: '#0ea3d8',
   },
   downloadButton: {
-    backgroundColor: '#ECFDF5',
+    backgroundColor: COLORS.accentGreen,
     borderWidth: 1,
-    borderColor: '#D1FAE5',
+    borderColor: COLORS.borderGlow,
   },
   downloadButtonText: {
     fontSize: 14,
     fontWeight: '600',
-    color: '#10B981',
+    color: COLORS.textPrimary,
   },
 });
 

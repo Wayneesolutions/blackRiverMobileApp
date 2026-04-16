@@ -15,7 +15,7 @@ import { Ionicons } from '@expo/vector-icons';
 import MapViewWithLiveTracking from '../../components/MapViewWithLiveTracking';
 import { apiService } from '../../services/api/apiService';
 import { logger } from '../../utils/loggerHelper';
-
+import { COLORS, SPACING, RADIUS, FONT_SIZE, FONT_WEIGHT, SHADOWS } from '../../theme';
 // Import Trip interface and conversion function from ActiveTrips
 interface Trip {
   _id: string;
@@ -194,13 +194,13 @@ const getWaypointCoordinates = (waypoint: LoadWaypoint): { lat: number | null; l
   // Try multiple ways to get coordinates
   let lat = parseCoordinate(waypoint.address?.latitude);
   let lng = parseCoordinate(waypoint.address?.longitude);
-  
+
   // If not found in address, try direct on waypoint
   if (lat === null || lng === null) {
     lat = parseCoordinate((waypoint as any)?.latitude);
     lng = parseCoordinate((waypoint as any)?.longitude);
   }
-  
+
   // If still not found, try coordinates array
   if ((lat === null || lng === null) && (waypoint.address as any)?.coordinates) {
     const coords = (waypoint.address as any).coordinates;
@@ -209,7 +209,7 @@ const getWaypointCoordinates = (waypoint: LoadWaypoint): { lat: number | null; l
       lat = parseCoordinate(coords[1]); // latitude second in GeoJSON
     }
   }
-  
+
   return { lat, lng };
 };
 
@@ -229,7 +229,7 @@ const hasValidCoordinates = (load: Load): boolean => {
 
   const pickupLat = parseCoordinate(pickup?.latitude);
   const pickupLng = parseCoordinate(pickup?.longitude);
-  
+
   // Must have pickup coordinates
   if (pickupLat === null || pickupLng === null) {
     return false;
@@ -290,15 +290,15 @@ const convertTripToLoadForMap = (trip: Trip) => {
 
   const getLocationCoords = (location: any) => {
     if (!location) return { lat: null, lng: null };
-    
+
     let lat = parseCoord(location.latitude);
     let lng = parseCoord(location.longitude);
-    
+
     if ((lat === null || lng === null) && location.placeId?.currentLocation) {
       lat = parseCoord(location.placeId.currentLocation.latitude);
       lng = parseCoord(location.placeId.currentLocation.longitude);
     }
-    
+
     return { lat, lng };
   };
 
@@ -326,11 +326,11 @@ const convertTripToLoadForMap = (trip: Trip) => {
   // Helper to get stop coordinates
   const getStopCoords = (stop: any, order: any) => {
     if (!stop) return { lat: null, lng: null };
-    
+
     const lat = parseCoord(stop.latitude || stop.lat);
     const lng = parseCoord(stop.longitude || stop.lng);
     if (lat !== null && lng !== null) return { lat, lng };
-    
+
     // Fallback to main location
     if (stop.address && typeof stop.address === 'string') {
       if (order.pickupLocation) {
@@ -342,7 +342,7 @@ const convertTripToLoadForMap = (trip: Trip) => {
         if (coords.lat !== null && coords.lng !== null) return coords;
       }
     }
-    
+
     return { lat: null, lng: null };
   };
 
@@ -498,8 +498,8 @@ const LoadMapScreen: React.FC = () => {
         const tripsData = Array.isArray(response.data.data)
           ? response.data.data
           : Array.isArray(response.data)
-          ? response.data
-          : [];
+            ? response.data
+            : [];
 
         setTrips(tripsData);
 
@@ -679,7 +679,7 @@ const LoadMapScreen: React.FC = () => {
                     {/* Show waypoints count if multiple stops */}
                     {load.route?.wayPoints && load.route.wayPoints.length > 2 && (
                       <View style={styles.metaRow}>
-                        <Ionicons name="location-outline" size={16} color="#4B5563" />
+                        <Ionicons name="location-outline" size={16} color={COLORS.accentNavyBlue} />
                         <Text style={styles.metaLabel}>Additional Stops</Text>
                         <Text style={styles.metaValue}>{load.route.wayPoints.length - 2} stops</Text>
                       </View>
@@ -687,7 +687,7 @@ const LoadMapScreen: React.FC = () => {
 
                     {load.vehicle?.internalId && (
                       <View style={styles.metaRow}>
-                        <Ionicons name="car-outline" size={16} color="#4B5563" />
+                        <Ionicons name="car-outline" size={16} color={COLORS.accentRed} />
                         <Text style={styles.metaLabel}>Vehicle</Text>
                         <Text style={styles.metaValue}>{load.vehicle.internalId}</Text>
                       </View>
@@ -695,7 +695,7 @@ const LoadMapScreen: React.FC = () => {
 
                     {firstOrder?.customer?.name && (
                       <View style={styles.metaRow}>
-                        <Ionicons name="business-outline" size={16} color="#4B5563" />
+                        <Ionicons name="business-outline" size={16} color={COLORS.accentGreen} />
                         <Text style={styles.metaLabel}>Customer</Text>
                         <Text style={styles.metaValue}>{firstOrder.customer.name}</Text>
                       </View>
@@ -733,17 +733,17 @@ const LoadMapScreen: React.FC = () => {
 const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
-    backgroundColor: '#f5f5f5',
+    backgroundColor: COLORS.bgMain,
   },
   container: {
     flex: 1,
   },
   header: {
-    backgroundColor: '#fff',
+    backgroundColor: COLORS.bgCardLight,
     paddingHorizontal: 20,
     paddingVertical: 24,
     borderBottomWidth: 1,
-    borderBottomColor: '#e5e5e5',
+    borderBottomColor: COLORS.accentNavyBlue,
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
@@ -751,7 +751,7 @@ const styles = StyleSheet.create({
   headerTitle: {
     fontSize: 26,
     fontWeight: '700',
-    color: '#1F2937',
+    color: COLORS.textPrimary,
     marginBottom: 4,
   },
   headerSubtitle: {
@@ -759,7 +759,7 @@ const styles = StyleSheet.create({
     color: '#6B7280',
   },
   counterBadge: {
-    backgroundColor: '#8B5CF6',
+    backgroundColor: COLORS.accentNavyBlue,
     borderRadius: 16,
     paddingHorizontal: 14,
     paddingVertical: 8,
@@ -819,7 +819,7 @@ const styles = StyleSheet.create({
     lineHeight: 20,
   },
   card: {
-    backgroundColor: '#fff',
+    backgroundColor: COLORS.bgCardLight,
     borderRadius: 16,
     padding: 16,
     marginBottom: 18,
@@ -848,7 +848,7 @@ const styles = StyleSheet.create({
   loadId: {
     fontSize: 16,
     fontWeight: '700',
-    color: '#111827',
+    color: COLORS.textPrimary,
     flexShrink: 1,
   },
   statusBadge: {
@@ -857,7 +857,7 @@ const styles = StyleSheet.create({
     borderRadius: 999,
   },
   statusText: {
-    color: '#fff',
+    color: COLORS.textPrimary,
     fontWeight: '600',
     fontSize: 10,
     letterSpacing: 0.5,
@@ -903,18 +903,18 @@ const styles = StyleSheet.create({
   routeDetails: {
     flex: 1,
     borderBottomWidth: 1,
-    borderBottomColor: '#E5E7EB',
+    borderBottomColor: COLORS.accentNavyBlue,
     paddingBottom: 12,
   },
   routeLocation: {
     fontSize: 16,
     fontWeight: '600',
-    color: '#111827',
+    color: COLORS.textPrimary,
     marginBottom: 4,
   },
   routeAddress: {
     fontSize: 13,
-    color: '#6B7280',
+    color: COLORS.textSecondary,
   },
   routeConnector: {
     height: 20,
@@ -932,11 +932,11 @@ const styles = StyleSheet.create({
   metaLabel: {
     fontSize: 13,
     fontWeight: '600',
-    color: '#4B5563',
+    color: COLORS.textPrimary,
   },
   metaValue: {
     fontSize: 13,
-    color: '#1F2937',
+    color: COLORS.textSecondary,
   },
   ordersInfo: {
     flexDirection: 'row',
@@ -954,7 +954,7 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   orderCountBadge: {
-    backgroundColor: '#8B5CF6',
+    backgroundColor: COLORS.accentGreen,
     paddingHorizontal: 6,
     paddingVertical: 2,
     borderRadius: 8,

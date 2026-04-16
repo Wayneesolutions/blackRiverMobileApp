@@ -17,6 +17,7 @@ import { apiService } from '../../services/api/apiService';
 import { logger } from '../../utils/loggerHelper';
 import { Colors } from '../../utils/colors';
 import { authManager } from '../../types/AuthManager';
+import { COLORS, SPACING, RADIUS, FONT_SIZE, FONT_WEIGHT, SHADOWS } from '../../theme';
 
 type FilterType = 'monthly' | 'weekly';
 
@@ -118,7 +119,7 @@ export default function MileageSheetScreen() {
         endDate: today.toISOString(),
         joiningDate: joiningDate?.toISOString(),
       });
-      
+
       // Fetch mileage data after dates are initialized
       // This will be called after state updates, so we'll use a separate effect
     } catch (error: any) {
@@ -138,7 +139,7 @@ export default function MileageSheetScreen() {
   const fetchMileageData = async () => {
     try {
       setLoading(true);
-      
+
       // Build query parameters
       const params: {
         startDate?: string;
@@ -147,18 +148,18 @@ export default function MileageSheetScreen() {
       } = {
         groupBy: filterType
       };
-      
+
       if (startDate) {
         params.startDate = startDate.toISOString();
       }
       if (endDate) {
         params.endDate = endDate.toISOString();
       }
-      
+
       // Fetch mileage data from API
       logger.info('Fetching mileage data with params:', params);
       const response = await apiService.getDriverMileage(params);
-      
+
       logger.info('Mileage API response:', {
         success: response.success,
         hasData: !!response.data,
@@ -167,12 +168,12 @@ export default function MileageSheetScreen() {
         error: response.error,
         message: response.message
       });
-      
+
       if (response.success && response.data) {
         // Handle nested data structure: backend returns {success: true, data: [...]}
         // API service wraps it as {success: true, data: {success: true, data: [...]}}
         let mileageData: MileageData[] = [];
-        
+
         if (Array.isArray(response.data)) {
           // Direct array
           mileageData = response.data;
@@ -186,11 +187,11 @@ export default function MileageSheetScreen() {
             mileageData = nestedData.data;
           }
         }
-        
+
         setAllMileageData(mileageData);
         setFilteredMileageData(mileageData);
         logger.info('Mileage data loaded successfully', { count: mileageData.length });
-        
+
         if (mileageData.length === 0) {
           logger.warn('No mileage data returned from API - check backend logs');
         }
@@ -245,20 +246,20 @@ export default function MileageSheetScreen() {
     const sunday = new Date(monday);
     sunday.setDate(monday.getDate() + 6);
     sunday.setHours(23, 59, 59, 999);
-    
+
     const label = `${monday.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} - ${sunday.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}`;
-    
+
     return { start: monday, end: sunday, label };
   };
 
   const groupTripsByWeek = (trips: MileageData['trips']): MileageData[] => {
     const weeklyData: Record<string, MileageData['trips']> = {};
-    
+
     trips.forEach(trip => {
       const tripDate = new Date(trip.startDate);
       const weekRange = getWeekRange(tripDate);
       const weekKey = weekRange.label;
-      
+
       if (!weeklyData[weekKey]) {
         weeklyData[weekKey] = [];
       }
@@ -270,7 +271,7 @@ export default function MileageSheetScreen() {
       // For demo, assume 85% loaded, 15% empty
       const loadedMiles = totalMiles * 0.85;
       const emptyMiles = totalMiles * 0.15;
-      
+
       return {
         month: weekLabel,
         totalMiles,
@@ -297,13 +298,13 @@ export default function MileageSheetScreen() {
           const tripDate = new Date(trip.startDate);
           return tripDate >= startDate && tripDate <= endDate;
         });
-        
+
         if (filteredTrips.length === 0) return null;
-        
+
         const totalMiles = filteredTrips.reduce((sum, trip) => sum + trip.distance, 0);
         const loadedMiles = filteredTrips.reduce((sum, trip) => sum + trip.distance * 0.85, 0);
         const emptyMiles = filteredTrips.reduce((sum, trip) => sum + trip.distance * 0.15, 0);
-        
+
         return {
           ...period,
           totalMiles,
@@ -327,7 +328,7 @@ export default function MileageSheetScreen() {
   const handleDateSelect = (date: Date) => {
     const selectedDate = new Date(date);
     selectedDate.setHours(0, 0, 0, 0);
-    
+
     // Validate against min and max dates
     if (minDate) {
       const minDateStart = new Date(minDate);
@@ -337,14 +338,14 @@ export default function MileageSheetScreen() {
         return;
       }
     }
-    
+
     const maxDateStart = new Date(maxDate);
     maxDateStart.setHours(0, 0, 0, 0);
     if (selectedDate > maxDateStart) {
       Alert.alert('Invalid Date', 'Date cannot be after today');
       return;
     }
-    
+
     if (showDatePicker === 'start') {
       setStartDate(selectedDate);
       if (endDate && selectedDate > endDate) {
@@ -377,7 +378,7 @@ export default function MileageSheetScreen() {
     const today = new Date();
     const daysInMonth = new Date(displayYear, displayMonth + 1, 0).getDate();
     const firstDayOfMonth = new Date(displayYear, displayMonth, 1).getDay();
-    
+
     const days = [];
     // Add empty cells for days before the first day of the month
     for (let i = 0; i < firstDayOfMonth; i++) {
@@ -393,7 +394,7 @@ export default function MileageSheetScreen() {
     const navigateMonth = (direction: 'prev' | 'next') => {
       let newMonth = displayMonth;
       let newYear = displayYear;
-      
+
       if (direction === 'prev') {
         if (newMonth === 0) {
           newMonth = 11;
@@ -409,12 +410,12 @@ export default function MileageSheetScreen() {
           newMonth = newMonth + 1;
         }
       }
-      
+
       // Check if the new month/year is within bounds
       const newDate = new Date(newYear, newMonth, 1);
       const maxDateStart = new Date(maxDate);
       maxDateStart.setHours(0, 0, 0, 0);
-      
+
       if (minDate) {
         const minDateStart = new Date(minDate);
         minDateStart.setHours(0, 0, 0, 0);
@@ -423,12 +424,12 @@ export default function MileageSheetScreen() {
           return;
         }
       }
-      
+
       if (newDate > maxDateStart) {
         // Don't navigate after max date
         return;
       }
-      
+
       setDisplayMonth(newMonth);
       setDisplayYear(newYear);
     };
@@ -472,23 +473,23 @@ export default function MileageSheetScreen() {
                   if (day === null) {
                     return <View key={index} style={styles.calendarDay} />;
                   }
-                  
+
                   const date = new Date(displayYear, displayMonth, day);
                   const dateStartOfDay = new Date(date);
                   dateStartOfDay.setHours(0, 0, 0, 0);
-                  
+
                   const todayStart = new Date(maxDate);
                   todayStart.setHours(0, 0, 0, 0);
-                  
+
                   const minDateStart = minDate ? new Date(minDate) : null;
                   if (minDateStart) {
                     minDateStart.setHours(0, 0, 0, 0);
                   }
-                  
+
                   const isStartDate = startDate && dateStartOfDay.toDateString() === startDate.toDateString();
                   const isEndDate = endDate && dateStartOfDay.toDateString() === endDate.toDateString();
                   const isInRange = startDate && endDate && dateStartOfDay >= startDate && dateStartOfDay <= endDate;
-                  
+
                   // Disable dates before minDate or after maxDate
                   const isBeforeMin = minDateStart && dateStartOfDay < minDateStart;
                   const isAfterMax = dateStartOfDay > todayStart;
@@ -561,10 +562,10 @@ export default function MileageSheetScreen() {
               style={[styles.filterButton, filterType === 'monthly' && styles.filterButtonActive]}
               onPress={() => setFilterType('monthly')}
             >
-              <Ionicons 
-                name="calendar" 
-                size={18} 
-                color={filterType === 'monthly' ? Colors.white : Colors.gray[500]} 
+              <Ionicons
+                name="calendar"
+                size={18}
+                color={filterType === 'monthly' ? Colors.white : Colors.gray[500]}
               />
               <Text style={[styles.filterButtonText, filterType === 'monthly' && styles.filterButtonTextActive]}>
                 Monthly
@@ -574,10 +575,10 @@ export default function MileageSheetScreen() {
               style={[styles.filterButton, filterType === 'weekly' && styles.filterButtonActive]}
               onPress={() => setFilterType('weekly')}
             >
-              <Ionicons 
-                name="calendar-outline" 
-                size={18} 
-                color={filterType === 'weekly' ? Colors.white : Colors.gray[500]} 
+              <Ionicons
+                name="calendar-outline"
+                size={18}
+                color={filterType === 'weekly' ? Colors.white : Colors.gray[500]}
               />
               <Text style={[styles.filterButtonText, filterType === 'weekly' && styles.filterButtonTextActive]}>
                 Weekly
@@ -590,20 +591,20 @@ export default function MileageSheetScreen() {
         <View style={[styles.filterRow, styles.filterRowLast]}>
           <Text style={styles.filterLabel}>Date Range:</Text>
           <View style={styles.dateFilterRow}>
-        <TouchableOpacity
-          style={styles.dateFilterButton}
-          onPress={() => {
-            // Show the month of the start date, or min date, or current month
-            const dateToShow = startDate || minDate || new Date();
-            setDisplayMonth(dateToShow.getMonth());
-            setDisplayYear(dateToShow.getFullYear());
-            setShowDatePicker('start');
-            setShowCalendarModal(true);
-          }}
-        >
+            <TouchableOpacity
+              style={styles.dateFilterButton}
+              onPress={() => {
+                // Show the month of the start date, or min date, or current month
+                const dateToShow = startDate || minDate || new Date();
+                setDisplayMonth(dateToShow.getMonth());
+                setDisplayYear(dateToShow.getFullYear());
+                setShowDatePicker('start');
+                setShowCalendarModal(true);
+              }}
+            >
               <Ionicons name="calendar-outline" size={16} color={Colors.primary} />
               <Text style={styles.dateFilterText} numberOfLines={1}>
-                {startDate 
+                {startDate
                   ? startDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
                   : 'Start Date'}
               </Text>
@@ -611,24 +612,24 @@ export default function MileageSheetScreen() {
 
             <Text style={styles.dateSeparator}>-</Text>
 
-        <TouchableOpacity
-          style={styles.dateFilterButton}
-          onPress={() => {
-            if (!startDate) {
-              Alert.alert('Select Start Date', 'Please select a start date first');
-              return;
-            }
-            // Show the month of the end date, or start date, or current month
-            const dateToShow = endDate || startDate || new Date();
-            setDisplayMonth(dateToShow.getMonth());
-            setDisplayYear(dateToShow.getFullYear());
-            setShowDatePicker('end');
-            setShowCalendarModal(true);
-          }}
-        >
+            <TouchableOpacity
+              style={styles.dateFilterButton}
+              onPress={() => {
+                if (!startDate) {
+                  Alert.alert('Select Start Date', 'Please select a start date first');
+                  return;
+                }
+                // Show the month of the end date, or start date, or current month
+                const dateToShow = endDate || startDate || new Date();
+                setDisplayMonth(dateToShow.getMonth());
+                setDisplayYear(dateToShow.getFullYear());
+                setShowDatePicker('end');
+                setShowCalendarModal(true);
+              }}
+            >
               <Ionicons name="calendar-outline" size={16} color={Colors.primary} />
               <Text style={styles.dateFilterText} numberOfLines={1}>
-                {endDate 
+                {endDate
                   ? endDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
                   : 'End Date'}
               </Text>
@@ -661,7 +662,7 @@ export default function MileageSheetScreen() {
           <Ionicons name="speedometer-outline" size={64} color={Colors.gray[400]} />
           <Text style={styles.emptyTitle}>No Mileage Data</Text>
           <Text style={styles.emptySubtitle}>
-            Your mileage data will appear here once trips are completed. 
+            Your mileage data will appear here once trips are completed.
             Contact your dispatcher for more information.
           </Text>
         </ScrollView>
@@ -757,10 +758,10 @@ export default function MileageSheetScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: Colors.gray[50],
+    backgroundColor: COLORS.bgMain,
   },
   header: {
-    backgroundColor: Colors.white,
+    backgroundColor: COLORS.bgCardLight,
     padding: 20,
     borderBottomWidth: 1,
     borderBottomColor: Colors.gray[200],
@@ -768,12 +769,12 @@ const styles = StyleSheet.create({
   headerTitle: {
     fontSize: 24,
     fontWeight: 'bold',
-    color: Colors.gray[900],
+    color: COLORS.textPrimary,
     marginBottom: 4,
   },
   headerSubtitle: {
     fontSize: 14,
-    color: Colors.gray[500],
+    color: COLORS.textSecondary,
   },
   filterSection: {
     backgroundColor: Colors.white,

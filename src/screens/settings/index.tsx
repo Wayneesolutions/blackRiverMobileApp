@@ -653,7 +653,7 @@ const SettingsScreen = ({ route, navigation: navProp, onLogout }: SettingsScreen
           >
             <View style={styles.actionContent}>
               <View style={styles.actionIconContainer}>
-                <Ionicons name="refresh" size={24} color="#8B5CF6" />
+                <Ionicons name="refresh" size={24} color={COLORS.accentBlue} />
               </View>
               <View style={styles.actionTextContainer}>
                 <Text style={styles.actionTitle}>Check for Updates</Text>
@@ -662,7 +662,7 @@ const SettingsScreen = ({ route, navigation: navProp, onLogout }: SettingsScreen
                 </Text>
               </View>
               {isUpdating ? (
-                <ActivityIndicator size="small" color="#8B5CF6" />
+                <ActivityIndicator size="small" color={COLORS.accentNavyBlue} />
               ) : (
                 <Ionicons name="chevron-forward" size={20} color="#999" />
               )}
@@ -676,7 +676,7 @@ const SettingsScreen = ({ route, navigation: navProp, onLogout }: SettingsScreen
           >
             <View style={styles.actionContent}>
               <View style={styles.actionIconContainer}>
-                <Ionicons name="lock-closed" size={24} color="#8B5CF6" />
+                <Ionicons name="lock-closed" size={24} color={COLORS.accentGreen} />
               </View>
               <View style={styles.actionTextContainer}>
                 <Text style={styles.actionTitle}>Change Password</Text>
@@ -693,7 +693,7 @@ const SettingsScreen = ({ route, navigation: navProp, onLogout }: SettingsScreen
           >
             <View style={styles.actionContent}>
               <View style={styles.actionIconContainer}>
-                <Ionicons name="chatbubble-ellipses" size={24} color="#8B5CF6" />
+                <Ionicons name="chatbubble-ellipses" size={24} color={COLORS.accentOrange} />
               </View>
               <View style={styles.actionTextContainer}>
                 <Text style={styles.actionTitle}>Send Feedback</Text>
@@ -726,77 +726,11 @@ const SettingsScreen = ({ route, navigation: navProp, onLogout }: SettingsScreen
             </View>
           </TouchableOpacity>
 
-          <TouchableOpacity
-            style={styles.actionBtn}
-            onPress={async () => {
-              await notificationService.sendLocalNotification(
-                'New Trip Assigned',
-                'Pick up from Warehouse A — Order #1234',
-                { type: 'trip_assigned' }
-              );
-              Alert.alert('Scheduled', 'Notification sent! Swipe down from top of iPhone to see it.');
-            }}
-            activeOpacity={0.7}
-          >
-            <View style={styles.actionContent}>
-              <View style={styles.actionIconContainer}>
-                <Ionicons name="car" size={24} color="#10B981" />
-              </View>
-              <View style={styles.actionTextContainer}>
-                <Text style={styles.actionTitle}>Test Trip Notification</Text>
-                <Text style={styles.actionSubtitle}>Tap → swipe down from top to see it</Text>
-              </View>
-              <Ionicons name="notifications-outline" size={20} color="#999" />
-            </View>
-          </TouchableOpacity>
 
-          <TouchableOpacity
-            style={styles.actionBtn}
-            onPress={async () => {
-              await notificationService.sendLocalNotification(
-                'Dispatcher',
-                'Your next load is ready. Please confirm.',
-                { type: 'chat' }
-              );
-              Alert.alert('Scheduled', 'Notification sent! Swipe down from top of iPhone to see it.');
-            }}
-            activeOpacity={0.7}
-          >
-            <View style={styles.actionContent}>
-              <View style={styles.actionIconContainer}>
-                <Ionicons name="chatbubble-ellipses" size={24} color="#3B82F6" />
-              </View>
-              <View style={styles.actionTextContainer}>
-                <Text style={styles.actionTitle}>Test Chat Notification</Text>
-                <Text style={styles.actionSubtitle}>Tap → swipe down from top to see it</Text>
-              </View>
-              <Ionicons name="notifications-outline" size={20} color="#999" />
-            </View>
-          </TouchableOpacity>
 
-          <TouchableOpacity
-            style={[styles.actionBtn, { borderBottomWidth: 0 }]}
-            onPress={async () => {
-              await notificationService.sendLocalNotification(
-                'Logistiq Innovations',
-                'You have a new update from dispatch.',
-                { type: 'notification' }
-              );
-              Alert.alert('Scheduled', 'Notification sent! Swipe down from top of iPhone to see it.');
-            }}
-            activeOpacity={0.7}
-          >
-            <View style={styles.actionContent}>
-              <View style={styles.actionIconContainer}>
-                <Ionicons name="notifications" size={24} color="#8B5CF6" />
-              </View>
-              <View style={styles.actionTextContainer}>
-                <Text style={styles.actionTitle}>Test General Notification</Text>
-                <Text style={styles.actionSubtitle}>Tap → swipe down from top to see it</Text>
-              </View>
-              <Ionicons name="notifications-outline" size={20} color="#999" />
-            </View>
-          </TouchableOpacity>
+
+
+
         </View>
 
         {/* Logout Section */}
@@ -905,12 +839,12 @@ const styles = StyleSheet.create({
   profileHeroName: {
     fontSize: 22,
     fontWeight: '700',
-    color: '#1F2937',
+    color: COLORS.textPrimary,
     marginBottom: 4,
   },
   profileHeroEmail: {
     fontSize: 14,
-    color: '#6B7280',
+    color: COLORS.textPrimary,
     marginBottom: 12,
   },
   profileStatusBadge: {
@@ -924,7 +858,7 @@ const styles = StyleSheet.create({
     letterSpacing: 0.5,
   },
   actionsSection: {
-    backgroundColor: '#fff',
+    backgroundColor: COLORS.bgCardLight,
     marginTop: 20,
     marginHorizontal: 20,
     borderRadius: 16,
@@ -936,11 +870,11 @@ const styles = StyleSheet.create({
     elevation: 2,
   },
   actionBtn: {
-    backgroundColor: '#fff',
+    backgroundColor: COLORS.bgCardLight,
     paddingVertical: 16,
     paddingHorizontal: 20,
     borderBottomWidth: 1,
-    borderBottomColor: '#f3f4f6',
+    borderBottomColor: COLORS.accentNavyBlue,
   },
   disabledBtn: {
     opacity: 0.6,
@@ -957,7 +891,7 @@ const styles = StyleSheet.create({
     width: 40,
     height: 40,
     borderRadius: 20,
-    backgroundColor: '#F3F4F6',
+
     justifyContent: 'center',
     alignItems: 'center',
     marginRight: 12,
@@ -968,12 +902,12 @@ const styles = StyleSheet.create({
   actionTitle: {
     fontSize: 16,
     fontWeight: '600',
-    color: '#1F2937',
+    color: COLORS.textPrimary,
     marginBottom: 4,
   },
   actionSubtitle: {
     fontSize: 13,
-    color: '#6B7280',
+    color: COLORS.textPrimary,
   },
   logoutText: {
     color: '#EF4444',
@@ -981,13 +915,13 @@ const styles = StyleSheet.create({
   sectionTitle: {
     fontSize: 18,
     fontWeight: '700',
-    color: '#1F2937',
+    color: COLORS.textPrimary,
     marginTop: 24,
     marginBottom: 12,
     marginHorizontal: 20,
   },
   card: {
-    backgroundColor: '#fff',
+    backgroundColor: COLORS.bgCardLight,
     marginHorizontal: 20,
     marginBottom: 20,
     borderRadius: 16,
@@ -1003,12 +937,12 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     paddingVertical: 12,
     borderBottomWidth: 1,
-    borderBottomColor: '#f3f4f6',
+    borderBottomColor: COLORS.accentNavyBlue,
   },
-  label: { fontSize: 14, color: '#555', fontWeight: '500', flex: 1 },
+  label: { fontSize: 14, color: COLORS.textPrimary, fontWeight: '500', flex: 1 },
   value: {
     fontSize: 14,
-    color: '#333',
+    color: COLORS.textPrimary,
     fontWeight: '600',
     flex: 1.5,
     textAlign: 'right',
