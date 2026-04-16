@@ -253,7 +253,13 @@ class ApiService {
         const body = options?.body;
         let isFormData = false;
         try {
-            isFormData = body != null && typeof FormData !== 'undefined' && body instanceof FormData;
+            isFormData =
+                body != null && (
+                    // Standard browser check
+                    (typeof FormData !== 'undefined' && body instanceof FormData) ||
+                    // React Native / Hermes fallback: FormData stores parts in _parts array
+                    (typeof body === 'object' && '_parts' in (body as any) && Array.isArray((body as any)._parts))
+                );
         } catch (e) {
             // FormData might not be available or instanceof check failed
             isFormData = false;
@@ -791,8 +797,11 @@ class ApiService {
                 formData.append('description', description);
             }
 
+            // Debug: confirm isFormData detection works in this RN build
+            const isRNFormData = typeof formData === 'object' && '_parts' in (formData as any);
+            console.log('📤 FormData detection – instanceof:', formData instanceof FormData, '| _parts:', isRNFormData);
             console.log('📤 Sending request to /driver/orders/' + orderId + '/documents');
-            
+
             const response = await this.request(`/driver/orders/${orderId}/documents`, {
                 method: 'POST',
                 body: formData,

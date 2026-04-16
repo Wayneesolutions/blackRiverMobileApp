@@ -12,6 +12,8 @@ import {
   ActivityIndicator,
   Animated,
   ScrollView,
+  useWindowDimensions,
+  StatusBar,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
@@ -34,6 +36,9 @@ interface LoginErrors {
 }
 
 export default function LoginScreen({ navigation, onAuthSuccess }: Props) {
+  const { width } = useWindowDimensions();
+  const isTablet  = width >= 600;
+
   const [email, setEmail]               = useState("");
   const [password, setPassword]         = useState("");
   const [showPassword, setShowPassword] = useState(false);
@@ -42,15 +47,14 @@ export default function LoginScreen({ navigation, onAuthSuccess }: Props) {
   const [emailFocused, setEmailFocused] = useState(false);
   const [passFocused, setPassFocused]   = useState(false);
 
-  // Subtle fade-in on mount
   const fadeAnim  = useRef(new Animated.Value(0)).current;
-  const slideAnim = useRef(new Animated.Value(24)).current;
+  const slideAnim = useRef(new Animated.Value(30)).current;
 
   useEffect(() => {
     logger.userAction("Screen View", { screen: "LoginScreen" }, "LoginScreen");
     Animated.parallel([
-      Animated.timing(fadeAnim,  { toValue: 1, duration: 600, useNativeDriver: true }),
-      Animated.timing(slideAnim, { toValue: 0, duration: 600, useNativeDriver: true }),
+      Animated.timing(fadeAnim,  { toValue: 1, duration: 700, useNativeDriver: true }),
+      Animated.timing(slideAnim, { toValue: 0, duration: 700, useNativeDriver: true }),
     ]).start();
   }, []);
 
@@ -140,9 +144,9 @@ export default function LoginScreen({ navigation, onAuthSuccess }: Props) {
       clearTimeout(timeoutId);
       let errorMessage = "An unexpected error occurred. Please try again.";
       if (error instanceof Error) {
-        if (error.message === "Network request failed") errorMessage = "Unable to connect to server. Please check your internet connection.";
-        else if (error.message.includes("timeout"))    errorMessage = "Connection timeout. Please try again.";
-        else if (error.message.includes("ECONNREFUSED")) errorMessage = "Server is not available. Please try again later.";
+        if (error.message === "Network request failed")    errorMessage = "Unable to connect to server. Please check your internet connection.";
+        else if (error.message.includes("timeout"))       errorMessage = "Connection timeout. Please try again.";
+        else if (error.message.includes("ECONNREFUSED"))  errorMessage = "Server is not available. Please try again later.";
         logger.error("Login error", { error: error.message, stack: error.stack, email }, "LoginScreen");
       } else {
         logger.error("Login error", { error: String(error), email }, "LoginScreen");
@@ -173,160 +177,212 @@ export default function LoginScreen({ navigation, onAuthSuccess }: Props) {
 
   // ─── JSX ──────────────────────────────────────────────────────────────────────
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={styles.safeArea} edges={["top", "bottom"]}>
+      <StatusBar barStyle="light-content" backgroundColor={COLORS.bgMain} />
+
+      {/* Background depth glows */}
+      <View style={styles.bgGlow1} pointerEvents="none" />
+      <View style={styles.bgGlow2} pointerEvents="none" />
+
       <KeyboardAvoidingView
         behavior={Platform.OS === "ios" ? "padding" : "height"}
-        style={{ flex: 1 }}
+        style={styles.kavFlex}
       >
         <ScrollView
-          contentContainerStyle={styles.scrollContent}
+          contentContainerStyle={[
+            styles.scrollContent,
+            isTablet && styles.scrollContentTablet,
+          ]}
           keyboardShouldPersistTaps="handled"
           showsVerticalScrollIndicator={false}
         >
-          {/* ── Hero / Brand section ────────────────────────────────────────── */}
-          <View style={styles.heroSection}>
-            {/* Neon glow circle behind logo */}
-            <View style={styles.logoGlow} />
-            <Image source={logo} style={styles.logoImage} resizeMode="contain" />
+          <View style={[styles.inner, isTablet && styles.innerTablet]}>
 
-            <View style={styles.brandTextRow}>
-              <Text style={styles.tagline}>All in One </Text>
-              <View style={styles.taglineHighlight}>
-                <Text style={styles.taglineHighlightText}>Driver Platform</Text>
-              </View>
-            </View>
-
-            <Text style={styles.heroSubtext}>
-              Manage trips, logs & fleet — from your pocket.
-            </Text>
-          </View>
-
-          {/* ── Form card ───────────────────────────────────────────────────── */}
-          <Animated.View
-            style={[
-              styles.formCard,
-              { opacity: fadeAnim, transform: [{ translateY: slideAnim }] },
-            ]}
-          >
-            {/* Neon glow line at card top */}
-            <View style={styles.cardGlowLine} />
-
-            <View style={styles.welcomeSection}>
-              <Text style={styles.welcomeTitle}>Welcome Back</Text>
-              <Text style={styles.welcomeSubtitle}>Sign in to your account</Text>
-            </View>
-
-            {/* ── Email ─────────────────────────────────────────────────────── */}
-            <Text style={styles.inputLabel}>Email Address</Text>
-            <View
-              style={[
-                styles.inputContainer,
-                { borderColor: inputBorder(emailFocused, errors.email) },
-                emailFocused && styles.inputContainerFocused,
-              ]}
-            >
-              <Ionicons
-                name="mail-outline"
-                size={18}
-                color={errors.email ? COLORS.accentRed : emailFocused ? COLORS.accentBlue : COLORS.textSecondary}
-                style={styles.inputIcon}
-              />
-              <TextInput
-                style={styles.input}
-                placeholder="your@email.com"
-                placeholderTextColor={COLORS.textSecondary}
-                value={email}
-                onChangeText={handleEmailChange}
-                keyboardType="email-address"
-                autoCapitalize="none"
-                autoCorrect={false}
-                editable={!isLoading}
-                returnKeyType="next"
-                onFocus={() => setEmailFocused(true)}
-                onBlur={() => setEmailFocused(false)}
-              />
-            </View>
-            {errors.email && (
-              <View style={styles.errorRow}>
-                <Ionicons name="alert-circle" size={12} color={COLORS.accentRed} />
-                <Text style={styles.errorText}>{errors.email}</Text>
-              </View>
-            )}
-
-            {/* ── Password ──────────────────────────────────────────────────── */}
-            <Text style={[styles.inputLabel, { marginTop: SPACING.md }]}>Password</Text>
-            <View
-              style={[
-                styles.inputContainer,
-                { borderColor: inputBorder(passFocused, errors.password) },
-                passFocused && styles.inputContainerFocused,
-              ]}
-            >
-              <Ionicons
-                name="lock-closed-outline"
-                size={18}
-                color={errors.password ? COLORS.accentRed : passFocused ? COLORS.accentBlue : COLORS.textSecondary}
-                style={styles.inputIcon}
-              />
-              <TextInput
-                style={[styles.input, { flex: 1 }]}
-                placeholder="••••••••"
-                placeholderTextColor={COLORS.textSecondary}
-                value={password}
-                onChangeText={handlePasswordChange}
-                secureTextEntry={!showPassword}
-                editable={!isLoading}
-                returnKeyType="done"
-                onSubmitEditing={handleLogin}
-                onFocus={() => setPassFocused(true)}
-                onBlur={() => setPassFocused(false)}
-              />
-              <TouchableOpacity
-                onPress={() => setShowPassword(!showPassword)}
-                style={styles.eyeIcon}
-                disabled={isLoading}
-              >
-                <Ionicons
-                  name={showPassword ? "eye-outline" : "eye-off-outline"}
-                  size={18}
-                  color={errors.password ? COLORS.accentRed : COLORS.textSecondary}
+            {/* ── Brand / Hero ──────────────────────────────────────────────── */}
+            <View style={[styles.heroSection, isTablet && styles.heroSectionTablet]}>
+              <View style={styles.logoWrapper}>
+               
+                <Image
+                  source={logo}
+                  style={[styles.logoImage, isTablet && styles.logoImageTablet]}
+                  resizeMode="contain"
                 />
-              </TouchableOpacity>
-            </View>
-            {errors.password && (
-              <View style={styles.errorRow}>
-                <Ionicons name="alert-circle" size={12} color={COLORS.accentRed} />
-                <Text style={styles.errorText}>{errors.password}</Text>
               </View>
-            )}
 
-            {/* ── Sign In button ────────────────────────────────────────────── */}
-            <TouchableOpacity
-              style={[styles.loginButton, isLoading && styles.loginButtonDisabled]}
-              onPress={handleLogin}
-              disabled={isLoading}
-              activeOpacity={0.85}
-            >
-              {isLoading ? (
-                <View style={styles.loadingRow}>
-                  <ActivityIndicator color={COLORS.black} size="small" />
-                  <Text style={[styles.loginButtonText, { marginLeft: SPACING.sm }]}>
-                    Signing in…
+              <View style={styles.brandRow}>
+                <Text style={[styles.tagline, isTablet && styles.taglineTablet]}>
+                  All in One{" "}
+                </Text>
+                <View style={styles.taglineBadge}>
+                  <Text style={[styles.taglineBadgeText, isTablet && styles.taglineTablet]}>
+                    Driver Platform
                   </Text>
                 </View>
-              ) : (
-                <View style={styles.loadingRow}>
-                  <Ionicons name="log-in-outline" size={20} color={COLORS.black} style={{ marginRight: 6 }} />
-                  <Text style={styles.loginButtonText}>Sign In</Text>
-                </View>
-              )}
-            </TouchableOpacity>
+              </View>
 
-            {/* ── Footer note ───────────────────────────────────────────────── */}
-            <Text style={styles.footerNote}>
-              Having trouble? Contact your fleet administrator.
-            </Text>
-          </Animated.View>
+              <Text style={[styles.heroSub, isTablet && styles.heroSubTablet]}>
+                Manage trips, logs &amp; fleet — from your pocket.
+              </Text>
+            </View>
+
+            {/* ── Form Card ─────────────────────────────────────────────────── */}
+            <Animated.View
+              style={[
+                styles.formCard,
+                isTablet && styles.formCardTablet,
+                { opacity: fadeAnim, transform: [{ translateY: slideAnim }] },
+              ]}
+            >
+              {/* top accent line */}
+              <View style={styles.cardAccentLine} />
+
+              <View style={styles.welcomeBlock}>
+                <Text style={[styles.welcomeTitle, isTablet && styles.welcomeTitleTablet]}>
+                  Welcome Back
+                </Text>
+                <Text style={styles.welcomeSub}>Sign in to your account</Text>
+              </View>
+
+              {/* ── Email field ─────────────────────────────────────────────── */}
+              <View style={styles.fieldGroup}>
+                <Text style={styles.label}>EMAIL ADDRESS</Text>
+                <View
+                  style={[
+                    styles.inputWrap,
+                    { borderColor: inputBorder(emailFocused, errors.email) },
+                    emailFocused && styles.inputWrapFocused,
+                    !!errors.email && styles.inputWrapError,
+                  ]}
+                >
+                  <Ionicons
+                    name="mail-outline"
+                    size={17}
+                    color={
+                      errors.email
+                        ? COLORS.accentRed
+                        : emailFocused
+                        ? COLORS.accentBlue
+                        : COLORS.textSecondary
+                    }
+                    style={styles.inputIcon}
+                  />
+                  <TextInput
+                    style={styles.textInput}
+                    placeholder="your@email.com"
+                    placeholderTextColor={COLORS.textSecondary}
+                    value={email}
+                    onChangeText={handleEmailChange}
+                    keyboardType="email-address"
+                    autoCapitalize="none"
+                    autoCorrect={false}
+                    editable={!isLoading}
+                    returnKeyType="next"
+                    onFocus={() => setEmailFocused(true)}
+                    onBlur={() => setEmailFocused(false)}
+                  />
+                </View>
+                {errors.email ? (
+                  <View style={styles.errorRow}>
+                    <Ionicons name="alert-circle" size={12} color={COLORS.accentRed} />
+                    <Text style={styles.errorText}>{errors.email}</Text>
+                  </View>
+                ) : null}
+              </View>
+
+              {/* ── Password field ──────────────────────────────────────────── */}
+              <View style={styles.fieldGroup}>
+                <Text style={styles.label}>PASSWORD</Text>
+                <View
+                  style={[
+                    styles.inputWrap,
+                    { borderColor: inputBorder(passFocused, errors.password) },
+                    passFocused && styles.inputWrapFocused,
+                    !!errors.password && styles.inputWrapError,
+                  ]}
+                >
+                  <Ionicons
+                    name="lock-closed-outline"
+                    size={17}
+                    color={
+                      errors.password
+                        ? COLORS.accentRed
+                        : passFocused
+                        ? COLORS.accentBlue
+                        : COLORS.textSecondary
+                    }
+                    style={styles.inputIcon}
+                  />
+                  <TextInput
+                    style={[styles.textInput, { flex: 1 }]}
+                    placeholder="••••••••"
+                    placeholderTextColor={COLORS.textSecondary}
+                    value={password}
+                    onChangeText={handlePasswordChange}
+                    secureTextEntry={!showPassword}
+                    editable={!isLoading}
+                    returnKeyType="done"
+                    onSubmitEditing={handleLogin}
+                    onFocus={() => setPassFocused(true)}
+                    onBlur={() => setPassFocused(false)}
+                  />
+                  <TouchableOpacity
+                    onPress={() => setShowPassword(!showPassword)}
+                    style={styles.eyeBtn}
+                    disabled={isLoading}
+                    hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                  >
+                    <Ionicons
+                      name={showPassword ? "eye-outline" : "eye-off-outline"}
+                      size={17}
+                      color={errors.password ? COLORS.accentRed : COLORS.textSecondary}
+                    />
+                  </TouchableOpacity>
+                </View>
+                {errors.password ? (
+                  <View style={styles.errorRow}>
+                    <Ionicons name="alert-circle" size={12} color={COLORS.accentRed} />
+                    <Text style={styles.errorText}>{errors.password}</Text>
+                  </View>
+                ) : null}
+              </View>
+
+              {/* ── Sign In button ───────────────────────────────────────────── */}
+              <TouchableOpacity
+                style={[
+                  styles.signInBtn,
+                  isLoading && styles.signInBtnDisabled,
+                ]}
+                onPress={handleLogin}
+                disabled={isLoading}
+                activeOpacity={0.82}
+              >
+                {isLoading ? (
+                  <View style={styles.btnContent}>
+                    <ActivityIndicator color={COLORS.white} size="small" />
+                    <Text style={[styles.signInText, { marginLeft: SPACING.sm }]}>
+                      Signing in…
+                    </Text>
+                  </View>
+                ) : (
+                  <View style={styles.btnContent}>
+                    <Ionicons
+                      name="log-in-outline"
+                      size={19}
+                      color={COLORS.white}
+                      style={{ marginRight: 6 }}
+                    />
+                    <Text style={styles.signInText}>Sign In</Text>
+                  </View>
+                )}
+              </TouchableOpacity>
+
+              {/* ── Footer note ─────────────────────────────────────────────── */}
+              <Text style={styles.footerNote}>
+                Having trouble? Contact your fleet administrator.
+              </Text>
+            </Animated.View>
+
+          </View>
         </ScrollView>
       </KeyboardAvoidingView>
     </SafeAreaView>
@@ -335,153 +391,242 @@ export default function LoginScreen({ navigation, onAuthSuccess }: Props) {
 
 // ─── Styles ───────────────────────────────────────────────────────────────────
 
+const INPUT_HEIGHT  = 52;
+const CARD_RADIUS   = 24;
+const FORM_PADDING  = SPACING["2xl"];     // 32
+
 const styles = StyleSheet.create({
 
-  container: {
+  safeArea: {
     flex: 1,
     backgroundColor: COLORS.bgMain,
   },
+  kavFlex: {
+    flex: 1,
+  },
+
+  // ── Background depth glows ────────────────────────────────────────────────────
+  bgGlow1: {
+    position: "absolute",
+    width: 320,
+    height: 320,
+    borderRadius: 160,
+    backgroundColor: COLORS.accentBlue,
+    opacity: 0.04,
+    top: -60,
+    left: -80,
+  },
+  bgGlow2: {
+    position: "absolute",
+    width: 240,
+    height: 240,
+    borderRadius: 120,
+    backgroundColor: COLORS.accentNavyBlue,
+    opacity: 0.06,
+    bottom: 80,
+    right: -60,
+  },
+
+  // ── Scroll ───────────────────────────────────────────────────────────────────
   scrollContent: {
     flexGrow: 1,
   },
-
-  // ── Hero ─────────────────────────────────────────────────────────────────────
-  heroSection: {
-    flex: 1,
-    alignItems: "center",
+  scrollContentTablet: {
     justifyContent: "center",
+    paddingVertical: SPACING["3xl"],
+  },
+
+  // ── Inner wrapper (tablet: constrained width) ─────────────────────────────────
+  inner: {
+    flex: 1,
+  },
+  innerTablet: {
+    maxWidth: 480,
+    width: "100%",
+    alignSelf: "center",
+  },
+
+  // ── Hero / Brand ──────────────────────────────────────────────────────────────
+  heroSection: {
+    alignItems: "center",
     paddingTop: SPACING["3xl"],
     paddingBottom: SPACING["2xl"],
-    paddingHorizontal: SPACING.base,
+    paddingHorizontal: SPACING.xl,
+  },
+  heroSectionTablet: {
+    paddingTop: SPACING["2xl"],
+    paddingBottom: SPACING.xl,
+  },
+  logoWrapper: {
+    alignItems: "center",
+    justifyContent: "center",
+    marginBottom: SPACING.xl,
     position: "relative",
   },
   logoGlow: {
     position: "absolute",
-    width: 160,
-    height: 160,
-    borderRadius: RADIUS.full,
+    width: 180,
+    height: 100,
+    borderRadius: 50,
     backgroundColor: COLORS.accentBlue,
-    opacity: 0.06,
-    top: SPACING["2xl"],
+    opacity: 0.07,
   },
   logoImage: {
-    width: 140,
-    height: 46,
-    marginBottom: SPACING.xl,
+    width: 160,
+    height: 52,
   },
-  brandTextRow: {
+  logoImageTablet: {
+    width: 190,
+    height: 62,
+  },
+  brandRow: {
     flexDirection: "row",
     alignItems: "center",
     flexWrap: "wrap",
     justifyContent: "center",
-    gap: SPACING.sm,
     marginBottom: SPACING.sm,
   },
   tagline: {
     fontSize: FONT_SIZE["2xl"],
     color: COLORS.textPrimary,
     fontWeight: FONT_WEIGHT.semibold,
+    letterSpacing: -0.3,
   },
-  taglineHighlight: {
-    backgroundColor: COLORS.accentBlue,
-    paddingHorizontal: SPACING.sm,
-    paddingVertical: 2,
-    borderRadius: RADIUS.sm,
+  taglineTablet: {
+    fontSize: FONT_SIZE["3xl"],
   },
-  taglineHighlightText: {
-    fontSize: FONT_SIZE["2xl"],
-    color: COLORS.black,
-    fontWeight: FONT_WEIGHT.bold,
+  taglineBadge: {
+    borderWidth: 1.5,
+    borderColor: COLORS.accentBlue,
+    backgroundColor: "rgba(0,209,255,0.08)",
+    paddingHorizontal: SPACING.md,
+    paddingVertical: 4,
+    borderRadius: RADIUS.full,
   },
-  heroSubtext: {
+  taglineBadgeText: {
+    fontSize: FONT_SIZE.xl,
+    color: COLORS.accentBlue,
+    fontWeight: FONT_WEIGHT.semibold,
+    letterSpacing: 0.1,
+  },
+  heroSub: {
     fontSize: FONT_SIZE.sm,
     color: COLORS.textSecondary,
     textAlign: "center",
     marginTop: SPACING.xs,
     lineHeight: 20,
+    letterSpacing: 0.1,
+  },
+  heroSubTablet: {
+    fontSize: FONT_SIZE.base,
+    lineHeight: 22,
   },
 
   // ── Form card ─────────────────────────────────────────────────────────────────
   formCard: {
-    backgroundColor: COLORS.bgCard,
-    borderTopLeftRadius: RADIUS["2xl"],
-    borderTopRightRadius: RADIUS["2xl"],
-    paddingHorizontal: SPACING.xl,
-    paddingBottom: SPACING["2xl"],
-    borderWidth: 1,
-    borderColor: COLORS.borderSubtle,
-    borderBottomWidth: 0,
-    // shadow
+    backgroundColor: COLORS.bgCardLight,
+    borderTopLeftRadius:  CARD_RADIUS,
+    borderTopRightRadius: CARD_RADIUS,
+    paddingHorizontal: FORM_PADDING,
+    paddingBottom: SPACING["3xl"],
+    borderTopWidth: 1,
+    borderLeftWidth: 1,
+    borderRightWidth: 1,
+    borderColor: "rgba(0,209,255,0.12)",
+    // elevation shadow
     shadowColor: COLORS.accentBlue,
-    shadowOffset: { width: 0, height: -2 },
-    shadowOpacity: 0.10,
-    shadowRadius: 12,
-    elevation: 8,
+    shadowOffset: { width: 0, height: -4 },
+    shadowOpacity: 0.08,
+    shadowRadius: 20,
+    elevation: 12,
   },
-  cardGlowLine: {
-    height: 2,
+  formCardTablet: {
+    borderRadius: CARD_RADIUS,
+    borderWidth: 1,
+    borderColor: "rgba(0,209,255,0.14)",
+    paddingBottom: FORM_PADDING,
+    shadowOffset: { width: 0, height: 4 },
+  },
+
+  // top accent line
+  cardAccentLine: {
+    height: 4,
+    width: 36,
     backgroundColor: COLORS.accentBlue,
-    opacity: 0.50,
-    marginHorizontal: SPACING["2xl"],
-    borderBottomLeftRadius: RADIUS.full,
-    borderBottomRightRadius: RADIUS.full,
+    borderRadius: RADIUS.full,
+    alignSelf: "center",
+    marginTop: SPACING.lg,
     marginBottom: SPACING.xl,
+    opacity: 0.5,
   },
-  welcomeSection: {
-    marginBottom: SPACING.xl,
+
+  // welcome block
+  welcomeBlock: {
     alignItems: "center",
+    marginBottom: SPACING["2xl"],
   },
   welcomeTitle: {
     fontSize: FONT_SIZE["2xl"],
     fontWeight: FONT_WEIGHT.bold,
     color: COLORS.textPrimary,
+    letterSpacing: -0.4,
     marginBottom: SPACING.xs,
   },
-  welcomeSubtitle: {
+  welcomeTitleTablet: {
+    fontSize: FONT_SIZE["3xl"],
+  },
+  welcomeSub: {
     fontSize: FONT_SIZE.base,
     color: COLORS.textSecondary,
+    letterSpacing: 0.1,
   },
 
-  // ── Inputs ───────────────────────────────────────────────────────────────────
-  inputLabel: {
-    fontSize: FONT_SIZE.xs,
-    fontWeight: FONT_WEIGHT.medium,
-    color: COLORS.textSecondary,
-    letterSpacing: 0.5,
-    textTransform: "uppercase",
-    marginBottom: SPACING.xs,
+  // ── Field groups ──────────────────────────────────────────────────────────────
+  fieldGroup: {
+    marginBottom: SPACING.lg,
   },
-  inputContainer: {
+  label: {
+    fontSize: FONT_SIZE.xs,
+    fontWeight: FONT_WEIGHT.semibold,
+    color: COLORS.textSecondary,
+    letterSpacing: 0.8,
+    marginBottom: SPACING.sm,
+  },
+  inputWrap: {
     flexDirection: "row",
     alignItems: "center",
+    height: INPUT_HEIGHT,
     borderWidth: 1,
-    borderRadius: RADIUS.md,
-    backgroundColor: "rgba(255,255,255,0.04)",
+    borderRadius: RADIUS.lg,
+    backgroundColor: "rgba(255,255,255,0.05)",
     paddingHorizontal: SPACING.md,
-    marginBottom: SPACING.xs,
   },
-  inputContainerFocused: {
-    backgroundColor: "rgba(0,209,255,0.04)",
+  inputWrapFocused: {
+    backgroundColor: "rgba(17,131,224,0.06)",
+  },
+  inputWrapError: {
+    backgroundColor: "rgba(244,63,94,0.04)",
   },
   inputIcon: {
     marginRight: SPACING.md,
   },
-  input: {
+  textInput: {
     flex: 1,
-    paddingVertical: SPACING.md + 2,
+    height: INPUT_HEIGHT,
     fontSize: FONT_SIZE.base,
     color: COLORS.textPrimary,
+    paddingVertical: 0,
   },
-  eyeIcon: {
-    padding: SPACING.xs,
-    marginLeft: SPACING.sm,
+  eyeBtn: {
+    paddingLeft: SPACING.sm,
   },
+
+  // ── Error row ─────────────────────────────────────────────────────────────────
   errorRow: {
     flexDirection: "row",
-    alignItems: "center",
+    alignItems: "flex-start",
     gap: SPACING.xs,
-    marginBottom: SPACING.sm,
-    marginLeft: 2,
+    marginTop: SPACING.xs,
   },
   errorText: {
     fontSize: FONT_SIZE.xs,
@@ -490,33 +635,34 @@ const styles = StyleSheet.create({
     lineHeight: 16,
   },
 
-  // ── Button ────────────────────────────────────────────────────────────────────
-  loginButton: {
-    backgroundColor: COLORS.accentBlue,
-    borderRadius: RADIUS.md,
-    paddingVertical: SPACING.md + 2,
+  // ── Sign In button ────────────────────────────────────────────────────────────
+  signInBtn: {
+    backgroundColor: COLORS.accentNavyBlue,
+    borderRadius: RADIUS.lg,
+    height: INPUT_HEIGHT,
     alignItems: "center",
     justifyContent: "center",
-    marginTop: SPACING.xl,
-    shadowColor: COLORS.accentBlue,
-    shadowOffset: { width: 0, height: 0 },
-    shadowOpacity: 0.50,
-    shadowRadius: 12,
-    elevation: 6,
+    marginTop: SPACING.sm,
+    shadowColor: COLORS.accentNavyBlue,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.45,
+    shadowRadius: 14,
+    elevation: 8,
   },
-  loginButtonDisabled: {
-    backgroundColor: "rgba(0,209,255,0.35)",
+  signInBtnDisabled: {
+    backgroundColor: "rgba(17,131,224,0.35)",
     shadowOpacity: 0,
     elevation: 0,
   },
-  loginButtonText: {
-    fontSize: FONT_SIZE.md,
-    fontWeight: FONT_WEIGHT.bold,
-    color: COLORS.black,
-  },
-  loadingRow: {
+  btnContent: {
     flexDirection: "row",
     alignItems: "center",
+  },
+  signInText: {
+    fontSize: FONT_SIZE.md,
+    fontWeight: FONT_WEIGHT.bold,
+    color: COLORS.white,
+    letterSpacing: 0.4,
   },
 
   // ── Footer note ───────────────────────────────────────────────────────────────
@@ -526,5 +672,6 @@ const styles = StyleSheet.create({
     color: COLORS.textSecondary,
     textAlign: "center",
     lineHeight: 18,
+    letterSpacing: 0.1,
   },
 });
