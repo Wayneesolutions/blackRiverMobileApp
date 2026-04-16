@@ -23,6 +23,7 @@ import { notificationService } from '../../services/notificationService';
 import { logger } from '../../utils/loggerHelper';
 import { RootStackParamList } from '../../navigation/AppNavigator';
 import { AuthService } from '../../navigation/AppNavigator';
+import { COLORS, SPACING, RADIUS, FONT_SIZE, FONT_WEIGHT, SHADOWS } from '../../theme';
 
 interface SettingsScreenProps {
   route?: any;
@@ -122,10 +123,10 @@ const SettingsScreen = ({ route, navigation: navProp, onLogout }: SettingsScreen
 
   const handlePasswordSubmit = async () => {
     console.log('🔐 handlePasswordSubmit called');
-    console.log('Form state:', { 
-      hasCurrentPassword: !!currentPassword, 
-      hasNewPassword: !!newPassword, 
-      hasConfirmPassword: !!confirmPassword 
+    console.log('Form state:', {
+      hasCurrentPassword: !!currentPassword,
+      hasNewPassword: !!newPassword,
+      hasConfirmPassword: !!confirmPassword
     });
 
     if (!currentPassword || !newPassword || !confirmPassword) {
@@ -145,40 +146,40 @@ const SettingsScreen = ({ route, navigation: navProp, onLogout }: SettingsScreen
 
     try {
       setIsChangingPassword(true);
-      logger.info('Changing password', { 
+      logger.info('Changing password', {
         hasCurrentPassword: !!currentPassword,
         hasNewPassword: !!newPassword,
         newPasswordLength: newPassword.length
       });
-      
+
       console.log('📞 Calling apiService.changePassword');
       const response = await apiService.changePassword(currentPassword, newPassword);
-      console.log('✅ API response received:', { 
-        success: response.success, 
+      console.log('✅ API response received:', {
+        success: response.success,
         error: response.error,
-        statusCode: response.statusCode 
+        statusCode: response.statusCode
       });
 
       if (response.success) {
         logger.userAction('Password Changed', {}, 'SettingsScreen');
-        
+
         // Reset loading state first
         setIsChangingPassword(false);
-        
+
         // Close modal and reset form immediately
         setShowPasswordModal(false);
         setCurrentPassword('');
         setNewPassword('');
         setConfirmPassword('');
-        
+
         // Show success alert after interactions complete (ensuring modal has closed)
         InteractionManager.runAfterInteractions(() => {
           Alert.alert(
             "Success",
             "Password changed successfully!\nYou will be logged out for security.",
             [
-              { 
-                text: "OK", 
+              {
+                text: "OK",
                 onPress: async () => {
                   // Logout user after alert is dismissed
                   await handleLogout();
@@ -198,7 +199,7 @@ const SettingsScreen = ({ route, navigation: navProp, onLogout }: SettingsScreen
       logger.error('Error changing password', error);
       setIsChangingPassword(false);
       Alert.alert(
-        "Error", 
+        "Error",
         error?.message || "An unexpected error occurred. Please try again."
       );
     }
@@ -217,7 +218,7 @@ const SettingsScreen = ({ route, navigation: navProp, onLogout }: SettingsScreen
     try {
       setIsSubmittingFeedback(true);
       logger.info('Submitting feedback', { type: feedbackType });
-      
+
       const response = await apiService.submitFeedback(feedbackType, feedbackText);
 
       if (response.success) {
@@ -260,13 +261,13 @@ const SettingsScreen = ({ route, navigation: navProp, onLogout }: SettingsScreen
                 // Log but don't fail - we'll logout locally anyway
                 logger.error('API logout error (continuing with local logout)', apiError);
               }
-              
+
               // Clear auth data
               await authManager.logout();
               await AuthService.clearAuth();
-              
+
               logger.userAction('Logout', {}, 'SettingsScreen');
-              
+
               // Navigate to login screen
               // Use the onLogout callback if provided (preferred method)
               if (onLogout && typeof onLogout === 'function') {
@@ -668,8 +669,8 @@ const SettingsScreen = ({ route, navigation: navProp, onLogout }: SettingsScreen
             </View>
           </TouchableOpacity>
 
-          <TouchableOpacity 
-            style={styles.actionBtn} 
+          <TouchableOpacity
+            style={styles.actionBtn}
             onPress={handleChangePassword}
             activeOpacity={0.7}
           >
@@ -685,8 +686,8 @@ const SettingsScreen = ({ route, navigation: navProp, onLogout }: SettingsScreen
             </View>
           </TouchableOpacity>
 
-          <TouchableOpacity 
-            style={styles.actionBtn} 
+          <TouchableOpacity
+            style={styles.actionBtn}
             onPress={handleSendFeedback}
             activeOpacity={0.7}
           >
@@ -800,8 +801,8 @@ const SettingsScreen = ({ route, navigation: navProp, onLogout }: SettingsScreen
 
         {/* Logout Section */}
         <View style={styles.actionsSection}>
-          <TouchableOpacity 
-            style={[styles.actionBtn, styles.logoutBtn]} 
+          <TouchableOpacity
+            style={[styles.actionBtn, styles.logoutBtn]}
             onPress={handleLogout}
             activeOpacity={0.7}
           >
@@ -838,31 +839,31 @@ const SettingsScreen = ({ route, navigation: navProp, onLogout }: SettingsScreen
 const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
-    backgroundColor: '#f5f5f5',
+    backgroundColor: COLORS.bgMain,
   },
-  container: { 
-    flex: 1, 
-    backgroundColor: '#f5f5f5',
+  container: {
+    flex: 1,
+    backgroundColor: COLORS.bgMain,
   },
   header: {
-    backgroundColor: '#fff',
+    backgroundColor: COLORS.bgCardLight,
     paddingHorizontal: 20,
     paddingVertical: 20,
     borderBottomWidth: 1,
-    borderBottomColor: '#e5e5e5',
+    borderBottomColor: COLORS.accentNavyBlue,
   },
   headerTitle: {
     fontSize: 28,
     fontWeight: 'bold',
-    color: '#1F2937',
+    color: COLORS.textHeading,
   },
   profileHero: {
     alignItems: 'center',
     paddingVertical: 28,
     paddingHorizontal: 20,
-    backgroundColor: '#fff',
+    backgroundColor: COLORS.bgCardLight,
     borderBottomWidth: 1,
-    borderBottomColor: '#f3f4f6',
+    borderBottomColor: COLORS.accentNavyBlue,
   },
   profileAvatarWrapper: {
     position: 'relative',
@@ -873,7 +874,7 @@ const styles = StyleSheet.create({
     height: 96,
     borderRadius: 48,
     borderWidth: 3,
-    borderColor: '#8B5CF6',
+    borderColor: COLORS.accentNavyBlue,
   },
   profileAvatarFallback: {
     width: 96,
@@ -964,14 +965,14 @@ const styles = StyleSheet.create({
   actionTextContainer: {
     flex: 1,
   },
-  actionTitle: { 
-    fontSize: 16, 
-    fontWeight: '600', 
+  actionTitle: {
+    fontSize: 16,
+    fontWeight: '600',
     color: '#1F2937',
     marginBottom: 4,
   },
-  actionSubtitle: { 
-    fontSize: 13, 
+  actionSubtitle: {
+    fontSize: 13,
     color: '#6B7280',
   },
   logoutText: {
@@ -985,8 +986,8 @@ const styles = StyleSheet.create({
     marginBottom: 12,
     marginHorizontal: 20,
   },
-  card: { 
-    backgroundColor: '#fff', 
+  card: {
+    backgroundColor: '#fff',
     marginHorizontal: 20,
     marginBottom: 20,
     borderRadius: 16,
@@ -1020,7 +1021,7 @@ const styles = StyleSheet.create({
 
   // Loading states
   loadingContainer: {
-    backgroundColor: '#fff',
+    backgroundColor: COLORS.bgMain,
     padding: 40,
     alignItems: 'center',
     marginHorizontal: 20,
@@ -1029,7 +1030,7 @@ const styles = StyleSheet.create({
   },
   loadingText: {
     marginTop: 10,
-    color: '#6B7280',
+    color: COLORS.accentNavyBlue,
     fontSize: 14,
   },
   errorContainer: {

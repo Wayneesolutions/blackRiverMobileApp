@@ -23,7 +23,8 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { logger } from '../../utils/loggerHelper';
 import { authManager } from '../../types/AuthManager';
 import { apiService } from '../../services/api/apiService';
-
+// ─── Global Theme ─────────────────────────────────────────────────────────────
+import { COLORS, SPACING, RADIUS, FONT_SIZE, FONT_WEIGHT, SHADOWS } from '../../theme';
 const DriverChatScreen = () => {
   const navigation = useNavigation();
   const currentUser = authManager.getCurrentUser();
@@ -73,13 +74,13 @@ const DriverChatScreen = () => {
       setLoading(true);
       logger.info('Loading driver chat messages', { driverId });
       const response = await chatService.getDriverChatMessages(driverId, 1, 100);
-      
-      logger.info('Driver chat messages API response', { 
+
+      logger.info('Driver chat messages API response', {
         success: response.success,
         hasData: !!response.data,
         messagesCount: response.data?.messages?.length || response.data?.data?.messages?.length || 0
       });
-      
+
       // Handle nested response structure
       let messagesArray: any[] = [];
       if (response.success && response.data) {
@@ -91,7 +92,7 @@ const DriverChatScreen = () => {
           messagesArray = response.data;
         }
       }
-      
+
       if (messagesArray.length > 0) {
         const normalizedMessages = messagesArray.map((msg: any) => normalizeMessage(msg));
         setMessages(normalizedMessages);
@@ -139,7 +140,7 @@ const DriverChatScreen = () => {
         logger.info('Skipping system message (trip status) - only for dispatchers');
         return;
       }
-      
+
       // Normalize driverId from message (handle both object and string formats)
       let messageDriverId: string = '';
       if (message.driverId) {
@@ -149,10 +150,10 @@ const DriverChatScreen = () => {
           messageDriverId = String(message.driverId);
         }
       }
-      
+
       // Normalize current driverId for comparison
       const currentDriverIdStr = String(driverId);
-      
+
       logger.info('New message received in mobile chat', {
         messageDriverId,
         currentDriverId: currentDriverIdStr,
@@ -160,11 +161,11 @@ const DriverChatScreen = () => {
         senderId: message.senderId?._id || message.senderId,
         messagePreview: message.message?.substring(0, 50)
       });
-      
+
       // Only process messages with driverId matching current driver
       if (messageDriverId === currentDriverIdStr) {
         const normalized = normalizeMessage(message);
-        
+
         // Check if message already exists to avoid duplicates
         setMessages((prev) => {
           const exists = prev.some(msg => msg._id === normalized._id);
@@ -172,11 +173,11 @@ const DriverChatScreen = () => {
             logger.info('Message already exists, skipping duplicate');
             return prev;
           }
-          
+
           // Check if this is a real message that should replace an optimistic message
           const senderId = normalized.senderId._id || '';
           const currentUserId = currentUserIdRef.current || '';
-          
+
           if (senderId === currentUserId) {
             // Remove optimistic messages from current user
             const filtered = prev.filter(msg => {
@@ -191,9 +192,9 @@ const DriverChatScreen = () => {
             return [...prev, normalized];
           }
         });
-        
+
         scrollToBottom();
-        
+
         // Mark as read if it's not from current user
         const senderId = message.senderId?._id || message.senderId || '';
         if (senderId !== currentUserIdRef.current) {
@@ -245,7 +246,7 @@ const DriverChatScreen = () => {
           logger.info('Initializing socket connection');
           await socketService.initialize();
         }
-        
+
         // Always authenticate socket for chat (even if already connected)
         // This ensures socketUser is set on the backend
         logger.info('Authenticating socket for chat');
@@ -283,10 +284,10 @@ const DriverChatScreen = () => {
             throw joinError;
           }
         }
-        
+
         // Load messages
         await loadMessages();
-        
+
         // Mark messages as read
         await chatService.markDriverMessagesAsRead(driverId);
       } catch (error: any) {
@@ -525,12 +526,12 @@ const DriverChatScreen = () => {
         >
           {loading ? (
             <View style={styles.loadingContainer}>
-              <ActivityIndicator size="large" color="#8B5CF6" />
+              <ActivityIndicator size="large" color={COLORS.accentNavyBlue} />
               <Text style={styles.loadingText}>Loading messages...</Text>
             </View>
           ) : messages.length === 0 ? (
             <View style={styles.emptyContainer}>
-              <Ionicons name="chatbubbles-outline" size={64} color="#9CA3AF" />
+              <Ionicons name="chatbubbles-outline" size={64} color={COLORS.accentNavyBlue} />
               <Text style={styles.emptyText}>No messages yet</Text>
               <Text style={styles.emptySubtext}>Start the conversation with your dispatcher!</Text>
             </View>
@@ -706,7 +707,7 @@ const DriverChatScreen = () => {
           >
             <Ionicons name="attach" size={24} color="#8B5CF6" />
           </TouchableOpacity>
-          
+
           <TextInput
             style={styles.input}
             value={newMessage}
@@ -719,7 +720,7 @@ const DriverChatScreen = () => {
             multiline
             maxLength={1000}
           />
-          
+
           <TouchableOpacity
             onPress={handleSendMessage}
             disabled={sending || (!newMessage.trim() && !selectedFile)}
@@ -743,13 +744,13 @@ const DriverChatScreen = () => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#EDE7F6',
+    backgroundColor: COLORS.bgMain,
   },
   keyboardView: {
     flex: 1,
   },
   header: {
-    backgroundColor: '#7C3AED',
+    backgroundColor: COLORS.accentNavyBlue,
     paddingTop: Platform.OS === 'ios' ? 12 : 16,
     paddingBottom: 14,
     paddingHorizontal: 16,
@@ -788,7 +789,7 @@ const styles = StyleSheet.create({
     borderRadius: 6,
     backgroundColor: '#4ADE80',
     borderWidth: 2,
-    borderColor: '#7C3AED',
+    borderColor: COLORS.bgMain,
   },
   headerContent: {
     flex: 1,
@@ -821,15 +822,15 @@ const styles = StyleSheet.create({
   dateSeparatorLine: {
     flex: 1,
     height: 1,
-    backgroundColor: '#C4B5FD',
+    backgroundColor: COLORS.accentBlue,
     opacity: 0.5,
   },
   dateSeparatorText: {
     marginHorizontal: 10,
     fontSize: 12,
-    color: '#7C3AED',
+    color: COLORS.accentBlue,
     fontWeight: '600',
-    backgroundColor: '#EDE7F6',
+    backgroundColor: COLORS.bgCardLight,
     paddingHorizontal: 8,
     paddingVertical: 3,
     borderRadius: 10,
@@ -844,7 +845,7 @@ const styles = StyleSheet.create({
   loadingText: {
     marginTop: 12,
     fontSize: 16,
-    color: '#6B7280',
+    color: COLORS.textPrimary,
   },
   emptyContainer: {
     flex: 1,
@@ -879,7 +880,7 @@ const styles = StyleSheet.create({
     width: 34,
     height: 34,
     borderRadius: 17,
-    backgroundColor: '#7C3AED',
+    backgroundColor: COLORS.accentNavyBlue,
     justifyContent: 'center',
     alignItems: 'center',
     marginRight: 6,
@@ -894,7 +895,7 @@ const styles = StyleSheet.create({
     marginRight: 6,
   },
   avatarText: {
-    color: '#fff',
+    color: COLORS.textPrimary,
     fontSize: 13,
     fontWeight: '700',
   },
@@ -905,7 +906,7 @@ const styles = StyleSheet.create({
     borderRadius: 18,
   },
   messageBubbleLeft: {
-    backgroundColor: '#fff',
+    backgroundColor: COLORS.bgCardLight,
     borderBottomLeftRadius: 18,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 1 },
@@ -914,7 +915,7 @@ const styles = StyleSheet.create({
     elevation: 2,
   },
   messageBubbleRight: {
-    backgroundColor: '#7C3AED',
+    backgroundColor: COLORS.accentNavyBlue,
     borderBottomRightRadius: 18,
     shadowColor: '#4C1D95',
     shadowOffset: { width: 0, height: 2 },
@@ -931,7 +932,7 @@ const styles = StyleSheet.create({
   senderName: {
     fontSize: 12,
     fontWeight: '700',
-    color: '#7C3AED',
+    color: COLORS.accentNavyBlue,
     marginBottom: 3,
   },
   messageText: {
@@ -939,10 +940,10 @@ const styles = StyleSheet.create({
     lineHeight: 21,
   },
   messageTextLeft: {
-    color: '#1F2937',
+    color: COLORS.textPrimary,
   },
   messageTextRight: {
-    color: '#fff',
+    color: COLORS.textPrimary,
   },
   fileButton: {
     flexDirection: 'row',
@@ -952,7 +953,7 @@ const styles = StyleSheet.create({
     borderRadius: 10,
   },
   fileButtonLeft: {
-    backgroundColor: '#F3F4F6',
+    backgroundColor: COLORS.accentNavyBlue,
   },
   fileButtonRight: {
     backgroundColor: 'rgba(255, 255, 255, 0.15)',
@@ -963,7 +964,7 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   fileNameLeft: {
-    color: '#1F2937',
+    color: COLORS.textPrimary,
   },
   fileNameRight: {
     color: '#fff',
@@ -1021,7 +1022,7 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     paddingHorizontal: 14,
     paddingVertical: 10,
-    backgroundColor: '#F5F3FF',
+    backgroundColor: COLORS.bgCardLight,
     borderTopWidth: 1,
     borderTopColor: '#DDD6FE',
   },
@@ -1052,9 +1053,9 @@ const styles = StyleSheet.create({
     alignItems: 'flex-end',
     paddingHorizontal: 12,
     paddingVertical: 10,
-    backgroundColor: '#fff',
+    backgroundColor: COLORS.bgCardLight,
     borderTopWidth: 1,
-    borderTopColor: '#EDE9FE',
+    borderTopColor: COLORS.accentNavyBlue,
   },
   attachButton: {
     marginRight: 6,
@@ -1068,18 +1069,18 @@ const styles = StyleSheet.create({
     maxHeight: 100,
     paddingHorizontal: 16,
     paddingVertical: 10,
-    backgroundColor: '#F5F3FF',
+    backgroundColor: COLORS.bgCard,
     borderRadius: 22,
     fontSize: 15,
-    color: '#1F2937',
+    color: COLORS.textPrimary,
     borderWidth: 1,
-    borderColor: '#DDD6FE',
+    borderColor: COLORS.accentNavyBlue,
   },
   sendButton: {
     width: 42,
     height: 42,
     borderRadius: 21,
-    backgroundColor: '#7C3AED',
+    backgroundColor: COLORS.accentNavyBlue,
     justifyContent: 'center',
     alignItems: 'center',
     marginLeft: 8,
