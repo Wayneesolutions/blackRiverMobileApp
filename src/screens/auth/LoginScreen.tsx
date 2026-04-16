@@ -122,7 +122,7 @@ export default function LoginScreen({ navigation, onAuthSuccess }: Props) {
       // apiService wraps it: { success: true, data: { success: true, message: "...", driver: {...} } }
       const backendResponse = response.data;
       const driverData = backendResponse?.driver || (backendResponse && 'id' in backendResponse ? backendResponse : null);
-      
+
       // Type guard to check if driverData has the required properties
       if (response.success && driverData && typeof driverData === 'object' && 'id' in driverData) {
         const driver = driverData as { id: string; name: string; email: string; token: string };
@@ -150,11 +150,11 @@ export default function LoginScreen({ navigation, onAuthSuccess }: Props) {
       } else {
         // Handle API error - show inline errors below input fields
         const newErrors: LoginErrors = {};
-        
+
         // Check if backend returned a specific error message
         const backendResponse = response.data as any;
         let errorMessage = "";
-        
+
         if (backendResponse && typeof backendResponse === 'object') {
           // Backend returns: { success: false, message: "..." }
           if (backendResponse.message) {
@@ -176,7 +176,7 @@ export default function LoginScreen({ navigation, onAuthSuccess }: Props) {
           // 404: "Driver not found" - means email doesn't exist
           // 401: "Invalid credentials" - means password is wrong
           // 400: "Invalid email or password"
-          
+
           logger.userAction('Login Failed - Invalid Credentials', {
             email,
             error: errorMessage,
@@ -184,14 +184,14 @@ export default function LoginScreen({ navigation, onAuthSuccess }: Props) {
           }, 'LoginScreen');
 
           // Determine if it's email or password error based on backend message
-          if (errorMessage.toLowerCase().includes('driver not found') || 
-              errorMessage.toLowerCase().includes('not found') ||
-              statusCode === 404) {
+          if (errorMessage.toLowerCase().includes('driver not found') ||
+            errorMessage.toLowerCase().includes('not found') ||
+            statusCode === 404) {
             // Email doesn't exist - show specific error message
             newErrors.email = errorMessage || `Driver not found with this email: ${email}. Please check your email and try again.`;
           } else if (errorMessage.toLowerCase().includes('invalid credentials') ||
-                     errorMessage.toLowerCase().includes('password') ||
-                     statusCode === 401) {
+            errorMessage.toLowerCase().includes('password') ||
+            statusCode === 401) {
             // Password is wrong
             newErrors.password = errorMessage || "Incorrect password. Please check and try again.";
           } else {
@@ -202,12 +202,12 @@ export default function LoginScreen({ navigation, onAuthSuccess }: Props) {
         }
         // Network/Connection errors (statusCode 0 or network-related errors)
         // Only show network error if it's NOT a 404/401/400 (those are handled above)
-        else if (statusCode === 0 || 
-            (errorMessage.includes('Unable to connect') && statusCode !== 404) || 
-            errorMessage.includes('Network request failed') ||
-            errorMessage.includes('ECONNREFUSED') ||
-            errorMessage.includes('timeout')) {
-          
+        else if (statusCode === 0 ||
+          (errorMessage.includes('Unable to connect') && statusCode !== 404) ||
+          errorMessage.includes('Network request failed') ||
+          errorMessage.includes('ECONNREFUSED') ||
+          errorMessage.includes('timeout')) {
+
           logger.userAction('Login Failed - Network Error', {
             email,
             error: errorMessage,
@@ -573,7 +573,7 @@ const styles = StyleSheet.create({
   testButton: {
     marginTop: 8,
     padding: 8,
-    backgroundColor: "#906AD1",
+    // backgroundColor: "#906AD1",
     borderRadius: 4,
     alignItems: 'center',
   },
