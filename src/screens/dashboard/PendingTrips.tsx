@@ -5,13 +5,13 @@ import {
   StyleSheet,
   ScrollView,
   TouchableOpacity,
-  SafeAreaView,
   ActivityIndicator,
   RefreshControl,
   Alert,
   Linking,
   Share,
 } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation, useRoute, useFocusEffect } from '@react-navigation/native';
 import type { RouteProp } from '@react-navigation/native';
@@ -19,6 +19,7 @@ import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { RootStackParamList } from '../../navigation/AppNavigator';
 import { apiService } from '../../services/api/apiService';
 import { logger } from '../../utils/loggerHelper';
+import { COLORS, SPACING, RADIUS, FONT_SIZE, FONT_WEIGHT } from '../../theme';
 
 type NavigationProp = NativeStackNavigationProp<RootStackParamList>;
 type PendingTripsRouteProp = RouteProp<RootStackParamList, 'PendingTrips'>;
@@ -416,7 +417,7 @@ const PendingTrips = () => {
 
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={styles.container} edges={["bottom"]}>
       {/* Tab Bar — hidden when opened from dashboard with a locked tab */}
       {!lockedTab && (
         <View style={styles.tabBar}>
@@ -480,453 +481,453 @@ const PendingTrips = () => {
           </View>
         )}
         {displayedTrips.map((trip) => (
-            <View key={trip._id} style={styles.tripCard}>
-              <View style={styles.tripHeader}>
-                <View>
-                  <Text style={styles.tripNumber}>{trip.tripNumber}</Text>
-                  <Text style={styles.tripDate}>
-                    Start: {formatDate(trip.plannedStartDate)}
-                  </Text>
-                </View>
-                <View style={[styles.statusBadge, { backgroundColor: getStatusColor(trip.status) }]}>
-                  <Text style={styles.statusText}>{getStatusDisplay(trip.status)}</Text>
-                </View>
+          <View key={trip._id} style={styles.tripCard}>
+            <View style={styles.tripHeader}>
+              <View>
+                <Text style={styles.tripNumber}>{trip.tripNumber}</Text>
+                <Text style={styles.tripDate}>
+                  Start: {formatDate(trip.plannedStartDate)}
+                </Text>
               </View>
+              <View style={styles.statusBadge}>
+                <Text style={styles.statusText}>Completed</Text>
+              </View>
+            </View>
 
-              {trip.truck && (
-                <View style={styles.infoRow}>
-                  <Text style={styles.infoLabel}>Truck:</Text>
-                  <Text style={styles.infoValue}>
-                    {trip.truck.plateNumber || trip.truck.internalId || 'N/A'}
-                  </Text>
-                </View>
-              )}
+            {trip.truck && (
+              <View style={styles.infoRow}>
+                <Text style={styles.infoLabel}>Truck:</Text>
+                <Text style={styles.infoValue}>
+                  {trip.truck.plateNumber || trip.truck.internalId || 'N/A'}
+                </Text>
+              </View>
+            )}
 
-              {trip.trailer && (
-                <View style={styles.infoRow}>
-                  <Text style={styles.infoLabel}>Trailer:</Text>
-                  <Text style={styles.infoValue}>
-                    {trip.trailer.plateNumber || trip.trailer.trailerNumber || 'N/A'}
-                  </Text>
-                </View>
-              )}
+            {trip.trailer && (
+              <View style={styles.infoRow}>
+                <Text style={styles.infoLabel}>Trailer:</Text>
+                <Text style={styles.infoValue}>
+                  {trip.trailer.plateNumber || trip.trailer.trailerNumber || 'N/A'}
+                </Text>
+              </View>
+            )}
 
-              {trip.orders && trip.orders.length > 0 && (
-                <View style={styles.ordersSection}>
-                  <Text style={styles.ordersTitle}>
-                    Orders ({trip.orders.length}):
-                  </Text>
-                  {trip.orders.map((order, index) => (
-                    <View key={order._id || index} style={styles.orderItem}>
-                      <Text style={styles.orderNumber}>{order.orderNumber}</Text>
-                      {order.customerOrderNo && (
-                        <Text style={styles.customerOrderNo}>
-                          Customer Order: {order.customerOrderNo}
-                        </Text>
-                      )}
-                      {order.customer?.name && (
-                        <Text style={styles.customerName}>Customer: {order.customer.name}</Text>
-                      )}
-                      
-                      {/* Shipper Information */}
-                      <View style={styles.sectionDivider}>
-                        <Text style={styles.sectionTitle}>Shipper Information</Text>
+            {trip.orders && trip.orders.length > 0 && (
+              <View style={styles.ordersSection}>
+                <Text style={styles.ordersTitle}>
+                  Orders ({trip.orders.length}):
+                </Text>
+                {trip.orders.map((order, index) => (
+                  <View key={order._id || index} style={styles.orderItem}>
+                    <Text style={styles.orderNumber}>{order.orderNumber}</Text>
+                    {order.customerOrderNo && (
+                      <Text style={styles.customerOrderNo}>
+                        Customer Order: {order.customerOrderNo}
+                      </Text>
+                    )}
+                    {order.customer?.name && (
+                      <Text style={styles.customerName}>Customer: {order.customer.name}</Text>
+                    )}
+
+                    {/* Shipper Information */}
+                    <View style={styles.sectionDivider}>
+                      <Text style={styles.sectionTitle}>Shipper Information</Text>
+                    </View>
+                    {order.shipper?.name && (
+                      <View style={styles.infoRow}>
+                        <Text style={styles.infoLabel}>Name:</Text>
+                        <Text style={styles.infoValue}>{order.shipper.name}</Text>
                       </View>
-                      {order.shipper?.name && (
-                        <View style={styles.infoRow}>
-                          <Text style={styles.infoLabel}>Name:</Text>
-                          <Text style={styles.infoValue}>{order.shipper.name}</Text>
-                        </View>
-                      )}
-                      {order.shipper?.phone && (
-                        <View style={styles.infoRow}>
-                          <Text style={styles.infoLabel}>Phone:</Text>
-                          <Text style={styles.infoValue}>{order.shipper.phone}</Text>
-                        </View>
-                      )}
-                      {order.shipper?.contact && (
-                        <View style={styles.infoRow}>
-                          <Text style={styles.infoLabel}>Contact:</Text>
-                          <Text style={styles.infoValue}>{order.shipper.contact}</Text>
-                        </View>
-                      )}
-                      <View style={styles.locationRow}>
-                        <Text style={styles.locationLabel}>Address: </Text>
-                        <Text style={styles.locationValue}>
-                          {order.shipper?.address || formatAddress(order.pickupLocation) || 'N/A'}
+                    )}
+                    {order.shipper?.phone && (
+                      <View style={styles.infoRow}>
+                        <Text style={styles.infoLabel}>Phone:</Text>
+                        <Text style={styles.infoValue}>{order.shipper.phone}</Text>
+                      </View>
+                    )}
+                    {order.shipper?.contact && (
+                      <View style={styles.infoRow}>
+                        <Text style={styles.infoLabel}>Contact:</Text>
+                        <Text style={styles.infoValue}>{order.shipper.contact}</Text>
+                      </View>
+                    )}
+                    <View style={styles.locationRow}>
+                      <Text style={styles.locationLabel}>Address: </Text>
+                      <Text style={styles.locationValue}>
+                        {order.shipper?.address || formatAddress(order.pickupLocation) || 'N/A'}
+                      </Text>
+                    </View>
+                    {order.shipper?.city && order.shipper?.province && (
+                      <View style={styles.infoRow}>
+                        <Text style={styles.infoLabel}>City/Province:</Text>
+                        <Text style={styles.infoValue}>
+                          {order.shipper.city}, {order.shipper.province}
                         </Text>
                       </View>
-                      {order.shipper?.city && order.shipper?.province && (
-                        <View style={styles.infoRow}>
-                          <Text style={styles.infoLabel}>City/Province:</Text>
-                          <Text style={styles.infoValue}>
-                            {order.shipper.city}, {order.shipper.province}
-                          </Text>
-                        </View>
-                      )}
-                      {order.shipper?.postalCode && (
-                        <View style={styles.infoRow}>
-                          <Text style={styles.infoLabel}>Postal Code:</Text>
-                          <Text style={styles.infoValue}>{order.shipper.postalCode}</Text>
-                        </View>
-                      )}
-                      
-                      {/* Multiple Pickup Stops */}
-                      {order.stops && order.stops.length > 0 && (
-                        <View style={styles.stopsSection}>
-                          <Text style={styles.stopsTitle}>Additional Pickup Stops ({order.stops.length}):</Text>
-                          {order.stops.map((stop: any, stopIndex: number) => (
-                            <View key={stopIndex} style={styles.stopItem}>
-                              <Text style={styles.stopNumber}>Stop {stop.stop || stopIndex + 1}</Text>
-                              {stop.shipper && (
-                                <View style={styles.infoRow}>
-                                  <Text style={styles.infoLabel}>Shipper:</Text>
-                                  <Text style={styles.infoValue}>{stop.shipper}</Text>
-                                </View>
-                              )}
-                              {stop.address && (
-                                <View style={styles.locationRow}>
-                                  <Text style={styles.locationLabel}>Address:</Text>
-                                  <Text style={styles.locationValue}>{stop.address}</Text>
-                                </View>
-                              )}
-                              {stop.contact && (
-                                <View style={styles.infoRow}>
-                                  <Text style={styles.infoLabel}>Contact:</Text>
-                                  <Text style={styles.infoValue}>{stop.contact}</Text>
-                                </View>
-                              )}
-                              {stop.date && (
-                                <View style={styles.infoRow}>
-                                  <Text style={styles.infoLabel}>Date:</Text>
-                                  <Text style={styles.infoValue}>{stop.date}</Text>
-                                </View>
-                              )}
-                              {stop.appointment && (
-                                <View style={styles.infoRow}>
-                                  <Text style={styles.infoLabel}>Appointment:</Text>
-                                  <Text style={styles.infoValue}>{stop.appointment}</Text>
-                                </View>
-                              )}
-                              {stop.pickUpNumber && (
-                                <View style={styles.infoRow}>
-                                  <Text style={styles.infoLabel}>Pickup #:</Text>
-                                  <Text style={styles.infoValue}>{stop.pickUpNumber}</Text>
-                                </View>
-                              )}
-                            </View>
-                          ))}
-                        </View>
-                      )}
-                      
-                      {/* Pickup Appointment Details */}
-                      {(order.pickupAppointment || order.pickupDate) && (
-                        <View style={styles.appointmentSection}>
-                          <Text style={styles.appointmentTitle}>Pickup Appointment Details</Text>
-                          {order.pickupAppointment?.type && (
-                            <View style={styles.infoRow}>
-                              <Text style={styles.infoLabel}>Type:</Text>
-                              <Text style={styles.infoValue}>{order.pickupAppointment.type}</Text>
-                            </View>
-                          )}
+                    )}
+                    {order.shipper?.postalCode && (
+                      <View style={styles.infoRow}>
+                        <Text style={styles.infoLabel}>Postal Code:</Text>
+                        <Text style={styles.infoValue}>{order.shipper.postalCode}</Text>
+                      </View>
+                    )}
+
+                    {/* Multiple Pickup Stops */}
+                    {order.stops && order.stops.length > 0 && (
+                      <View style={styles.stopsSection}>
+                        <Text style={styles.stopsTitle}>Additional Pickup Stops ({order.stops.length}):</Text>
+                        {order.stops.map((stop: any, stopIndex: number) => (
+                          <View key={stopIndex} style={styles.stopItem}>
+                            <Text style={styles.stopNumber}>Stop {stop.stop || stopIndex + 1}</Text>
+                            {stop.shipper && (
+                              <View style={styles.infoRow}>
+                                <Text style={styles.infoLabel}>Shipper:</Text>
+                                <Text style={styles.infoValue}>{stop.shipper}</Text>
+                              </View>
+                            )}
+                            {stop.address && (
+                              <View style={styles.locationRow}>
+                                <Text style={styles.locationLabel}>Address:</Text>
+                                <Text style={styles.locationValue}>{stop.address}</Text>
+                              </View>
+                            )}
+                            {stop.contact && (
+                              <View style={styles.infoRow}>
+                                <Text style={styles.infoLabel}>Contact:</Text>
+                                <Text style={styles.infoValue}>{stop.contact}</Text>
+                              </View>
+                            )}
+                            {stop.date && (
+                              <View style={styles.infoRow}>
+                                <Text style={styles.infoLabel}>Date:</Text>
+                                <Text style={styles.infoValue}>{stop.date}</Text>
+                              </View>
+                            )}
+                            {stop.appointment && (
+                              <View style={styles.infoRow}>
+                                <Text style={styles.infoLabel}>Appointment:</Text>
+                                <Text style={styles.infoValue}>{stop.appointment}</Text>
+                              </View>
+                            )}
+                            {stop.pickUpNumber && (
+                              <View style={styles.infoRow}>
+                                <Text style={styles.infoLabel}>Pickup #:</Text>
+                                <Text style={styles.infoValue}>{stop.pickUpNumber}</Text>
+                              </View>
+                            )}
+                          </View>
+                        ))}
+                      </View>
+                    )}
+
+                    {/* Pickup Appointment Details */}
+                    {(order.pickupAppointment || order.pickupDate) && (
+                      <View style={styles.appointmentSection}>
+                        <Text style={styles.appointmentTitle}>Pickup Appointment Details</Text>
+                        {order.pickupAppointment?.type && (
                           <View style={styles.infoRow}>
-                            <Text style={styles.infoLabel}>Date:</Text>
-                            <Text style={styles.infoValue}>
-                              {order.pickupAppointment?.date 
-                                ? formatDateOnly(order.pickupAppointment.date)
-                                : order.pickupDate 
+                            <Text style={styles.infoLabel}>Type:</Text>
+                            <Text style={styles.infoValue}>{order.pickupAppointment.type}</Text>
+                          </View>
+                        )}
+                        <View style={styles.infoRow}>
+                          <Text style={styles.infoLabel}>Date:</Text>
+                          <Text style={styles.infoValue}>
+                            {order.pickupAppointment?.date
+                              ? formatDateOnly(order.pickupAppointment.date)
+                              : order.pickupDate
                                 ? formatDateOnly(order.pickupDate)
                                 : 'N/A'}
-                            </Text>
-                          </View>
-                          <View style={styles.infoRow}>
-                            <Text style={styles.infoLabel}>Time:</Text>
-                            <Text style={styles.infoValue}>
-                              {order.pickupAppointment?.time 
-                                ? order.pickupAppointment.time
-                                : order.pickupDate 
+                          </Text>
+                        </View>
+                        <View style={styles.infoRow}>
+                          <Text style={styles.infoLabel}>Time:</Text>
+                          <Text style={styles.infoValue}>
+                            {order.pickupAppointment?.time
+                              ? order.pickupAppointment.time
+                              : order.pickupDate
                                 ? formatTime(order.pickupDate)
                                 : 'N/A'}
-                            </Text>
-                          </View>
+                          </Text>
                         </View>
-                      )}
+                      </View>
+                    )}
 
-                      {/* Receiver Information */}
-                      <View style={styles.sectionDivider}>
-                        <Text style={styles.sectionTitle}>Receiver Information</Text>
+                    {/* Receiver Information */}
+                    <View style={styles.sectionDivider}>
+                      <Text style={styles.sectionTitle}>Receiver Information</Text>
+                    </View>
+                    {order.receiver?.name && (
+                      <View style={styles.infoRow}>
+                        <Text style={styles.infoLabel}>Name:</Text>
+                        <Text style={styles.infoValue}>{order.receiver.name}</Text>
                       </View>
-                      {order.receiver?.name && (
-                        <View style={styles.infoRow}>
-                          <Text style={styles.infoLabel}>Name:</Text>
-                          <Text style={styles.infoValue}>{order.receiver.name}</Text>
-                        </View>
-                      )}
-                      {order.receiver?.phone && (
-                        <View style={styles.infoRow}>
-                          <Text style={styles.infoLabel}>Phone:</Text>
-                          <Text style={styles.infoValue}>{order.receiver.phone}</Text>
-                        </View>
-                      )}
-                      {order.receiver?.contact && (
-                        <View style={styles.infoRow}>
-                          <Text style={styles.infoLabel}>Contact:</Text>
-                          <Text style={styles.infoValue}>{order.receiver.contact}</Text>
-                        </View>
-                      )}
-                      <View style={styles.locationRow}>
-                        <Text style={styles.locationLabel}>Address: </Text>
-                        <Text style={styles.locationValue}>
-                          {order.receiver?.address || formatAddress(order.deliveryLocation) || 'N/A'}
-                        </Text>
+                    )}
+                    {order.receiver?.phone && (
+                      <View style={styles.infoRow}>
+                        <Text style={styles.infoLabel}>Phone:</Text>
+                        <Text style={styles.infoValue}>{order.receiver.phone}</Text>
                       </View>
-                      
-                      {/* Multiple Delivery Stops */}
-                      {order.receiverStops && order.receiverStops.length > 0 && (
-                        <View style={styles.stopsSection}>
-                          <Text style={styles.stopsTitle}>Additional Delivery Stops ({order.receiverStops.length}):</Text>
-                          {order.receiverStops.map((stop: any, stopIndex: number) => (
-                            <View key={stopIndex} style={styles.stopItem}>
-                              <Text style={styles.stopNumber}>Stop {stop.stop || stopIndex + 1}</Text>
-                              {stop.receiver && (
-                                <View style={styles.infoRow}>
-                                  <Text style={styles.infoLabel}>Receiver:</Text>
-                                  <Text style={styles.infoValue}>{stop.receiver}</Text>
-                                </View>
-                              )}
-                              {stop.address && (
-                                <View style={styles.locationRow}>
-                                  <Text style={styles.locationLabel}>Address:</Text>
-                                  <Text style={styles.locationValue}>{stop.address}</Text>
-                                </View>
-                              )}
-                              {stop.contact && (
-                                <View style={styles.infoRow}>
-                                  <Text style={styles.infoLabel}>Contact:</Text>
-                                  <Text style={styles.infoValue}>{stop.contact}</Text>
-                                </View>
-                              )}
-                              {stop.date && (
-                                <View style={styles.infoRow}>
-                                  <Text style={styles.infoLabel}>Date:</Text>
-                                  <Text style={styles.infoValue}>{stop.date}</Text>
-                                </View>
-                              )}
-                              {stop.appointment && (
-                                <View style={styles.infoRow}>
-                                  <Text style={styles.infoLabel}>Appointment:</Text>
-                                  <Text style={styles.infoValue}>{stop.appointment}</Text>
-                                </View>
-                              )}
-                              {stop.dropOffNumber && (
-                                <View style={styles.infoRow}>
-                                  <Text style={styles.infoLabel}>Drop-off #:</Text>
-                                  <Text style={styles.infoValue}>{stop.dropOffNumber}</Text>
-                                </View>
-                              )}
-                            </View>
-                          ))}
-                        </View>
-                      )}
-                      
-                      {/* Delivery Appointment Details */}
-                      {(order.deliveryAppointment || order.deliveryDate) && (
-                        <View style={styles.appointmentSection}>
-                          <Text style={styles.appointmentTitle}>Delivery Appointment Details</Text>
-                          <View style={styles.infoRow}>
-                            <Text style={styles.infoLabel}>Date:</Text>
-                            <Text style={styles.infoValue}>
-                              {order.deliveryAppointment?.date 
-                                ? formatDateOnly(order.deliveryAppointment.date)
-                                : order.deliveryDate 
+                    )}
+                    {order.receiver?.contact && (
+                      <View style={styles.infoRow}>
+                        <Text style={styles.infoLabel}>Contact:</Text>
+                        <Text style={styles.infoValue}>{order.receiver.contact}</Text>
+                      </View>
+                    )}
+                    <View style={styles.locationRow}>
+                      <Text style={styles.locationLabel}>Address: </Text>
+                      <Text style={styles.locationValue}>
+                        {order.receiver?.address || formatAddress(order.deliveryLocation) || 'N/A'}
+                      </Text>
+                    </View>
+
+                    {/* Multiple Delivery Stops */}
+                    {order.receiverStops && order.receiverStops.length > 0 && (
+                      <View style={styles.stopsSection}>
+                        <Text style={styles.stopsTitle}>Additional Delivery Stops ({order.receiverStops.length}):</Text>
+                        {order.receiverStops.map((stop: any, stopIndex: number) => (
+                          <View key={stopIndex} style={styles.stopItem}>
+                            <Text style={styles.stopNumber}>Stop {stop.stop || stopIndex + 1}</Text>
+                            {stop.receiver && (
+                              <View style={styles.infoRow}>
+                                <Text style={styles.infoLabel}>Receiver:</Text>
+                                <Text style={styles.infoValue}>{stop.receiver}</Text>
+                              </View>
+                            )}
+                            {stop.address && (
+                              <View style={styles.locationRow}>
+                                <Text style={styles.locationLabel}>Address:</Text>
+                                <Text style={styles.locationValue}>{stop.address}</Text>
+                              </View>
+                            )}
+                            {stop.contact && (
+                              <View style={styles.infoRow}>
+                                <Text style={styles.infoLabel}>Contact:</Text>
+                                <Text style={styles.infoValue}>{stop.contact}</Text>
+                              </View>
+                            )}
+                            {stop.date && (
+                              <View style={styles.infoRow}>
+                                <Text style={styles.infoLabel}>Date:</Text>
+                                <Text style={styles.infoValue}>{stop.date}</Text>
+                              </View>
+                            )}
+                            {stop.appointment && (
+                              <View style={styles.infoRow}>
+                                <Text style={styles.infoLabel}>Appointment:</Text>
+                                <Text style={styles.infoValue}>{stop.appointment}</Text>
+                              </View>
+                            )}
+                            {stop.dropOffNumber && (
+                              <View style={styles.infoRow}>
+                                <Text style={styles.infoLabel}>Drop-off #:</Text>
+                                <Text style={styles.infoValue}>{stop.dropOffNumber}</Text>
+                              </View>
+                            )}
+                          </View>
+                        ))}
+                      </View>
+                    )}
+
+                    {/* Delivery Appointment Details */}
+                    {(order.deliveryAppointment || order.deliveryDate) && (
+                      <View style={styles.appointmentSection}>
+                        <Text style={styles.appointmentTitle}>Delivery Appointment Details</Text>
+                        <View style={styles.infoRow}>
+                          <Text style={styles.infoLabel}>Date:</Text>
+                          <Text style={styles.infoValue}>
+                            {order.deliveryAppointment?.date
+                              ? formatDateOnly(order.deliveryAppointment.date)
+                              : order.deliveryDate
                                 ? formatDateOnly(order.deliveryDate)
                                 : 'N/A'}
-                            </Text>
-                          </View>
-                          <View style={styles.infoRow}>
-                            <Text style={styles.infoLabel}>Time:</Text>
-                            <Text style={styles.infoValue}>
-                              {order.deliveryAppointment?.time 
-                                ? order.deliveryAppointment.time
-                                : order.deliveryDate 
+                          </Text>
+                        </View>
+                        <View style={styles.infoRow}>
+                          <Text style={styles.infoLabel}>Time:</Text>
+                          <Text style={styles.infoValue}>
+                            {order.deliveryAppointment?.time
+                              ? order.deliveryAppointment.time
+                              : order.deliveryDate
                                 ? formatTime(order.deliveryDate)
                                 : 'N/A'}
-                            </Text>
-                          </View>
+                          </Text>
                         </View>
-                      )}
-                      
-                      {/* Documents from Order - Only show if shareWithDriver is true */}
-                      {order.attachments && order.attachments.length > 0 && (() => {
-                        const sharedDocuments = order.attachments.filter((att: any) => att.shareWithDriver === true);
-                        if (sharedDocuments.length === 0) return null;
-                        
-                        return (
-                          <View style={styles.documentsSection}>
-                            <Text style={styles.documentsTitle}>
-                              Documents ({sharedDocuments.length}):
-                            </Text>
-                            {sharedDocuments.map((doc: any, docIndex: number) => (
-                              <TouchableOpacity
-                                key={doc.id || docIndex}
-                                style={styles.documentItem}
-                                onPress={async () => {
-                                  if (!doc.id || !order._id) {
-                                    Alert.alert('Error', 'Document information is missing.');
-                                    return;
-                                  }
+                      </View>
+                    )}
 
-                                  try {
-                                    // Fetch signed URL before opening
-                                    const response = await apiService.getOrderAttachmentSignedUrl(order._id, doc.id.toString(), 'inline');
-                                    if (response?.success && response?.data?.url) {
-                                      await Linking.openURL(response.data.url);
-                                    } else {
-                                      // Fallback to original URL
-                                      if (doc.url) {
-                                        await Linking.openURL(doc.url);
-                                      } else {
-                                        Alert.alert('Error', 'Unable to get document URL.');
-                                      }
-                                    }
-                                  } catch (error: any) {
-                                    console.error('Error opening document:', error);
+                    {/* Documents from Order - Only show if shareWithDriver is true */}
+                    {order.attachments && order.attachments.length > 0 && (() => {
+                      const sharedDocuments = order.attachments.filter((att: any) => att.shareWithDriver === true);
+                      if (sharedDocuments.length === 0) return null;
+
+                      return (
+                        <View style={styles.documentsSection}>
+                          <Text style={styles.documentsTitle}>
+                            Documents ({sharedDocuments.length}):
+                          </Text>
+                          {sharedDocuments.map((doc: any, docIndex: number) => (
+                            <TouchableOpacity
+                              key={doc.id || docIndex}
+                              style={styles.documentItem}
+                              onPress={async () => {
+                                if (!doc.id || !order._id) {
+                                  Alert.alert('Error', 'Document information is missing.');
+                                  return;
+                                }
+
+                                try {
+                                  // Fetch signed URL before opening
+                                  const response = await apiService.getOrderAttachmentSignedUrl(order._id, doc.id.toString(), 'inline');
+                                  if (response?.success && response?.data?.url) {
+                                    await Linking.openURL(response.data.url);
+                                  } else {
                                     // Fallback to original URL
                                     if (doc.url) {
-                                      Linking.openURL(doc.url).catch(() => {
-                                        Alert.alert('Error', 'Unable to open document. Please try again.');
-                                      });
+                                      await Linking.openURL(doc.url);
                                     } else {
-                                      Alert.alert('Error', 'Unable to open document. Please try again.');
+                                      Alert.alert('Error', 'Unable to get document URL.');
                                     }
                                   }
-                                }}
-                              >
-                                <Ionicons name="document-text" size={20} color="#2563eb" />
-                                <View style={styles.documentInfo}>
-                                  <Text style={styles.documentName} numberOfLines={1}>
-                                    {doc.name || 'Document'}
-                                  </Text>
-                                  <Text style={styles.documentMeta}>
-                                    {doc.fileSize ? formatFileSize(doc.fileSize) : 'Unknown size'}
-                                    {doc.uploadedAt && ` • ${new Date(doc.uploadedAt).toLocaleDateString()}`}
-                                  </Text>
-                                </View>
-                                <Ionicons name="download-outline" size={20} color="#2563eb" />
-                              </TouchableOpacity>
-                            ))}
-                          </View>
-                        );
-                      })()}
-                    </View>
-                  ))}
-                </View>
-              )}
+                                } catch (error: any) {
+                                  console.error('Error opening document:', error);
+                                  // Fallback to original URL
+                                  if (doc.url) {
+                                    Linking.openURL(doc.url).catch(() => {
+                                      Alert.alert('Error', 'Unable to open document. Please try again.');
+                                    });
+                                  } else {
+                                    Alert.alert('Error', 'Unable to open document. Please try again.');
+                                  }
+                                }
+                              }}
+                            >
+                              <Ionicons name="document-text" size={20} color="#2563eb" />
+                              <View style={styles.documentInfo}>
+                                <Text style={styles.documentName} numberOfLines={1}>
+                                  {doc.name || 'Document'}
+                                </Text>
+                                <Text style={styles.documentMeta}>
+                                  {doc.fileSize ? formatFileSize(doc.fileSize) : 'Unknown size'}
+                                  {doc.uploadedAt && ` • ${new Date(doc.uploadedAt).toLocaleDateString()}`}
+                                </Text>
+                              </View>
+                              <Ionicons name="download-outline" size={20} color="#2563eb" />
+                            </TouchableOpacity>
+                          ))}
+                        </View>
+                      );
+                    })()}
+                  </View>
+                ))}
+              </View>
+            )}
 
-              {trip.notes && (
-                <View style={styles.notesSection}>
-                  <Text style={styles.notesLabel}>Notes:</Text>
-                  <Text style={styles.notesText}>{trip.notes}</Text>
-                </View>
-              )}
+            {trip.notes && (
+              <View style={styles.notesSection}>
+                <Text style={styles.notesLabel}>Notes:</Text>
+                <Text style={styles.notesText}>{trip.notes}</Text>
+              </View>
+            )}
 
-              {/* Documents */}
-              {trip.documents && trip.documents.length > 0 && (
-                <View style={styles.documentsSection}>
-                  <Text style={styles.documentsTitle}>
-                    Documents ({trip.documents.length}):
-                  </Text>
-                  {trip.documents.map((doc, index) => (
-                    <TouchableOpacity
-                      key={doc._id || index}
-                      style={styles.documentItem}
-                      onPress={async () => {
-                        if (!doc._id || !trip._id) {
-                          Alert.alert('Error', 'Document information is missing.');
-                          return;
-                        }
+            {/* Documents */}
+            {trip.documents && trip.documents.length > 0 && (
+              <View style={styles.documentsSection}>
+                <Text style={styles.documentsTitle}>
+                  Documents ({trip.documents.length}):
+                </Text>
+                {trip.documents.map((doc, index) => (
+                  <TouchableOpacity
+                    key={doc._id || index}
+                    style={styles.documentItem}
+                    onPress={async () => {
+                      if (!doc._id || !trip._id) {
+                        Alert.alert('Error', 'Document information is missing.');
+                        return;
+                      }
 
-                        try {
-                          // Fetch signed URL before opening
-                          const response = await apiService.getTripDocumentSignedUrl(trip._id, doc._id, 'inline');
-                          if (response?.success && response?.data?.url) {
-                            await Linking.openURL(response.data.url);
-                          } else {
-                            // Fallback to original URL
-                            if (doc.fileUrl) {
-                              await Linking.openURL(doc.fileUrl);
-                            } else {
-                              Alert.alert('Error', 'Unable to get document URL.');
-                            }
-                          }
-                        } catch (error: any) {
-                          console.error('Error opening document:', error);
+                      try {
+                        // Fetch signed URL before opening
+                        const response = await apiService.getTripDocumentSignedUrl(trip._id, doc._id, 'inline');
+                        if (response?.success && response?.data?.url) {
+                          await Linking.openURL(response.data.url);
+                        } else {
                           // Fallback to original URL
                           if (doc.fileUrl) {
-                            Linking.openURL(doc.fileUrl).catch(() => {
-                              Alert.alert('Error', 'Unable to open document. Please try again.');
-                            });
+                            await Linking.openURL(doc.fileUrl);
                           } else {
-                            Alert.alert('Error', 'Unable to open document. Please try again.');
+                            Alert.alert('Error', 'Unable to get document URL.');
                           }
                         }
-                      }}
-                    >
-                      <Ionicons name="document-text" size={20} color="#2563eb" />
-                      <View style={styles.documentInfo}>
-                        <Text style={styles.documentName} numberOfLines={1}>
-                          {doc.fileName}
+                      } catch (error: any) {
+                        console.error('Error opening document:', error);
+                        // Fallback to original URL
+                        if (doc.fileUrl) {
+                          Linking.openURL(doc.fileUrl).catch(() => {
+                            Alert.alert('Error', 'Unable to open document. Please try again.');
+                          });
+                        } else {
+                          Alert.alert('Error', 'Unable to open document. Please try again.');
+                        }
+                      }
+                    }}
+                  >
+                    <Ionicons name="document-text" size={20} color="#2563eb" />
+                    <View style={styles.documentInfo}>
+                      <Text style={styles.documentName} numberOfLines={1}>
+                        {doc.fileName}
+                      </Text>
+                      {doc.description && (
+                        <Text style={styles.documentDescription} numberOfLines={1}>
+                          {doc.description}
                         </Text>
-                        {doc.description && (
-                          <Text style={styles.documentDescription} numberOfLines={1}>
-                            {doc.description}
-                          </Text>
-                        )}
-                        <Text style={styles.documentMeta}>
-                          {doc.fileSize ? formatFileSize(doc.fileSize) : 'Unknown size'}
-                          {doc.uploadedAt && ` • ${new Date(doc.uploadedAt).toLocaleDateString()}`}
-                        </Text>
-                      </View>
-                      <Ionicons name="download-outline" size={20} color="#2563eb" />
-                    </TouchableOpacity>
-                  ))}
-                </View>
-              )}
+                      )}
+                      <Text style={styles.documentMeta}>
+                        {doc.fileSize ? formatFileSize(doc.fileSize) : 'Unknown size'}
+                        {doc.uploadedAt && ` • ${new Date(doc.uploadedAt).toLocaleDateString()}`}
+                      </Text>
+                    </View>
+                    <Ionicons name="download-outline" size={20} color="#2563eb" />
+                  </TouchableOpacity>
+                ))}
+              </View>
+            )}
 
-              {/* Action area — depends on active tab */}
-              {activeTab === 'requests' ? (
-                <View style={styles.actionRow}>
-                  <TouchableOpacity
-                    style={styles.acceptButton}
-                    onPress={() => handleAccept(trip)}
-                  >
-                    <Ionicons name="checkmark-circle-outline" size={18} color="#fff" />
-                    <Text style={styles.acceptButtonText}>Accept</Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity
-                    style={styles.rejectButton}
-                    onPress={() => handleReject(trip)}
-                  >
-                    <Ionicons name="close-circle-outline" size={18} color="#fff" />
-                    <Text style={styles.rejectButtonText}>Reject</Text>
-                  </TouchableOpacity>
+            {/* Action area — depends on active tab */}
+            {activeTab === 'requests' ? (
+              <View style={styles.actionRow}>
+                <TouchableOpacity
+                  style={styles.acceptButton}
+                  onPress={() => handleAccept(trip)}
+                >
+                  <Ionicons name="checkmark-circle-outline" size={18} color="#fff" />
+                  <Text style={styles.acceptButtonText}>Accept</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={styles.rejectButton}
+                  onPress={() => handleReject(trip)}
+                >
+                  <Ionicons name="close-circle-outline" size={18} color="#fff" />
+                  <Text style={styles.rejectButtonText}>Reject</Text>
+                </TouchableOpacity>
+              </View>
+            ) : (
+              <View>
+                <View style={styles.acceptedBanner}>
+                  <Ionicons name="checkmark-circle" size={16} color="#16a34a" />
+                  <Text style={styles.acceptedBannerText}>You accepted this trip</Text>
                 </View>
-              ) : (
-                <View>
-                  <View style={styles.acceptedBanner}>
-                    <Ionicons name="checkmark-circle" size={16} color="#16a34a" />
-                    <Text style={styles.acceptedBannerText}>You accepted this trip</Text>
-                  </View>
-                  <TouchableOpacity
-                    style={styles.startButton}
-                    onPress={() => handleStartTrip(trip._id)}
-                  >
-                    <Text style={styles.startButtonText}>Start Trip</Text>
-                  </TouchableOpacity>
-                </View>
-              )}
-            </View>
-          ))}
+                <TouchableOpacity
+                  style={styles.startButton}
+                  onPress={() => handleStartTrip(trip._id)}
+                >
+                  <Text style={styles.startButtonText}>Start Trip</Text>
+                </TouchableOpacity>
+              </View>
+            )}
+          </View>
+        ))}
       </ScrollView>
     </SafeAreaView>
   );
@@ -935,7 +936,7 @@ const PendingTrips = () => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f5f5f5',
+    backgroundColor: COLORS.bgMain,
   },
   // ─── Tab Bar ───────────────────────────────────────────────────────────────
   tabBar: {
@@ -1011,160 +1012,185 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
   tripCard: {
-    backgroundColor: '#fff',
-    margin: 12,
-    padding: 16,
-    borderRadius: 12,
+    backgroundColor: COLORS.bgCard,
+    margin: SPACING.md,
+    borderRadius: RADIUS.lg,
+    borderWidth: 1,
+    borderColor: COLORS.borderSubtle,
+    overflow: 'hidden',
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
+    shadowOpacity: 0.15,
+    shadowRadius: 6,
+    elevation: 4,
   },
   tripHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'flex-start',
-    marginBottom: 12,
+    padding: SPACING.base,
+    borderBottomWidth: 1,
+    borderBottomColor: COLORS.borderSubtle,
   },
   tripNumber: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: '#2563eb',
-    marginBottom: 4,
+    fontSize: FONT_SIZE.md,
+    fontWeight: FONT_WEIGHT.bold,
+    color: COLORS.accentBlue,
+    marginBottom: 3,
   },
   tripDate: {
-    fontSize: 12,
-    color: '#666',
+    fontSize: FONT_SIZE.xs,
+    color: COLORS.textSecondary,
   },
   statusBadge: {
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: 'rgba(0,255,163,0.12)',
+    paddingHorizontal: SPACING.md,
+    paddingVertical: 5,
+    borderRadius: RADIUS.full,
+    borderWidth: 1,
+    borderColor: COLORS.accentGreen,
   },
   statusText: {
-    color: '#fff',
-    fontSize: 12,
-    fontWeight: '600',
+    color: COLORS.accentGreen,
+    fontSize: FONT_SIZE.xs,
+    fontWeight: FONT_WEIGHT.semibold,
   },
   infoRow: {
     flexDirection: 'row',
-    marginBottom: 8,
+    marginBottom: SPACING.xs + 2,
   },
   infoLabel: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#333',
-    width: 80,
+    fontSize: FONT_SIZE.sm,
+    fontWeight: FONT_WEIGHT.semibold,
+    color: COLORS.textSecondary,
+    width: 76,
+    marginLeft: 10
   },
   infoValue: {
-    fontSize: 14,
-    color: '#666',
+    fontSize: FONT_SIZE.sm,
+    color: COLORS.textPrimary,
     flex: 1,
   },
   ordersSection: {
-    marginTop: 12,
-    paddingTop: 12,
+    marginTop: SPACING.sm,
+    paddingTop: SPACING.md,
+    paddingHorizontal: SPACING.base,
     borderTopWidth: 1,
-    borderTopColor: '#e5e5e5',
+    borderTopColor: COLORS.borderSubtle,
   },
   ordersTitle: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#333',
-    marginBottom: 8,
+    fontSize: FONT_SIZE.base,
+    fontWeight: FONT_WEIGHT.semibold,
+    color: COLORS.textPrimary,
+    marginBottom: SPACING.md,
   },
   orderItem: {
-    backgroundColor: '#f9f9f9',
-    padding: 12,
-    borderRadius: 8,
-    marginBottom: 8,
+    backgroundColor: COLORS.bgCardLight,
+    padding: SPACING.md,
+    borderRadius: RADIUS.md,
+    marginBottom: SPACING.sm,
+    borderWidth: 1,
+    borderColor: COLORS.borderSubtle,
   },
   orderNumber: {
-    fontSize: 15,
-    fontWeight: '600',
-    color: '#2563eb',
-    marginBottom: 4,
+    fontSize: FONT_SIZE.base,
+    fontWeight: FONT_WEIGHT.semibold,
+    color: COLORS.accentBlue,
+    marginBottom: SPACING.xs,
   },
   customerOrderNo: {
-    fontSize: 12,
-    color: '#666',
-    marginBottom: 4,
+    fontSize: FONT_SIZE.xs,
+    color: COLORS.textSecondary,
+    marginBottom: SPACING.xs,
   },
   customerName: {
-    fontSize: 12,
-    color: '#666',
-    marginBottom: 4,
+    fontSize: FONT_SIZE.xs,
+    color: COLORS.textSecondary,
+    marginBottom: SPACING.xs,
   },
   locationRow: {
     flexDirection: 'row',
-    marginBottom: 4,
+    marginBottom: SPACING.xs,
   },
   locationLabel: {
-    fontSize: 12,
-    fontWeight: '600',
-    color: '#333',
+    fontSize: FONT_SIZE.xs,
+    fontWeight: FONT_WEIGHT.semibold,
+    color: COLORS.textSecondary,
+    width: 60,
   },
   locationValue: {
-    fontSize: 12,
-    color: '#666',
+    fontSize: FONT_SIZE.xs,
+    color: COLORS.textPrimary,
     flex: 1,
   },
   notesSection: {
-    marginTop: 12,
-    paddingTop: 12,
+    marginTop: SPACING.sm,
+    paddingTop: SPACING.md,
+    paddingHorizontal: SPACING.base,
+    paddingBottom: SPACING.md,
     borderTopWidth: 1,
-    borderTopColor: '#e5e5e5',
+    borderTopColor: COLORS.borderSubtle,
   },
   notesLabel: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#333',
-    marginBottom: 4,
+    fontSize: FONT_SIZE.sm,
+    fontWeight: FONT_WEIGHT.semibold,
+    color: COLORS.textSecondary,
+    marginBottom: SPACING.xs,
   },
   notesText: {
-    fontSize: 14,
-    color: '#666',
+    fontSize: FONT_SIZE.sm,
+    color: COLORS.textPrimary,
+    lineHeight: 20,
   },
+
+  // ── Documents ────────────────────────────────────────────────────────────────
   documentsSection: {
-    marginTop: 12,
-    paddingTop: 12,
+    marginTop: SPACING.sm,
+    paddingTop: SPACING.md,
+    paddingHorizontal: SPACING.base,
+    paddingBottom: SPACING.base,
     borderTopWidth: 1,
-    borderTopColor: '#e5e5e5',
+    borderTopColor: COLORS.borderSubtle,
   },
   documentsTitle: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#333',
-    marginBottom: 8,
+    fontSize: FONT_SIZE.base,
+    fontWeight: FONT_WEIGHT.semibold,
+    color: COLORS.textPrimary,
+    marginBottom: SPACING.md,
   },
   documentItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#f9f9f9',
-    padding: 12,
-    borderRadius: 8,
-    marginBottom: 8,
-    gap: 12,
+    backgroundColor: COLORS.bgCardLight,
+    padding: SPACING.md,
+    borderRadius: RADIUS.md,
+    marginBottom: SPACING.sm,
+    borderWidth: 1,
+    borderColor: COLORS.borderSubtle,
+    gap: SPACING.md,
   },
   documentInfo: {
     flex: 1,
     minWidth: 0,
   },
   documentName: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#2563eb',
-    marginBottom: 4,
+    fontSize: FONT_SIZE.sm,
+    fontWeight: FONT_WEIGHT.semibold,
+    color: COLORS.accentBlue,
+    marginBottom: 3,
   },
   documentDescription: {
-    fontSize: 12,
-    color: '#666',
-    marginBottom: 4,
+    fontSize: FONT_SIZE.xs,
+    color: COLORS.textSecondary,
+    marginBottom: 3,
   },
   documentMeta: {
-    fontSize: 11,
-    color: '#999',
+    fontSize: FONT_SIZE.xs,
+    color: COLORS.textSecondary,
+    opacity: 0.7,
   },
   startButton: {
     backgroundColor: '#2563eb',
@@ -1178,57 +1204,69 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '600',
   },
+  // ── Section divider ──────────────────────────────────────────────────────────
   sectionDivider: {
-    marginTop: 12,
-    marginBottom: 8,
-    paddingTop: 12,
+    marginTop: SPACING.md,
+    marginBottom: SPACING.sm,
+    paddingTop: SPACING.md,
     borderTopWidth: 1,
-    borderTopColor: '#e0e0e0',
+    borderTopColor: COLORS.borderSubtle,
   },
   sectionTitle: {
-    fontSize: 14,
-    fontWeight: '700',
-    color: '#2563eb',
-    marginBottom: 8,
+    fontSize: FONT_SIZE.sm,
+    fontWeight: FONT_WEIGHT.bold,
+    color: COLORS.accentNavyBlue,
+    marginBottom: SPACING.sm,
+    letterSpacing: 0.3,
   },
+
+  // ── Appointment ──────────────────────────────────────────────────────────────
   appointmentSection: {
-    backgroundColor: '#f0f7ff',
-    padding: 10,
-    borderRadius: 6,
-    marginTop: 8,
-    marginBottom: 8,
+    backgroundColor: 'rgba(0,209,255,0.05)',
+    padding: SPACING.md,
+    borderRadius: RADIUS.md,
+    marginTop: SPACING.sm,
+    marginBottom: SPACING.sm,
+    borderWidth: 1,
+    borderColor: COLORS.borderSubtle,
   },
   appointmentTitle: {
-    fontSize: 13,
-    fontWeight: '600',
-    color: '#333',
-    marginBottom: 6,
+    fontSize: FONT_SIZE.xs,
+    fontWeight: FONT_WEIGHT.semibold,
+    color: COLORS.accentBlue,
+    marginBottom: SPACING.sm,
+    letterSpacing: 0.3,
+    textTransform: 'uppercase',
   },
+
+  // ── Stops ────────────────────────────────────────────────────────────────────
   stopsSection: {
-    marginTop: 12,
-    padding: 8,
-    backgroundColor: '#f9f9f9',
-    borderRadius: 6,
+    marginTop: SPACING.md,
+    padding: SPACING.md,
+    backgroundColor: COLORS.bgCardLight,
+    borderRadius: RADIUS.md,
+    borderWidth: 1,
+    borderColor: COLORS.borderSubtle,
   },
   stopsTitle: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#333',
-    marginBottom: 8,
+    fontSize: FONT_SIZE.sm,
+    fontWeight: FONT_WEIGHT.semibold,
+    color: COLORS.textSecondary,
+    marginBottom: SPACING.md,
   },
   stopItem: {
-    marginBottom: 12,
-    padding: 8,
-    backgroundColor: '#fff',
-    borderRadius: 6,
+    marginBottom: SPACING.md,
+    padding: SPACING.sm,
+    backgroundColor: COLORS.bgCard,
+    borderRadius: RADIUS.sm,
     borderLeftWidth: 3,
-    borderLeftColor: '#2563eb',
+    borderLeftColor: COLORS.accentBlue,
   },
   stopNumber: {
-    fontSize: 13,
-    fontWeight: '600',
-    color: '#2563eb',
-    marginBottom: 6,
+    fontSize: FONT_SIZE.xs,
+    fontWeight: FONT_WEIGHT.semibold,
+    color: COLORS.accentBlue,
+    marginBottom: SPACING.sm,
   },
   actionRow: {
     flexDirection: 'row',

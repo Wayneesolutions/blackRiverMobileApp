@@ -7,7 +7,7 @@ import {
     ScrollView,
     TouchableOpacity,
     Image,
-    Dimensions,
+    useWindowDimensions,
     ActivityIndicator,
     RefreshControl,
     Linking,
@@ -31,8 +31,6 @@ import { logger } from '../../utils/loggerHelper';
 import { COLORS, SPACING, RADIUS, FONT_SIZE, FONT_WEIGHT, SHADOWS } from '../../theme';
 
 type NavigationProp = NativeStackNavigationProp<RootStackParamList>;
-
-const { width } = Dimensions.get("window");
 
 interface DriverProfile {
     _id: string;
@@ -100,6 +98,17 @@ const STAT_CARDS = [
 export default function DashboardScreen() {
     const navigation = useNavigation<NavigationProp>();
     const route = useRoute();
+    const { width } = useWindowDimensions();
+    const isTablet  = width >= 600;
+
+    // Responsive sizing
+    const avatarSize      = isTablet ? 100 : 78;
+    const taskIconSize    = isTablet ? 50  : 40;
+    const taskIconImg     = isTablet ? 26  : 22;
+    const taskIonIcon     = isTablet ? 24  : 20;
+    const wishItemW       = (width - 60) / (isTablet ? 5 : 3.5);
+    const wishItemGridW   = (width - 80) / (isTablet ? 5 : 3);
+    const wishIcon        = isTablet ? 32  : 26;
     const [showAllWishList, setShowAllWishList] = useState(false);
     const [profile, setProfile] = useState<DriverProfile | null>(null);
     const [stats, setStats] = useState<LoadStats>({
@@ -260,12 +269,18 @@ export default function DashboardScreen() {
     const renderWishItem = (item: any, isGrid: boolean = false) => (
         <TouchableOpacity
             key={item.id}
-            style={[styles.wishItem, { backgroundColor: item.color }, isGrid && styles.wishItemGrid]}
+            style={[
+                styles.wishItem,
+                { backgroundColor: item.color, width: isGrid ? wishItemGridW : wishItemW },
+                isGrid && styles.wishItemGrid,
+            ]}
             onPress={() => handleWishItemPress(item)}
             activeOpacity={0.75}
         >
-            <View style={styles.iconWrapper}>{item.icon}</View>
-            <Text style={[styles.wishText, isGrid && styles.wishTextGrid]} numberOfLines={2}>
+            <View style={styles.iconWrapper}>
+                {React.cloneElement(item.icon, { size: wishIcon })}
+            </View>
+            <Text style={[styles.wishText, isGrid && styles.wishTextGrid, isTablet && styles.wishTextTablet]} numberOfLines={2}>
                 {item.name}
             </Text>
         </TouchableOpacity>
@@ -339,7 +354,7 @@ export default function DashboardScreen() {
                                 <View style={styles.profileInfo}>
                                     <Text style={styles.driverLabel}>Driver</Text>
                                     <View style={styles.nameRow}>
-                                        <Text style={styles.driverName} numberOfLines={1}>
+                                        <Text style={[styles.driverName, isTablet && styles.driverNameTablet]} numberOfLines={1}>
                                             {profile?.name || authManager.getCurrentUser()?.name || 'Driver'}
                                         </Text>
                                         <View style={styles.statusBadge}>
@@ -365,11 +380,11 @@ export default function DashboardScreen() {
                                 {(profile?.profileImage || profile?.profileImageUrl) ? (
                                     <Image
                                         source={{ uri: profile.profileImage || profile.profileImageUrl }}
-                                        style={styles.avatar}
+                                        style={[styles.avatar, { width: avatarSize, height: avatarSize }]}
                                     />
                                 ) : (
-                                    <View style={[styles.avatar, styles.avatarPlaceholder]}>
-                                        <Ionicons name="person" size={38} color={COLORS.accentBlue} />
+                                    <View style={[styles.avatar, styles.avatarPlaceholder, { width: avatarSize, height: avatarSize }]}>
+                                        <Ionicons name="person" size={Math.round(avatarSize * 0.48)} color={COLORS.accentBlue} />
                                     </View>
                                 )}
                             </View>
@@ -397,23 +412,23 @@ export default function DashboardScreen() {
                                         <View style={[styles.taskAccentBar, { backgroundColor: card.accentColor }]} />
 
                                         {/* Icon */}
-                                        <View style={[styles.taskIconContainer, { backgroundColor: `${card.accentColor}22` }]}>
+                                        <View style={[styles.taskIconContainer, { width: taskIconSize, height: taskIconSize, backgroundColor: `${card.accentColor}22` }]}>
                                             {card.isImage ? (
-                                                <Image source={card.icon} style={[styles.taskIcon, { tintColor: card.accentColor }]} />
+                                                <Image source={card.icon} style={[styles.taskIcon, { width: taskIconImg, height: taskIconImg, tintColor: card.accentColor }]} />
                                             ) : (
-                                                <Ionicons name={card.ionicon!} size={20} color={card.accentColor} />
+                                                <Ionicons name={card.ionicon!} size={taskIonIcon} color={card.accentColor} />
                                             )}
                                         </View>
 
                                         {/* Label + count */}
                                         <View style={styles.taskContent}>
-                                            <Text style={styles.taskText}>{card.label}</Text>
+                                            <Text style={[styles.taskText, isTablet && styles.taskTextTablet]}>{card.label}</Text>
                                             <View style={styles.taskCountRow}>
-                                                <Text style={[styles.taskCount, { color: card.accentColor }]}>
+                                                <Text style={[styles.taskCount, isTablet && styles.taskCountTablet, { color: card.accentColor }]}>
                                                     {value}
                                                 </Text>
                                                 {(card as any).hasBadge && value > 0 && (
-                                                    <Text style={styles.awaitingLabel}> awaiting</Text>
+                                                    <Text style={[styles.awaitingLabel, isTablet && styles.awaitingLabelTablet]}> awaiting</Text>
                                                 )}
                                             </View>
                                         </View>
@@ -425,7 +440,7 @@ export default function DashboardScreen() {
                                             </View>
                                         )}
 
-                                        <Ionicons name="chevron-forward" size={16} color={COLORS.textSecondary} />
+                                        <Ionicons name="chevron-forward" size={isTablet ? 20 : 16} color={COLORS.textSecondary} />
                                     </TouchableOpacity>
                                 );
                             })}
@@ -540,6 +555,9 @@ const styles = StyleSheet.create({
         color: COLORS.textPrimary,
         fontWeight: FONT_WEIGHT.bold,
         flexShrink: 1,
+    },
+    driverNameTablet: {
+        fontSize: FONT_SIZE['2xl'],
     },
     statusBadge: {
         flexDirection: 'row',
@@ -666,6 +684,9 @@ const styles = StyleSheet.create({
         color: COLORS.textSecondary,
         marginBottom: 2,
     },
+    taskTextTablet: {
+        fontSize: FONT_SIZE.base,
+    },
     taskCountRow: {
         flexDirection: 'row',
         alignItems: 'baseline',
@@ -674,10 +695,16 @@ const styles = StyleSheet.create({
         fontSize: FONT_SIZE.xl,
         fontWeight: FONT_WEIGHT.bold,
     },
+    taskCountTablet: {
+        fontSize: FONT_SIZE['2xl'],
+    },
     awaitingLabel: {
         fontSize: FONT_SIZE.xs,
         color: COLORS.textSecondary,
         fontWeight: FONT_WEIGHT.medium,
+    },
+    awaitingLabelTablet: {
+        fontSize: FONT_SIZE.sm,
     },
     pendingBadge: {
         borderRadius: RADIUS.full,
@@ -709,7 +736,7 @@ const styles = StyleSheet.create({
         paddingHorizontal: 2,
     },
     wishItem: {
-        width: (width - 60) / 3.5,
+        // width is set dynamically via inline style (wishItemW)
         minWidth: 86,
         aspectRatio: 1,
         borderRadius: RADIUS.lg,
@@ -726,7 +753,7 @@ const styles = StyleSheet.create({
         elevation: 3,
     },
     wishItemGrid: {
-        width: (width - 80) / 3,
+        // width is set dynamically via inline style (wishItemGridW)
         minWidth: 96,
         marginRight: SPACING.sm,
         marginLeft: 0,
@@ -746,6 +773,10 @@ const styles = StyleSheet.create({
     },
     wishTextGrid: {
         fontSize: FONT_SIZE.sm,
+        marginTop: SPACING.sm,
+    },
+    wishTextTablet: {
+        fontSize: FONT_SIZE.base,
         marginTop: SPACING.sm,
     },
 });

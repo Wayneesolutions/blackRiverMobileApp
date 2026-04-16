@@ -775,49 +775,72 @@ class ApiService {
 
     // Order document upload and completion
     async uploadOrderDocument(orderId: string, documentFile: any, documentType: string, description?: string): Promise<ApiResponse> {
+        // Use XMLHttpRequest directly — React Native's XHR correctly sets
+        // multipart/form-data; boundary=... when send(FormData) is called,
+        // regardless of any fetch-layer Content-Type detection issues.
         try {
-            console.log('📤 uploadOrderDocument called:', { orderId, documentType, fileName: documentFile?.name });
-            
-            const formData = new FormData();
-            
-            if (documentFile) {
-                if (Platform.OS === 'web') {
-                    formData.append('document', documentFile);
-                } else {
-                    formData.append('document', {
-                        uri: documentFile.uri,
-                        type: documentFile.mimeType || documentFile.type || 'application/pdf',
-                        name: documentFile.name || 'document.pdf',
-                    } as any);
-                }
-            }
-            
-            formData.append('documentType', documentType);
-            if (description) {
-                formData.append('description', description);
-            }
+            await this.ensureInitialized();
+        } catch (_) { /* non-blocking */ }
 
-            // Debug: confirm isFormData detection works in this RN build
-            const isRNFormData = typeof formData === 'object' && '_parts' in (formData as any);
-            console.log('📤 FormData detection – instanceof:', formData instanceof FormData, '| _parts:', isRNFormData);
-            console.log('📤 Sending request to /driver/orders/' + orderId + '/documents');
+        console.log('📤 uploadOrderDocument (XHR):', { orderId, documentType, fileName: documentFile?.name });
 
-            const response = await this.request(`/driver/orders/${orderId}/documents`, {
-                method: 'POST',
-                body: formData,
-            }, true);
-            
-            console.log('📤 Upload response:', response);
-            return response;
-        } catch (error: any) {
-            console.error('❌ Error uploading order document:', error);
-            logger.error('Error uploading order document', error);
-            return {
-                success: false,
-                error: error.message || 'Failed to upload document',
-                statusCode: 0
-            };
+        const formData = new FormData();
+
+        if (documentFile) {
+            if (Platform.OS === 'web') {
+                formData.append('document', documentFile);
+            } else {
+                formData.append('document', {
+                    uri: documentFile.uri,
+                    type: documentFile.mimeType || documentFile.type || 'application/pdf',
+                    name: documentFile.name || 'document.pdf',
+                } as any);
+            }
         }
+
+        formData.append('documentType', documentType);
+        if (description) formData.append('description', description);
+
+        const url = `${this.baseURL}/driver/orders/${orderId}/documents`;
+        console.log('📤 XHR POST →', url);
+
+        return new Promise<ApiResponse>((resolve) => {
+            const xhr = new XMLHttpRequest();
+            xhr.open('POST', url);
+
+            // Set Authorization header only — do NOT set Content-Type.
+            // XHR sets multipart/form-data with the correct boundary automatically.
+            if (this.token) {
+                xhr.setRequestHeader('Authorization', `Bearer ${this.token}`);
+            }
+
+            xhr.onload = () => {
+                try {
+                    const data = JSON.parse(xhr.responseText);
+                    console.log('📤 XHR response:', xhr.status, data);
+                    resolve({
+                        success: data?.success === true,
+                        data,
+                        error: data?.success !== true ? (data?.message || data?.error || 'Upload failed') : undefined,
+                        statusCode: xhr.status,
+                    });
+                } catch (_) {
+                    resolve({ success: false, error: 'Invalid server response', statusCode: xhr.status });
+                }
+            };
+
+            xhr.onerror = () => {
+                console.error('❌ XHR network error uploading order document');
+                resolve({ success: false, error: 'Network error. Please check your connection.', statusCode: 0 });
+            };
+
+            xhr.ontimeout = () => {
+                resolve({ success: false, error: 'Upload timed out. Please try again.', statusCode: 0 });
+            };
+
+            xhr.timeout = 60000; // 60s for file uploads
+            xhr.send(formData);
+        });
     }
 
     async completeOrder(orderId: string): Promise<ApiResponse> {
