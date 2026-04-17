@@ -256,7 +256,7 @@ export default function NotificationsScreen({ }) {
         return (
             <SafeAreaView style={styles.container}>
                 <View style={styles.loadingContainer}>
-                    <ActivityIndicator size="large" color="#906AD1" />
+                    <ActivityIndicator size="large" color={COLORS.accentNavyBlue} />
                     <Text style={styles.loadingText}>Loading notifications...</Text>
                 </View>
             </SafeAreaView>

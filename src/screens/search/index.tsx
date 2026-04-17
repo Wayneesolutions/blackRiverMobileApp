@@ -14,6 +14,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { RootStackParamList } from '../../navigation/AppNavigator';
+import { COLORS, SPACING, RADIUS, FONT_SIZE, FONT_WEIGHT, SHADOWS } from '../../theme';
 
 // Type definitions
 interface SearchablePage {
@@ -96,21 +97,21 @@ const quickActions: QuickAction[] = [
     name: 'Active Loads',
     icon: 'play-circle',
     route: 'ActiveTrips',
-    color: '#906AD1'
+    color: COLORS.accentNavyBlue
   },
   {
     id: 'qa2',
     name: 'View Map',
     icon: 'map',
     route: 'LoadMap',
-    color: '#3B82F6'
+    color: COLORS.accentNavyBlue
   },
   {
     id: 'qa3',
     name: 'Settings',
     icon: 'settings',
     route: 'Settings',
-    color: '#F59E0B'
+    color: COLORS.accentNavyBlue
   }
 ];
 
@@ -229,7 +230,7 @@ export default function SearchScreen({ navigation }: Props) {
                   onPress={() => handlePagePress(page)}
                 >
                   <View style={styles.pageIconContainer}>
-                    <Ionicons name={page.icon} size={20} color="#906AD1" />
+                    <Ionicons name={page.icon} size={20} color={COLORS.accentNavyBlue} />
                   </View>
                   <View style={styles.pageContent}>
                     <Text style={styles.pageTitle}>{page.name}</Text>
@@ -266,7 +267,7 @@ export default function SearchScreen({ navigation }: Props) {
       activeOpacity={0.7}
     >
       <View style={styles.resultIconContainer}>
-        <Ionicons name={item.icon} size={24} color="#906AD1" />
+        <Ionicons name={item.icon} size={24} color={COLORS.accentNavyBlue} />
       </View>
       <View style={styles.resultContent}>
         <Text style={styles.resultTitle}>{item.name}</Text>
@@ -330,7 +331,7 @@ export default function SearchScreen({ navigation }: Props) {
             styles.searchBar,
             isSearchFocused && styles.searchBarFocused
           ]}>
-            <Ionicons name="search-outline" size={20} color="#9CA3AF" />
+            <Ionicons name="search-outline" size={20} color={COLORS.textSecondary} />
             <TextInput
               style={styles.searchInput}
               placeholder="Search pages, features, or help topics..."
@@ -434,7 +435,7 @@ export default function SearchScreen({ navigation }: Props) {
                         onPress={() => handlePagePress(page)}
                       >
                         <View style={styles.pageIconContainer}>
-                          <Ionicons name={page.icon} size={20} color="#906AD1" />
+                          <Ionicons name={page.icon} size={20} color={COLORS.accentNavyBlue} />
                         </View>
                         <View style={styles.pageContent}>
                           <Text style={styles.pageTitle}>{page.name}</Text>
@@ -458,7 +459,7 @@ const styles = StyleSheet.create({
 
   container: {
     flex: 1,
-    backgroundColor: '#F8FAFC',
+    backgroundColor: COLORS.bgMain,
   },
   scrollContainer: {
     flex: 1,
@@ -480,7 +481,7 @@ const styles = StyleSheet.create({
   headerTitle: {
     fontSize: 24,
     fontWeight: 'bold',
-    color: '#1F2937',
+    color: COLORS.textPrimary,
     flex: 1,
     textAlign: 'left',
     marginRight: 40,
@@ -493,7 +494,7 @@ const styles = StyleSheet.create({
   searchBar: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#fff',
+    backgroundColor: COLORS.bgCard,
     borderRadius: 12,
     paddingHorizontal: 12,
     paddingVertical: 12,
@@ -501,9 +502,9 @@ const styles = StyleSheet.create({
     borderColor: 'transparent',
   },
   searchBarFocused: {
-    backgroundColor: '#fff',
-    borderColor: '#906AD1',
-    shadowColor: '#906AD1',
+    backgroundColor: COLORS.bgCardLight,
+    borderColor: COLORS.accentNavyBlue,
+    shadowColor: COLORS.accentNavyBlue,
     shadowOffset: {
       width: 0,
       height: 0,
@@ -515,18 +516,20 @@ const styles = StyleSheet.create({
   searchInput: {
     flex: 1,
     fontSize: 16,
-    color: '#1F2937',
+    color: COLORS.textSecondary,
     marginLeft: 8,
     marginRight: 8,
   },
   content: {
     flex: 1,
+
   },
   section: {
-    backgroundColor: '#fff',
+    backgroundColor: COLORS.bgCardLight,
     margin: 16,
     borderRadius: 12,
     padding: 16,
+
   },
   sectionHeader: {
     flexDirection: 'row',
@@ -537,12 +540,13 @@ const styles = StyleSheet.create({
   sectionTitle: {
     fontSize: 18,
     fontWeight: 'bold',
-    color: '#1F2937',
+    color: COLORS.textPrimary,
     marginBottom: 16,
+
   },
   clearButton: {
     fontSize: 14,
-    color: '#906AD1',
+    color: COLORS.accentNavyBlue,
     fontWeight: '600',
   },
 
@@ -573,7 +577,7 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     paddingHorizontal: 4,
     borderBottomWidth: 1,
-    borderBottomColor: '#F3F4F6',
+    borderBottomColor: COLORS.accentNavyBlue,
   },
   recentText: {
     fontSize: 14,
@@ -589,13 +593,13 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     paddingHorizontal: 4,
     borderBottomWidth: 1,
-    borderBottomColor: '#F3F4F6',
+    borderBottomColor: COLORS.accentNavyBlue,
   },
   resultIconContainer: {
     width: 40,
     height: 40,
     borderRadius: 20,
-    backgroundColor: '#F8FAFC',
+    backgroundColor: COLORS.bgCardLight,
     alignItems: 'center',
     justifyContent: 'center',
     marginRight: 12,
@@ -606,7 +610,7 @@ const styles = StyleSheet.create({
   resultTitle: {
     fontSize: 16,
     fontWeight: '600',
-    color: '#1F2937',
+    color: COLORS.textPrimary,
     marginBottom: 2,
   },
   resultDescription: {
@@ -616,7 +620,7 @@ const styles = StyleSheet.create({
   },
   resultCategory: {
     fontSize: 11,
-    color: '#906AD1',
+    color: COLORS.accentNavyBlue,
     fontWeight: '500',
     textTransform: 'uppercase',
   },
@@ -628,7 +632,7 @@ const styles = StyleSheet.create({
   categoryTitle: {
     fontSize: 14,
     fontWeight: '600',
-    color: '#906AD1',
+    color: COLORS.textSecondary,
     textTransform: 'uppercase',
     marginBottom: 8,
     paddingLeft: 4,
@@ -639,13 +643,13 @@ const styles = StyleSheet.create({
     paddingVertical: 10,
     paddingHorizontal: 4,
     borderBottomWidth: 1,
-    borderBottomColor: '#F9FAFB',
+    borderBottomColor: COLORS.accentNavyBlue,
   },
   pageIconContainer: {
     width: 32,
     height: 32,
     borderRadius: 16,
-    backgroundColor: '#F8FAFC',
+    backgroundColor: COLORS.bgCardLight,
     alignItems: 'center',
     justifyContent: 'center',
     marginRight: 12,
@@ -656,12 +660,12 @@ const styles = StyleSheet.create({
   pageTitle: {
     fontSize: 15,
     fontWeight: '500',
-    color: '#1F2937',
+    color: COLORS.textPrimary,
     marginBottom: 2,
   },
   pageDescription: {
     fontSize: 12,
-    color: '#6B7280',
+    color: COLORS.textSecondary,
   },
 
   // No Results
@@ -669,6 +673,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     paddingVertical: 40,
+
   },
   noResultsTitle: {
     fontSize: 18,
@@ -688,7 +693,7 @@ const styles = StyleSheet.create({
     marginTop: 16,
     paddingHorizontal: 20,
     paddingVertical: 10,
-    backgroundColor: '#906AD1',
+    backgroundColor: COLORS.accentNavyBlue,
     borderRadius: 8,
   },
   showAllButtonText: {
