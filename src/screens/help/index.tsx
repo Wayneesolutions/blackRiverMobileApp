@@ -15,6 +15,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { RootStackParamList } from '../../navigation/AppNavigator';
+import { COLORS, SPACING, RADIUS, FONT_SIZE, FONT_WEIGHT, SHADOWS } from '../../theme';
 
 type NavigationProp = NativeStackNavigationProp<RootStackParamList>;
 
@@ -95,7 +96,7 @@ export default function HelpScreen({ }) {
                 onPress={() => toggleSection(section.id)}
             >
                 <View style={styles.sectionTitleContainer}>
-                    <Ionicons name={section.icon} size={20} color="#906AD1" />
+                    <Ionicons name={section.icon} size={20} color={COLORS.accentNavyBlue} />
                     <Text style={styles.sectionTitle}>{section.title}</Text>
                 </View>
                 <Ionicons
@@ -166,7 +167,7 @@ export default function HelpScreen({ }) {
 const styles = StyleSheet.create({
     container: {
         flex: 1,
-        backgroundColor: '#F8FAFC',
+        backgroundColor: COLORS.bgMain,
     },
     scrollContainer: {
         flex: 1,
@@ -186,7 +187,7 @@ const styles = StyleSheet.create({
     headerTitle: {
         fontSize: 24,
         fontWeight: 'bold',
-        color: '#1F2937',
+        color: COLORS.textPrimary,
         flex: 1,
         textAlign: 'left',
         marginRight: 40,
@@ -203,7 +204,7 @@ const styles = StyleSheet.create({
     sectionHeaderTitle: {
         fontSize: 18,
         fontWeight: 'bold',
-        color: '#1F2937',
+        color: COLORS.textPrimary,
         marginBottom: 16,
     },
     supportOption: {
@@ -228,7 +229,7 @@ const styles = StyleSheet.create({
     supportTitle: {
         fontSize: 16,
         fontWeight: '600',
-        color: '#1F2937',
+        color: COLORS.textPrimary,
     },
     supportSubtitle: {
         fontSize: 14,
@@ -236,7 +237,7 @@ const styles = StyleSheet.create({
         marginTop: 2,
     },
     faqContainer: {
-        backgroundColor: '#fff',
+        backgroundColor: COLORS.bgCardLight,
         margin: 16,
         marginTop: 0,
         borderRadius: 12,
@@ -260,7 +261,7 @@ const styles = StyleSheet.create({
     sectionTitle: {
         fontSize: 16,
         fontWeight: '600',
-        color: '#1F2937',
+        color: COLORS.textPrimary,
         marginLeft: 8,
     },
     sectionContent: {
@@ -281,7 +282,7 @@ const styles = StyleSheet.create({
         lineHeight: 20,
     },
     appInfoContainer: {
-        backgroundColor: '#fff',
+        backgroundColor: COLORS.bgCardLight,
         margin: 16,
         marginTop: 0,
         borderRadius: 12,
@@ -292,7 +293,7 @@ const styles = StyleSheet.create({
         justifyContent: 'space-between',
         paddingVertical: 8,
         borderBottomWidth: 1,
-        borderBottomColor: '#F3F4F6',
+        borderBottomColor: COLORS.accentNavyBlue,
     },
     infoLabel: {
         fontSize: 14,
@@ -301,7 +302,7 @@ const styles = StyleSheet.create({
     infoValue: {
         fontSize: 14,
         fontWeight: '500',
-        color: '#1F2937',
+        color: COLORS.textPrimary,
     },
     emergencyContainer: {
         backgroundColor: '#FEF2F2',
