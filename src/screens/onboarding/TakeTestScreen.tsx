@@ -13,6 +13,8 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation, useRoute } from '@react-navigation/native';
+import type { NavigationProp } from '@react-navigation/native';
+import type { RootStackParamList } from '../../navigation/AppNavigator';
 import { apiService } from '../../services/api/apiService';
 import { COLORS, rs, rf, ri } from '../../theme';
 
@@ -39,7 +41,7 @@ interface UserAnswer {
 }
 
 const TakeTestScreen = () => {
-  const navigation = useNavigation();
+  const navigation = useNavigation<NavigationProp<RootStackParamList>>();
   const route = useRoute();
   const { testType } = route.params as { testType: TestType };
 
@@ -260,7 +262,7 @@ const TakeTestScreen = () => {
         }
 
         // Navigate to results screen with detailed results
-        navigation.navigate('TestResultsScreen' as never, {
+        navigation.navigate('TestResultsScreen', {
           testResult: {
             score,
             passed,
@@ -274,7 +276,7 @@ const TakeTestScreen = () => {
             }
           },
           testType
-        } as never);
+        });
       } else {
         console.error('❌ Submit failed:', response.error || response.message);
         Alert.alert('Error', response.error || response.message || 'Failed to submit test. Please try again.');

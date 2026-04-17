@@ -708,8 +708,8 @@ const SettingsScreen = ({ route, navigation: navProp, onLogout }: SettingsScreen
         </View>
 
         {/* Debug Section */}
-        <Text style={styles.sectionTitle}>Debug</Text>
-        <View style={styles.actionsSection}>
+        {/* <Text style={styles.sectionTitle}>Debug</Text> */}
+        {/* <View style={styles.actionsSection}>
           <TouchableOpacity
             style={styles.actionBtn}
             onPress={() => navigation.navigate('CrashLogs' as never)}
@@ -732,10 +732,10 @@ const SettingsScreen = ({ route, navigation: navProp, onLogout }: SettingsScreen
 
 
 
-        </View>
+        </View> */}
 
         {/* Logout Section */}
-        <View style={styles.actionsSection}>
+        {/* <View style={styles.actionsSection}>
           <TouchableOpacity
             style={[styles.actionBtn, styles.logoutBtn]}
             onPress={handleLogout}
@@ -752,7 +752,7 @@ const SettingsScreen = ({ route, navigation: navProp, onLogout }: SettingsScreen
               <Ionicons name="chevron-forward" size={20} color="#999" />
             </View>
           </TouchableOpacity>
-        </View>
+        </View> */}
 
         {/* Driver Info */}
         <Text style={styles.sectionTitle}>Driver Information</Text>

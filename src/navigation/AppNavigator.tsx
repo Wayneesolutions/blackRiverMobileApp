@@ -116,6 +116,8 @@ export type RootStackParamList = {
     OnboardingGuard: undefined;
     TrainingScreen: undefined;
     TestsScreen: undefined;
+    TakeTestScreen: { testType: string };
+    TestResultsScreen: { testResult: any; testType: string };
     CertificatesScreen: undefined;
     HRApprovalScreen: undefined;
     ELDDocuments: undefined;
@@ -500,11 +502,7 @@ export default function AppNavigator() {
             </RootStack.Screen>
 
             {/* Onboarding Screens */}
-            <RootStack.Screen name="OnboardingGuard">
-                {(props) => (
-                    <OnboardingGuardScreen {...props} />
-                )}
-            </RootStack.Screen>
+            <RootStack.Screen name="OnboardingGuard" component={OnboardingGuardScreen} />
             <RootStack.Screen name="TrainingScreen" component={TrainingScreen} />
             <RootStack.Screen name="TestsScreen" component={TestsScreen} />
             <RootStack.Screen name="TakeTestScreen" component={TakeTestScreen} />

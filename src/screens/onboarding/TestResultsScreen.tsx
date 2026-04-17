@@ -10,6 +10,8 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation, useRoute } from '@react-navigation/native';
+import type { NavigationProp } from '@react-navigation/native';
+import type { RootStackParamList } from '../../navigation/AppNavigator';
 import { COLORS, rs, rf, ri } from '../../theme';
 
 type TestType = 'TDG' | 'VEHICLE' | 'HOS' | 'WINTER';
@@ -41,7 +43,7 @@ interface TestResult {
 }
 
 const TestResultsScreen = () => {
-  const navigation = useNavigation();
+  const navigation = useNavigation<NavigationProp<RootStackParamList>>();
   const route = useRoute();
   const { testResult, testType } = route.params as { testResult: TestResult; testType: TestType };
 
@@ -248,7 +250,7 @@ const TestResultsScreen = () => {
                 style={[styles.actionButton, styles.actionButtonPrimary]}
                 onPress={() => {
                   // Navigate back to take test again
-                  navigation.navigate('TakeTestScreen' as never, { testType } as never);
+                  navigation.navigate('TakeTestScreen', { testType });
                 }}
               >
                 <Ionicons name="refresh-circle" size={20} color="#FFFFFF" />

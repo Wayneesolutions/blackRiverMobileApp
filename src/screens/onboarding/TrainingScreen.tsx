@@ -100,7 +100,7 @@ const TrainingScreen = () => {
         // Load viewed status from AsyncStorage
         const viewed = await AsyncStorage.getItem('viewedTrainingContent');
         if (viewed) {
-          const viewedSet = new Set(JSON.parse(viewed));
+          const viewedSet = new Set<string>(JSON.parse(viewed));
           setViewedContent(viewedSet);
 
           // Check if all content viewed
@@ -135,11 +135,11 @@ const TrainingScreen = () => {
 
       console.log('📱 Signed URL response:', JSON.stringify(response, null, 2));
       console.log('📱 Response success:', response.success);
-      console.log('📱 Response URL:', response.url);
+      console.log('📱 Response URL:', response.data?.url);
       console.log('📱 Response data:', response.data);
 
       // Handle nested response structure
-      const signedUrl = response.url || response.data?.url;
+      const signedUrl = response.data?.url;
 
       console.log('📱 Extracted signed URL:', signedUrl);
 

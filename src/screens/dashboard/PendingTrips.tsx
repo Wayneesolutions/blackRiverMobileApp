@@ -214,7 +214,8 @@ const PendingTrips = () => {
       ]);
 
       if (requestsRes?.success) {
-        const raw: any[] = requestsRes.data?.data || requestsRes.data || [];
+        const rawData = requestsRes.data?.data ?? requestsRes.data;
+        const raw: any[] = Array.isArray(rawData) ? rawData : [];
         // Normalize standalone-order items so the card renderer works for both
         // Trip items and Order items. Order items have their details at the top
         // level; wrap them in orders:[self] so the existing renderer can show them.

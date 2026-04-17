@@ -12,6 +12,8 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
+import type { NavigationProp } from '@react-navigation/native';
+import type { RootStackParamList } from '../../navigation/AppNavigator';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { apiService } from '../../services/api/apiService';
 import { COLORS, rs, rf, ri } from '../../theme';
@@ -40,7 +42,7 @@ interface DriverFlags {
 }
 
 const TestsScreen = () => {
-  const navigation = useNavigation();
+  const navigation = useNavigation<NavigationProp<RootStackParamList>>();
   const [loading, setLoading] = useState(true);
   const [tests, setTests] = useState<TestResult[]>([]);
   const [allTestsPassed, setAllTestsPassed] = useState(false);
@@ -179,7 +181,7 @@ const TestsScreen = () => {
           onPress: () => {
             console.log('🚀 Navigating to TakeTestScreen for test type:', test.testType);
             try {
-              navigation.navigate('TakeTestScreen' as never, { testType: test.testType } as never);
+              navigation.navigate('TakeTestScreen', { testType: test.testType });
             } catch (error) {
               console.error('❌ Navigation error:', error);
               Alert.alert('Error', 'Failed to start test. Please try again.');
@@ -201,7 +203,7 @@ const TestsScreen = () => {
           onPress: () => {
             console.log('🚀 Navigating to TakeTestScreen for retake:', test.testType);
             try {
-              navigation.navigate('TakeTestScreen' as never, { testType: test.testType } as never);
+              navigation.navigate('TakeTestScreen', { testType: test.testType });
             } catch (error) {
               console.error('❌ Navigation error:', error);
               Alert.alert('Error', 'Failed to start test. Please try again.');

@@ -12,6 +12,8 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
+import type { NavigationProp } from '@react-navigation/native';
+import type { RootStackParamList } from '../../navigation/AppNavigator';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { apiService } from '../../services/api/apiService';
 import { COLORS, rs, rf, ri } from '../../theme';
@@ -23,7 +25,7 @@ interface HRApprovalScreenProps {
 }
 
 const HRApprovalScreen = ({ onLogout }: HRApprovalScreenProps) => {
-  const navigation = useNavigation();
+  const navigation = useNavigation<NavigationProp<RootStackParamList>>();
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [status, setStatus] = useState<OnboardingStatus>('WAITING_FOR_HR_APPROVAL');
@@ -175,7 +177,7 @@ const HRApprovalScreen = ({ onLogout }: HRApprovalScreenProps) => {
                 activeOpacity={0.85}
                 style={styles.completeButton}
                 onPress={() => {
-                  navigation.navigate('MainTabs' as never, { screen: 'Dashboard' } as never);
+                  navigation.navigate('MainTabs', { screen: 'Dashboard' });
                 }}
               >
                 <Text style={styles.completeButtonText}>Go to Dashboard →</Text>

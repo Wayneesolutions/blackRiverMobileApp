@@ -6,14 +6,17 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 const PUSH_TOKEN_KEY = '@logistiq_push_token';
 
 // Show system notification banner even when app is in foreground
-Notifications.setNotificationHandler({
-    handleNotification: async () => ({
-        shouldShowBanner: true,
-        shouldShowList: true,
-        shouldPlaySound: true,
-        shouldSetBadge: true,
-    }),
-});
+// expo-notifications APIs are native-only — skip entirely on web
+if (Platform.OS !== 'web') {
+    Notifications.setNotificationHandler({
+        handleNotification: async () => ({
+            shouldShowBanner: true,
+            shouldShowList: true,
+            shouldPlaySound: true,
+            shouldSetBadge: true,
+        }),
+    });
+}
 
 class NotificationService {
     private _expoPushToken: string | null = null;
@@ -98,12 +101,14 @@ class NotificationService {
     addForegroundListener(
         handler: (notification: Notifications.Notification) => void
     ): ReturnType<typeof Notifications.addNotificationReceivedListener> {
+        if (Platform.OS === 'web') return { remove: () => {} } as any;
         return Notifications.addNotificationReceivedListener(handler);
     }
 
     addTapListener(
         handler: (response: Notifications.NotificationResponse) => void
     ): ReturnType<typeof Notifications.addNotificationResponseReceivedListener> {
+        if (Platform.OS === 'web') return { remove: () => {} } as any;
         return Notifications.addNotificationResponseReceivedListener(handler);
     }
 
@@ -114,10 +119,12 @@ class NotificationService {
     // ─── Badge ────────────────────────────────────────────────────────────────
 
     async setBadge(count: number) {
+        if (Platform.OS === 'web') return;
         await Notifications.setBadgeCountAsync(count);
     }
 
     async clearBadge() {
+        if (Platform.OS === 'web') return;
         await Notifications.setBadgeCountAsync(0);
     }
 
@@ -129,6 +136,7 @@ class NotificationService {
         data?: Record<string, any>,
         delaySeconds = 0
     ) {
+        if (Platform.OS === 'web') return;
         try {
             const { status } = await Notifications.getPermissionsAsync();
             console.log('[Notifications] Current permission status:', status);
