@@ -602,7 +602,7 @@ export default function MileageSheetScreen() {
                 setShowCalendarModal(true);
               }}
             >
-              <Ionicons name="calendar-outline" size={16} color={Colors.primary} />
+              <Ionicons name="calendar-outline" size={16} color={COLORS.accentNavyBlue} />
               <Text style={styles.dateFilterText} numberOfLines={1}>
                 {startDate
                   ? startDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
@@ -627,7 +627,7 @@ export default function MileageSheetScreen() {
                 setShowCalendarModal(true);
               }}
             >
-              <Ionicons name="calendar-outline" size={16} color={Colors.primary} />
+              <Ionicons name="calendar-outline" size={16} color={COLORS.accentNavyBlue} />
               <Text style={styles.dateFilterText} numberOfLines={1}>
                 {endDate
                   ? endDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
@@ -649,7 +649,7 @@ export default function MileageSheetScreen() {
 
       {loading && !refreshing ? (
         <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color={Colors.primary} />
+          <ActivityIndicator size="large" color={COLORS.accentNavyBlue} />
           <Text style={styles.loadingText}>Loading mileage data...</Text>
         </View>
       ) : !Array.isArray(filteredMileageData) || filteredMileageData.length === 0 ? (
@@ -777,10 +777,10 @@ const styles = StyleSheet.create({
     color: COLORS.textSecondary,
   },
   filterSection: {
-    backgroundColor: Colors.white,
+    backgroundColor: COLORS.bgCardLight,
     padding: 16,
     borderBottomWidth: 1,
-    borderBottomColor: Colors.gray[200],
+    borderBottomColor: COLORS.accentNavyBlue,
   },
   filterRow: {
     flexDirection: 'row',
@@ -793,7 +793,7 @@ const styles = StyleSheet.create({
   filterLabel: {
     fontSize: 14,
     fontWeight: '600',
-    color: Colors.gray[700],
+    color: COLORS.textPrimary,
     width: 100,
     marginRight: 12,
   },
@@ -815,8 +815,8 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   filterButtonActive: {
-    backgroundColor: Colors.primary,
-    borderColor: Colors.primary,
+    backgroundColor: COLORS.accentNavyBlue,
+    borderColor: COLORS.accentNavyBlue,
   },
   filterButtonText: {
     fontSize: 14,
@@ -848,7 +848,7 @@ const styles = StyleSheet.create({
   dateFilterText: {
     fontSize: 13,
     fontWeight: '500',
-    color: Colors.primary,
+    color: COLORS.accentNavyBlue,
     flex: 1,
   },
   dateSeparator: {
@@ -930,18 +930,18 @@ const styles = StyleSheet.create({
     margin: 2,
   },
   calendarDaySelected: {
-    backgroundColor: Colors.primary,
+    backgroundColor: COLORS.accentNavyBlue,
   },
   calendarDayInRange: {
     backgroundColor: Colors.gray[100],
   },
   calendarDayText: {
     fontSize: 14,
-    color: Colors.gray[900],
+    color: COLORS.accentNavyBlue,
     fontWeight: '500',
   },
   calendarDayTextDisabled: {
-    color: Colors.gray[300],
+    color: COLORS.accentNavyBlue,
   },
   calendarDayTextSelected: {
     color: Colors.white,
@@ -1014,12 +1014,12 @@ const styles = StyleSheet.create({
     lineHeight: 20,
   },
   monthCard: {
-    backgroundColor: Colors.white,
+    backgroundColor: COLORS.bgCardLight,
     borderRadius: 12,
     padding: 16,
     marginBottom: 16,
     borderWidth: 1,
-    borderColor: Colors.gray[200],
+    borderColor: COLORS.accentNavyBlue,
     shadowColor: '#000',
     shadowOffset: {
       width: 0,
@@ -1038,11 +1038,11 @@ const styles = StyleSheet.create({
   monthTitle: {
     fontSize: 18,
     fontWeight: '600',
-    color: Colors.gray[900],
+    color: COLORS.textPrimary,
   },
   monthSummary: {
     fontSize: 14,
-    color: Colors.gray[500],
+    color: COLORS.textSecondary,
     marginTop: 4,
   },
   statsRow: {
@@ -1050,40 +1050,40 @@ const styles = StyleSheet.create({
     justifyContent: 'space-around',
     paddingTop: 16,
     borderTopWidth: 1,
-    borderTopColor: Colors.gray[200],
+    borderTopColor: COLORS.accentNavyBlue,
   },
   statItem: {
     alignItems: 'center',
   },
   statLabel: {
     fontSize: 12,
-    color: Colors.gray[500],
+    color: COLORS.textSecondary,
     marginBottom: 4,
   },
   statValue: {
     fontSize: 16,
     fontWeight: '600',
-    color: Colors.gray[900],
+    color: COLORS.textPrimary,
   },
   tripsContainer: {
     marginTop: 16,
     paddingTop: 16,
     borderTopWidth: 1,
-    borderTopColor: Colors.gray[200],
+    borderTopColor: COLORS.accentNavyBlue,
   },
   tripsTitle: {
     fontSize: 16,
     fontWeight: '600',
-    color: Colors.gray[900],
+    color: COLORS.textPrimary,
     marginBottom: 12,
   },
   tripCard: {
-    backgroundColor: Colors.gray[50],
+    backgroundColor: COLORS.bgCard,
     borderRadius: 8,
     padding: 12,
     marginBottom: 12,
     borderWidth: 1,
-    borderColor: Colors.gray[200],
+    borderColor: COLORS.accentNavyBlue,
   },
   tripHeader: {
     flexDirection: 'row',
@@ -1094,12 +1094,12 @@ const styles = StyleSheet.create({
   tripNumber: {
     fontSize: 16,
     fontWeight: '600',
-    color: Colors.gray[900],
+    color: COLORS.textPrimary,
   },
   tripDistance: {
     fontSize: 14,
     fontWeight: '600',
-    color: Colors.primary,
+    color: COLORS.accentNavyBlue,
   },
   tripDetails: {
     gap: 8,
