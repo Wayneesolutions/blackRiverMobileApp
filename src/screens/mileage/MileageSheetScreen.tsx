@@ -454,11 +454,11 @@ export default function MileageSheetScreen() {
 
             <View style={styles.calendarMonthHeader}>
               <TouchableOpacity onPress={() => navigateMonth('prev')}>
-                <Ionicons name="chevron-back" size={24} color={Colors.primary} />
+                <Ionicons name="chevron-back" size={24} color={COLORS.accentNavyBlue} />
               </TouchableOpacity>
               <Text style={styles.calendarMonthName}>{monthName}</Text>
               <TouchableOpacity onPress={() => navigateMonth('next')}>
-                <Ionicons name="chevron-forward" size={24} color={Colors.primary} />
+                <Ionicons name="chevron-forward" size={24} color={COLORS.accentNavyBlue} />
               </TouchableOpacity>
             </View>
 
@@ -892,13 +892,13 @@ const styles = StyleSheet.create({
     marginBottom: 16,
     paddingVertical: 8,
     paddingHorizontal: 8,
-    backgroundColor: Colors.gray[50],
+    backgroundColor: COLORS.bgCard,
     borderRadius: 12,
   },
   calendarMonthName: {
     fontSize: 16,
     fontWeight: '600',
-    color: Colors.gray[900],
+    color: COLORS.textPrimary,
   },
   calendarGrid: {
     marginBottom: 20,
@@ -933,7 +933,7 @@ const styles = StyleSheet.create({
     backgroundColor: COLORS.accentNavyBlue,
   },
   calendarDayInRange: {
-    backgroundColor: Colors.gray[100],
+    backgroundColor: COLORS.bgCard,
   },
   calendarDayText: {
     fontSize: 14,
@@ -961,12 +961,12 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   calendarButtonPrimary: {
-    backgroundColor: Colors.primary,
+    backgroundColor: COLORS.accentNavyBlue,
   },
   calendarButtonSecondary: {
-    backgroundColor: Colors.gray[100],
+    backgroundColor: COLORS.bgCard,
     borderWidth: 1,
-    borderColor: Colors.gray[200],
+    borderColor: COLORS.accentNavyBlue,
   },
   calendarButtonTextPrimary: {
     color: Colors.white,
