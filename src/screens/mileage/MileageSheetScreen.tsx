@@ -868,7 +868,7 @@ const styles = StyleSheet.create({
     justifyContent: 'flex-end',
   },
   calendarModal: {
-    backgroundColor: Colors.white,
+    backgroundColor: COLORS.bgCardLight,
     borderTopLeftRadius: 20,
     borderTopRightRadius: 20,
     padding: 20,
@@ -883,7 +883,7 @@ const styles = StyleSheet.create({
   calendarTitle: {
     fontSize: 18,
     fontWeight: '600',
-    color: Colors.gray[900],
+    color: COLORS.textPrimary,
   },
   calendarMonthHeader: {
     flexDirection: 'row',
@@ -913,7 +913,7 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     fontSize: 12,
     fontWeight: '600',
-    color: Colors.gray[600],
+    color: COLORS.textPrimary,
     paddingVertical: 4,
   },
   calendarDays: {
