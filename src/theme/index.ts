@@ -8,3 +8,4 @@ export { SHADOWS } from './shadows';
 export { getStatusStyle, getPriorityStyle, hexToRgba } from './helpers';
 export type { StatusStyle, PriorityStyle } from './helpers';
 export { default as globalStyles } from './globalStyles';
+export { rs, rf, ri, isTablet, isLargeTablet, SCALE, screenWidth, screenHeight } from './responsive';

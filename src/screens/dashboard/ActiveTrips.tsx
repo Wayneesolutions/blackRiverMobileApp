@@ -21,7 +21,35 @@ import { RootStackParamList } from '../../navigation/AppNavigator';
 import { apiService } from '../../services/api/apiService';
 import { logger } from '../../utils/loggerHelper';
 import MapViewWithLiveTracking from '../../components/MapViewWithLiveTracking';
-import { COLORS, SPACING, RADIUS, FONT_SIZE, FONT_WEIGHT } from "../../theme";
+import { COLORS, SPACING, RADIUS, FONT_SIZE, FONT_WEIGHT, rs, rf, ri } from "../../theme";
+
+// ─── Responsive scaled constants (computed once at module load) ───────────────
+const FS = {
+  xs:   rf(FONT_SIZE.xs),
+  sm:   rf(FONT_SIZE.sm),
+  base: rf(FONT_SIZE.base),
+  md:   rf(FONT_SIZE.md),
+  lg:   rf(FONT_SIZE.lg),
+  xl:   rf(FONT_SIZE.xl),
+};
+const SP = {
+  xs:   rs(SPACING.xs),
+  sm:   rs(SPACING.sm),
+  md:   rs(SPACING.md),
+  base: rs(SPACING.base),
+  lg:   rs(SPACING.lg),
+  xl:   rs(SPACING.xl),
+  '2xl': rs(SPACING['2xl']),
+  '3xl': rs(SPACING['3xl']),
+};
+const RD = {
+  sm:   rs(RADIUS.sm),
+  md:   rs(RADIUS.md),
+  lg:   rs(RADIUS.lg),
+  xl:   rs(RADIUS.xl),
+  '2xl': rs(RADIUS['2xl']),
+  full: RADIUS.full,
+};
 
 // Conditionally import DocumentPicker
 let DocumentPicker: any = null;
@@ -1569,7 +1597,7 @@ const ActiveTrips = () => {
                           }
                         }}
                       >
-                        <Ionicons name="document-text" size={20} color="#2563eb" />
+                        <Ionicons name="document-text" size={ri(20)} color={COLORS.accentBlue} />
                         <View style={styles.documentInfo}>
                           <Text style={styles.documentName} numberOfLines={1}>
                             {doc.fileName}
@@ -1584,7 +1612,7 @@ const ActiveTrips = () => {
                             {doc.uploadedAt && ` • ${new Date(doc.uploadedAt).toLocaleDateString()}`}
                           </Text>
                         </View>
-                        <Ionicons name="download-outline" size={20} color="#2563eb" />
+                        <Ionicons name="download-outline" size={ri(20)} color={COLORS.accentBlue} />
                       </TouchableOpacity>
                     ))}
                   </View>
@@ -1650,7 +1678,7 @@ const ActiveTrips = () => {
                   setSelectedManifestFile(null);
                 }}
               >
-                <Ionicons name="close" size={24} color="#333" />
+                <Ionicons name="close" size={ri(24)} color={COLORS.textPrimary} />
               </TouchableOpacity>
             </View>
 
@@ -1706,7 +1734,7 @@ const ActiveTrips = () => {
                           </Text>
                           {hasPOD && (
                             <View style={[styles.statusBadge, { backgroundColor: '#d4edda' }]}>
-                              <Ionicons name="checkmark-circle" size={16} color="#2ecc71" />
+                              <Ionicons name="checkmark-circle" size={ri(16)} color={COLORS.statusSuccess} />
                               <Text style={[styles.statusText, { color: '#155724' }]}>Uploaded</Text>
                             </View>
                           )}
@@ -1736,7 +1764,7 @@ const ActiveTrips = () => {
                             }}
                             disabled={uploadingDocument}
                           >
-                            <Ionicons name="cloud-upload-outline" size={20} color="#2563eb" />
+                            <Ionicons name="cloud-upload-outline" size={ri(20)} color={COLORS.accentBlue} />
                             <Text style={styles.uploadButtonText}>
                               {selectedPodFile ? `Selected: ${selectedPodFile.name}` : 'Select POD File'}
                             </Text>
@@ -1747,7 +1775,7 @@ const ActiveTrips = () => {
                               .filter((att: any) => att.type === 'pod' || att.type === 'proof_of_delivery')
                               .map((att: any, index: number) => (
                                 <View key={att.id || index} style={styles.uploadedDocumentItem}>
-                                  <Ionicons name="document-text" size={20} color="#2ecc71" />
+                                  <Ionicons name="document-text" size={ri(20)} color={COLORS.statusSuccess} />
                                   <Text style={styles.uploadedDocumentName}>{att.name}</Text>
                                 </View>
                               ))}
@@ -1763,7 +1791,7 @@ const ActiveTrips = () => {
                           </Text>
                           {hasManifest && (
                             <View style={[styles.statusBadge, { backgroundColor: '#d4edda' }]}>
-                              <Ionicons name="checkmark-circle" size={16} color="#2ecc71" />
+                              <Ionicons name="checkmark-circle" size={ri(16)} color={COLORS.statusSuccess} />
                               <Text style={[styles.statusText, { color: '#155724' }]}>Uploaded</Text>
                             </View>
                           )}
@@ -1793,7 +1821,7 @@ const ActiveTrips = () => {
                             }}
                             disabled={uploadingDocument}
                           >
-                            <Ionicons name="cloud-upload-outline" size={20} color="#2563eb" />
+                            <Ionicons name="cloud-upload-outline" size={ri(20)} color={COLORS.accentBlue} />
                             <Text style={styles.uploadButtonText}>
                               {selectedManifestFile ? `Selected: ${selectedManifestFile.name}` : 'Select Manifest File'}
                             </Text>
@@ -1804,7 +1832,7 @@ const ActiveTrips = () => {
                               .filter((att: any) => att.type === 'border_manifest' || att.type === 'manifest')
                               .map((att: any, index: number) => (
                                 <View key={att.id || index} style={styles.uploadedDocumentItem}>
-                                  <Ionicons name="document-text" size={20} color="#2ecc71" />
+                                  <Ionicons name="document-text" size={ri(20)} color={COLORS.statusSuccess} />
                                   <Text style={styles.uploadedDocumentName}>{att.name}</Text>
                                 </View>
                               ))}
@@ -1879,16 +1907,16 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   loadingText: {
-    marginTop: 10,
+    marginTop: SP.sm,
     color: COLORS.textSecondary,
-    fontSize: FONT_SIZE.sm,
+    fontSize: FS.sm,
   },
 
   // ── Header (compact row) ────────────────────────────────────────────────────
   header: {
     backgroundColor: COLORS.bgCard,
-    paddingHorizontal: SPACING.base,
-    paddingVertical: SPACING.sm + 2,
+    paddingHorizontal: SP.base,
+    paddingVertical: SP.sm + 2,
     borderBottomWidth: 1,
     borderBottomColor: COLORS.borderSubtle,
     overflow: 'hidden',
@@ -1908,38 +1936,38 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
   },
   headerTitle: {
-    fontSize: FONT_SIZE.lg,
+    fontSize: FS.lg,
     fontWeight: FONT_WEIGHT.bold,
     color: COLORS.textPrimary,
   },
   headerSubtitle: {
-    fontSize: FONT_SIZE.xs,
+    fontSize: FS.xs,
     color: COLORS.textSecondary,
-    marginTop: 1,
+    marginTop: rs(1),
   },
   statsContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: SPACING.sm,
+    gap: SP.sm,
   },
   statItem: {
     alignItems: 'center',
-    minWidth: 44,
+    minWidth: rs(44),
   },
   statNumber: {
-    fontSize: FONT_SIZE.lg,
+    fontSize: FS.lg,
     fontWeight: FONT_WEIGHT.bold,
     color: COLORS.accentBlue,
   },
   statLabel: {
-    fontSize: 9,
+    fontSize: rf(9),
     color: COLORS.textSecondary,
     textTransform: 'uppercase',
     letterSpacing: 0.4,
   },
   statDivider: {
     width: 1,
-    height: 28,
+    height: rs(28),
     backgroundColor: COLORS.borderSubtle,
   },
 
@@ -1948,185 +1976,185 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    padding: SPACING['2xl'],
+    padding: SP['2xl'],
   },
   emptyIcon: {
-    fontSize: 56,
-    marginBottom: SPACING.base,
+    fontSize: rf(56),
+    marginBottom: SP.base,
   },
   emptyText: {
-    fontSize: FONT_SIZE.md,
+    fontSize: FS.md,
     fontWeight: FONT_WEIGHT.semibold,
     color: COLORS.textPrimary,
-    marginBottom: SPACING.sm,
+    marginBottom: SP.sm,
   },
   emptySubtext: {
-    fontSize: FONT_SIZE.sm,
+    fontSize: FS.sm,
     color: COLORS.textSecondary,
     textAlign: 'center',
   },
 
   // ── Section container / header ───────────────────────────────────────────────
   sectionContainer: {
-    marginBottom: SPACING.base,
+    marginBottom: SP.base,
   },
   sectionHeader: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: SPACING.base,
-    paddingVertical: SPACING.sm,
-    gap: SPACING.sm,
+    paddingHorizontal: SP.base,
+    paddingVertical: SP.sm,
+    gap: SP.sm,
   },
   sectionTitle: {
-    fontSize: FONT_SIZE.sm,
+    fontSize: FS.sm,
     fontWeight: FONT_WEIGHT.semibold,
     color: COLORS.accentNavyBlue,
     flex: 1,
   },
   sectionSubtitle: {
-    fontSize: FONT_SIZE.xs,
+    fontSize: FS.xs,
     color: COLORS.textSecondary,
   },
 
   // ── Trip card ────────────────────────────────────────────────────────────────
   tripCard: {
     backgroundColor: COLORS.bgCard,
-    marginHorizontal: SPACING.md,
-    marginBottom: SPACING.md,
-    padding: SPACING.base,
-    borderRadius: RADIUS.lg,
+    marginHorizontal: SP.md,
+    marginBottom: SP.md,
+    padding: SP.base,
+    borderRadius: RD.lg,
     borderWidth: 1,
     borderColor: COLORS.borderSubtle,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
+    shadowColor: COLORS.black,
+    shadowOffset: { width: 0, height: rs(2) },
     shadowOpacity: 0.15,
-    shadowRadius: 4,
+    shadowRadius: rs(4),
     elevation: 3,
   },
   pendingCard: {
-    borderLeftWidth: 3,
+    borderLeftWidth: rs(3),
     borderLeftColor: COLORS.accentOrange,
   },
   cardHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'flex-start',
-    marginBottom: SPACING.md,
+    marginBottom: SP.md,
   },
   headerInfo: {
     flex: 1,
   },
   tripNumber: {
-    fontSize: FONT_SIZE.md,
+    fontSize: FS.md,
     fontWeight: FONT_WEIGHT.bold,
     color: COLORS.accentBlue,
-    marginBottom: 2,
+    marginBottom: rs(2),
   },
   tripDate: {
-    fontSize: FONT_SIZE.xs,
+    fontSize: FS.xs,
     color: COLORS.textSecondary,
   },
   statusBadge: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 4,
-    paddingHorizontal: SPACING.sm + 2,
-    paddingVertical: 4,
+    gap: rs(4),
+    paddingHorizontal: SP.sm + 2,
+    paddingVertical: rs(4),
     borderRadius: RADIUS.full,
   },
   statusText: {
     color: COLORS.white,
-    fontSize: FONT_SIZE.xs,
+    fontSize: FS.xs,
     fontWeight: FONT_WEIGHT.semibold,
   },
 
   // ── Info rows ────────────────────────────────────────────────────────────────
   infoRow: {
     flexDirection: 'row',
-    marginBottom: SPACING.xs + 2,
+    marginBottom: SP.xs + 2,
   },
   infoLabel: {
-    fontSize: FONT_SIZE.sm,
+    fontSize: FS.sm,
     fontWeight: FONT_WEIGHT.semibold,
     color: COLORS.textSecondary,
-    width: 76,
+    width: rs(76),
   },
   infoValue: {
-    fontSize: FONT_SIZE.sm,
+    fontSize: FS.sm,
     color: COLORS.textPrimary,
     flex: 1,
   },
   locationRow: {
     flexDirection: 'row',
-    marginBottom: SPACING.xs,
+    marginBottom: SP.xs,
   },
   locationLabel: {
-    fontSize: FONT_SIZE.xs,
+    fontSize: FS.xs,
     fontWeight: FONT_WEIGHT.semibold,
     color: COLORS.textSecondary,
   },
   locationValue: {
-    fontSize: FONT_SIZE.xs,
+    fontSize: FS.xs,
     color: COLORS.textPrimary,
     flex: 1,
   },
 
   // ── Orders section ───────────────────────────────────────────────────────────
   ordersSection: {
-    marginTop: SPACING.md,
-    paddingTop: SPACING.md,
+    marginTop: SP.md,
+    paddingTop: SP.md,
     borderTopWidth: 1,
     borderTopColor: COLORS.borderSubtle,
   },
   ordersTitle: {
-    fontSize: FONT_SIZE.sm,
+    fontSize: FS.sm,
     fontWeight: FONT_WEIGHT.semibold,
     color: COLORS.textSecondary,
-    marginBottom: SPACING.sm,
+    marginBottom: SP.sm,
   },
   orderItem: {
     backgroundColor: COLORS.bgCardLight,
-    padding: SPACING.md,
-    borderRadius: RADIUS.md,
-    marginBottom: SPACING.sm,
+    padding: SP.md,
+    borderRadius: RD.md,
+    marginBottom: SP.sm,
     borderWidth: 1,
     borderColor: COLORS.borderSubtle,
   },
   orderNumber: {
-    fontSize: FONT_SIZE.base,
+    fontSize: FS.base,
     fontWeight: FONT_WEIGHT.semibold,
     color: COLORS.accentBlue,
-    marginBottom: 4,
+    marginBottom: rs(4),
   },
   customerOrderNo: {
-    fontSize: FONT_SIZE.xs,
+    fontSize: FS.xs,
     color: COLORS.textSecondary,
-    marginBottom: 2,
+    marginBottom: rs(2),
   },
   customerName: {
-    fontSize: FONT_SIZE.xs,
+    fontSize: FS.xs,
     color: COLORS.textSecondary,
-    marginBottom: 4,
+    marginBottom: rs(4),
   },
   orderStatusRow: {
     flexDirection: 'row',
-    marginTop: SPACING.xs,
+    marginTop: SP.xs,
   },
   orderStatusLabel: {
-    fontSize: FONT_SIZE.xs,
+    fontSize: FS.xs,
     fontWeight: FONT_WEIGHT.semibold,
     color: COLORS.textSecondary,
   },
   orderStatusValue: {
-    fontSize: FONT_SIZE.xs,
+    fontSize: FS.xs,
     fontWeight: FONT_WEIGHT.semibold,
   },
 
   // ── Inner section divider (Shipper / Receiver) ───────────────────────────────
   sectionDivider: {
-    marginTop: SPACING.md,
-    marginBottom: SPACING.sm,
-    paddingTop: SPACING.md,
+    marginTop: SP.md,
+    marginBottom: SP.sm,
+    paddingTop: SP.md,
     borderTopWidth: 1,
     borderTopColor: COLORS.borderSubtle,
   },
@@ -2134,102 +2162,102 @@ const styles = StyleSheet.create({
   // ── Appointment block ────────────────────────────────────────────────────────
   appointmentSection: {
     backgroundColor: 'rgba(0,209,255,0.05)',
-    padding: SPACING.sm + 2,
-    borderRadius: RADIUS.sm,
-    marginTop: SPACING.sm,
-    marginBottom: SPACING.sm,
+    padding: SP.sm + 2,
+    borderRadius: RD.sm,
+    marginTop: SP.sm,
+    marginBottom: SP.sm,
     borderWidth: 1,
     borderColor: COLORS.borderSubtle,
   },
   appointmentTitle: {
-    fontSize: FONT_SIZE.xs,
+    fontSize: FS.xs,
     fontWeight: FONT_WEIGHT.semibold,
     color: COLORS.accentBlue,
-    marginBottom: SPACING.xs,
+    marginBottom: SP.xs,
   },
 
   // ── Stops ────────────────────────────────────────────────────────────────────
   stopsSection: {
-    marginTop: SPACING.md,
-    padding: SPACING.sm,
+    marginTop: SP.md,
+    padding: SP.sm,
     backgroundColor: 'rgba(255,255,255,0.03)',
-    borderRadius: RADIUS.sm,
+    borderRadius: RD.sm,
     borderWidth: 1,
     borderColor: COLORS.borderSubtle,
   },
   stopsTitle: {
-    fontSize: FONT_SIZE.xs,
+    fontSize: FS.xs,
     fontWeight: FONT_WEIGHT.semibold,
     color: COLORS.textSecondary,
-    marginBottom: SPACING.sm,
+    marginBottom: SP.sm,
   },
   stopItem: {
-    marginBottom: SPACING.md,
-    padding: SPACING.sm,
+    marginBottom: SP.md,
+    padding: SP.sm,
     backgroundColor: COLORS.bgCard,
-    borderRadius: RADIUS.sm,
-    borderLeftWidth: 2,
+    borderRadius: RD.sm,
+    borderLeftWidth: rs(2),
     borderLeftColor: COLORS.accentBlue,
   },
   stopNumber: {
-    fontSize: FONT_SIZE.xs,
+    fontSize: FS.xs,
     fontWeight: FONT_WEIGHT.semibold,
     color: COLORS.accentBlue,
-    marginBottom: SPACING.xs,
+    marginBottom: SP.xs,
   },
 
   // ── Notes ────────────────────────────────────────────────────────────────────
   notesSection: {
-    marginTop: SPACING.md,
-    paddingTop: SPACING.md,
+    marginTop: SP.md,
+    paddingTop: SP.md,
     borderTopWidth: 1,
     borderTopColor: COLORS.borderSubtle,
   },
   notesLabel: {
-    fontSize: FONT_SIZE.sm,
+    fontSize: FS.sm,
     fontWeight: FONT_WEIGHT.semibold,
     color: COLORS.textSecondary,
-    marginBottom: SPACING.xs,
+    marginBottom: SP.xs,
   },
   notesText: {
-    fontSize: FONT_SIZE.sm,
+    fontSize: FS.sm,
     color: COLORS.textPrimary,
   },
 
   // ── Pending note ─────────────────────────────────────────────────────────────
   pendingNote: {
-    fontSize: FONT_SIZE.xs,
+    fontSize: FS.xs,
     color: COLORS.accentOrange,
-    marginTop: SPACING.sm,
-    paddingHorizontal: SPACING.sm,
-    paddingVertical: SPACING.xs + 2,
+    marginTop: SP.sm,
+    paddingHorizontal: SP.sm,
+    paddingVertical: SP.xs + 2,
     backgroundColor: 'rgba(245,158,11,0.10)',
-    borderRadius: RADIUS.sm,
+    borderRadius: RD.sm,
     borderWidth: 1,
     borderColor: 'rgba(245,158,11,0.25)',
   },
 
   // ── Documents ────────────────────────────────────────────────────────────────
   documentsSection: {
-    marginTop: SPACING.md,
-    paddingTop: SPACING.md,
+    marginTop: SP.md,
+    paddingTop: SP.md,
     borderTopWidth: 1,
     borderTopColor: COLORS.borderSubtle,
   },
   documentsTitle: {
-    fontSize: FONT_SIZE.sm,
+    fontSize: FS.sm,
     fontWeight: FONT_WEIGHT.semibold,
     color: COLORS.textSecondary,
-    marginBottom: SPACING.sm,
+    marginBottom: SP.sm,
   },
   documentItem: {
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: COLORS.bgCardLight,
-    padding: SPACING.md,
-    borderRadius: RADIUS.md,
-    marginBottom: SPACING.sm,
-    gap: SPACING.md,
+    padding: SP.md,
+    borderRadius: RD.md,
+    marginBottom: SP.sm,
+    gap: SP.md,
     borderWidth: 1,
     borderColor: COLORS.borderSubtle,
   },
@@ -2238,47 +2266,47 @@ const styles = StyleSheet.create({
     minWidth: 0,
   },
   documentName: {
-    fontSize: FONT_SIZE.sm,
+    fontSize: FS.sm,
     fontWeight: FONT_WEIGHT.semibold,
     color: COLORS.accentBlue,
-    marginBottom: 2,
+    marginBottom: rs(2),
   },
   documentDescription: {
-    fontSize: FONT_SIZE.xs,
+    fontSize: FS.xs,
     color: COLORS.textSecondary,
-    marginBottom: 2,
+    marginBottom: rs(2),
   },
   documentMeta: {
-    fontSize: 10,
+    fontSize: rf(10),
     color: COLORS.textSecondary,
   },
 
   // ── Action buttons ────────────────────────────────────────────────────────────
   buttonContainer: {
     flexDirection: 'row',
-    gap: SPACING.sm,
-    marginTop: SPACING.md,
+    gap: SP.sm,
+    marginTop: SP.md,
   },
   chatButton: {
     flex: 1,
     backgroundColor: COLORS.accentBlue,
-    paddingVertical: SPACING.sm + 2,
-    paddingHorizontal: SPACING.sm,
-    borderRadius: RADIUS.md,
+    paddingVertical: SP.sm + 2,
+    paddingHorizontal: SP.sm,
+    borderRadius: RD.md,
     alignItems: 'center',
     flexDirection: 'row',
     justifyContent: 'center',
-    gap: 4,
+    gap: rs(4),
     shadowColor: COLORS.accentBlue,
-    shadowOffset: { width: 0, height: 2 },
+    shadowOffset: { width: 0, height: rs(2) },
     shadowOpacity: 0.3,
-    shadowRadius: 4,
+    shadowRadius: rs(4),
     elevation: 3,
-    minHeight: 40,
+    minHeight: rs(40),
   },
   chatButtonText: {
     color: COLORS.black,
-    fontSize: FONT_SIZE.xs,
+    fontSize: FS.xs,
     fontWeight: FONT_WEIGHT.bold,
     textAlign: 'center',
     flexShrink: 1,
@@ -2286,18 +2314,18 @@ const styles = StyleSheet.create({
   mapButton: {
     flex: 1,
     backgroundColor: 'rgba(0,209,255,0.12)',
-    paddingVertical: SPACING.sm + 2,
-    paddingHorizontal: SPACING.sm,
-    borderRadius: RADIUS.md,
+    paddingVertical: SP.sm + 2,
+    paddingHorizontal: SP.sm,
+    borderRadius: RD.md,
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 1,
     borderColor: COLORS.accentBlue,
-    minHeight: 40,
+    minHeight: rs(40),
   },
   mapButtonText: {
     color: COLORS.accentBlue,
-    fontSize: FONT_SIZE.xs,
+    fontSize: FS.xs,
     fontWeight: FONT_WEIGHT.semibold,
     textAlign: 'center',
     flexShrink: 1,
@@ -2305,21 +2333,21 @@ const styles = StyleSheet.create({
   completeButton: {
     flex: 1,
     backgroundColor: COLORS.accentGreen,
-    paddingVertical: SPACING.sm + 2,
-    paddingHorizontal: SPACING.sm,
-    borderRadius: RADIUS.md,
+    paddingVertical: SP.sm + 2,
+    paddingHorizontal: SP.sm,
+    borderRadius: RD.md,
     alignItems: 'center',
     justifyContent: 'center',
     shadowColor: COLORS.accentGreen,
     shadowOffset: { width: 0, height: 0 },
     shadowOpacity: 0.3,
-    shadowRadius: 6,
+    shadowRadius: rs(6),
     elevation: 3,
-    minHeight: 40,
+    minHeight: rs(40),
   },
   completeButtonText: {
     color: COLORS.black,
-    fontSize: FONT_SIZE.xs,
+    fontSize: FS.xs,
     fontWeight: FONT_WEIGHT.semibold,
     textAlign: 'center',
     flexShrink: 1,
@@ -2333,10 +2361,10 @@ const styles = StyleSheet.create({
   },
   completionModalContent: {
     backgroundColor: COLORS.bgCard,
-    borderTopLeftRadius: RADIUS['2xl'],
-    borderTopRightRadius: RADIUS['2xl'],
+    borderTopLeftRadius: RD['2xl'],
+    borderTopRightRadius: RD['2xl'],
     maxHeight: '90%',
-    paddingBottom: SPACING.xl,
+    paddingBottom: SP.xl,
     borderWidth: 1,
     borderColor: COLORS.borderSubtle,
     borderBottomWidth: 0,
@@ -2345,37 +2373,37 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    padding: SPACING.base,
+    padding: SP.base,
     borderBottomWidth: 1,
     borderBottomColor: COLORS.borderSubtle,
   },
   modalTitle: {
-    fontSize: FONT_SIZE.lg,
+    fontSize: FS.lg,
     fontWeight: FONT_WEIGHT.bold,
     color: COLORS.textPrimary,
   },
   modalScrollView: {
-    padding: SPACING.base,
+    padding: SP.base,
   },
   modalSubtitle: {
-    fontSize: FONT_SIZE.base,
+    fontSize: FS.base,
     fontWeight: FONT_WEIGHT.semibold,
     color: COLORS.accentBlue,
-    marginBottom: SPACING.sm,
+    marginBottom: SP.sm,
   },
   modalDescription: {
-    fontSize: FONT_SIZE.sm,
+    fontSize: FS.sm,
     color: COLORS.textSecondary,
-    marginBottom: SPACING.base,
-    lineHeight: 20,
+    marginBottom: SP.base,
+    lineHeight: rf(20),
   },
 
   // ── Upload sections ───────────────────────────────────────────────────────────
   documentUploadSection: {
-    marginBottom: SPACING.base,
-    padding: SPACING.base,
+    marginBottom: SP.base,
+    padding: SP.base,
     backgroundColor: COLORS.bgCardLight,
-    borderRadius: RADIUS.lg,
+    borderRadius: RD.lg,
     borderWidth: 1,
     borderColor: COLORS.borderSubtle,
   },
@@ -2383,15 +2411,15 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: SPACING.md,
+    marginBottom: SP.md,
   },
   documentTitle: {
-    fontSize: FONT_SIZE.base,
+    fontSize: FS.base,
     fontWeight: FONT_WEIGHT.semibold,
     color: COLORS.textPrimary,
   },
   requiredText: {
-    fontSize: FONT_SIZE.xs,
+    fontSize: FS.xs,
     fontWeight: FONT_WEIGHT.semibold,
     color: COLORS.accentRed,
   },
@@ -2399,87 +2427,87 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: SPACING.sm,
+    gap: SP.sm,
     backgroundColor: 'rgba(0,209,255,0.06)',
-    padding: SPACING.md,
-    borderRadius: RADIUS.md,
+    padding: SP.md,
+    borderRadius: RD.md,
     borderWidth: 1,
     borderColor: COLORS.accentBlue,
     borderStyle: 'dashed',
   },
   uploadButtonText: {
-    fontSize: FONT_SIZE.sm,
+    fontSize: FS.sm,
     fontWeight: FONT_WEIGHT.semibold,
     color: COLORS.accentBlue,
   },
   selectedFileContainer: {
-    marginTop: SPACING.md,
-    padding: SPACING.md,
+    marginTop: SP.md,
+    padding: SP.md,
     backgroundColor: COLORS.bgCard,
-    borderRadius: RADIUS.md,
+    borderRadius: RD.md,
     borderWidth: 1,
     borderColor: COLORS.borderSubtle,
   },
   selectedFileName: {
-    fontSize: FONT_SIZE.sm,
+    fontSize: FS.sm,
     color: COLORS.textPrimary,
-    marginBottom: SPACING.sm,
+    marginBottom: SP.sm,
   },
   uploadSubmitButton: {
     backgroundColor: COLORS.accentBlue,
-    padding: SPACING.sm + 2,
-    borderRadius: RADIUS.md,
+    padding: SP.sm + 2,
+    borderRadius: RD.md,
     alignItems: 'center',
   },
   uploadSubmitText: {
     color: COLORS.black,
     fontWeight: FONT_WEIGHT.semibold,
-    fontSize: FONT_SIZE.sm,
+    fontSize: FS.sm,
   },
   uploadedDocumentList: {
-    marginTop: SPACING.md,
+    marginTop: SP.md,
   },
   uploadedDocumentItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: SPACING.sm,
-    padding: SPACING.sm,
+    gap: SP.sm,
+    padding: SP.sm,
     backgroundColor: COLORS.bgCard,
-    borderRadius: RADIUS.md,
-    marginBottom: SPACING.sm,
+    borderRadius: RD.md,
+    marginBottom: SP.sm,
     borderWidth: 1,
     borderColor: COLORS.borderSubtle,
   },
   uploadedDocumentName: {
-    fontSize: FONT_SIZE.sm,
+    fontSize: FS.sm,
     color: COLORS.textPrimary,
     flex: 1,
   },
   allDocumentsSection: {
-    marginTop: SPACING.base,
-    marginBottom: SPACING.base,
+    marginTop: SP.base,
+    marginBottom: SP.base,
   },
   allDocumentsTitle: {
-    fontSize: FONT_SIZE.base,
+    fontSize: FS.base,
     fontWeight: FONT_WEIGHT.semibold,
     color: COLORS.textPrimary,
-    marginBottom: SPACING.md,
+    marginBottom: SP.md,
   },
   documentType: {
-    fontSize: FONT_SIZE.xs,
+    fontSize: FS.xs,
     color: COLORS.textSecondary,
-    marginTop: SPACING.xs,
+    marginTop: SP.xs,
   },
   submitButton: {
     backgroundColor: COLORS.accentGreen,
-    padding: SPACING.base,
-    borderRadius: RADIUS.lg,
+    padding: SP.base,
+    borderRadius: RD.lg,
     alignItems: 'center',
-    marginTop: SPACING.base,
+    marginTop: SP.base,
     shadowColor: COLORS.accentGreen,
     shadowOffset: { width: 0, height: 0 },
     shadowOpacity: 0.3,
-    shadowRadius: 8,
+    shadowRadius: rs(8),
     elevation: 4,
   },
   submitButtonDisabled: {
@@ -2490,7 +2518,7 @@ const styles = StyleSheet.create({
   },
   submitButtonText: {
     color: COLORS.black,
-    fontSize: FONT_SIZE.base,
+    fontSize: FS.base,
     fontWeight: FONT_WEIGHT.bold,
   },
 });

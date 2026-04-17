@@ -14,7 +14,35 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from '@expo/vector-icons';
 import { apiService } from '../../services/api/apiService';
 import { logger } from '../../utils/loggerHelper';
-import { COLORS, SPACING, RADIUS, FONT_SIZE, FONT_WEIGHT } from '../../theme';
+import { COLORS, SPACING, RADIUS, FONT_SIZE, FONT_WEIGHT, rs, rf, ri } from '../../theme';
+
+// ─── Responsive scaled constants (computed once at module load) ───────────────
+const FS = {
+  xs:   rf(FONT_SIZE.xs),
+  sm:   rf(FONT_SIZE.sm),
+  base: rf(FONT_SIZE.base),
+  md:   rf(FONT_SIZE.md),
+  lg:   rf(FONT_SIZE.lg),
+  xl:   rf(FONT_SIZE.xl),
+};
+const SP = {
+  xs:   rs(SPACING.xs),
+  sm:   rs(SPACING.sm),
+  md:   rs(SPACING.md),
+  base: rs(SPACING.base),
+  lg:   rs(SPACING.lg),
+  xl:   rs(SPACING.xl),
+  '2xl': rs(SPACING['2xl']),
+  '3xl': rs(SPACING['3xl']),
+};
+const RD = {
+  sm:   rs(RADIUS.sm),
+  md:   rs(RADIUS.md),
+  lg:   rs(RADIUS.lg),
+  xl:   rs(RADIUS.xl),
+  '2xl': rs(RADIUS['2xl']),
+  full: RADIUS.full,
+};
 
 interface Trip {
   _id: string;
@@ -262,7 +290,7 @@ const CompleteTrips = () => {
             <Text style={styles.headerSubtitle}>Your trip history</Text>
           </View>
           <View style={styles.countBadge}>
-            <Ionicons name="checkmark-circle" size={14} color={COLORS.accentGreen} />
+            <Ionicons name="checkmark-circle" size={ri(14)} color={COLORS.accentGreen} />
             <Text style={styles.countBadgeText}>{trips.length}</Text>
           </View>
         </View>
@@ -622,7 +650,7 @@ const CompleteTrips = () => {
                         }
                       }}
                     >
-                      <Ionicons name="document-text" size={20} color="#2563eb" />
+                      <Ionicons name="document-text" size={ri(20)} color={COLORS.accentBlue} />
                       <View style={styles.documentInfo}>
                         <Text style={styles.documentName} numberOfLines={1}>
                           {doc.fileName}
@@ -637,7 +665,7 @@ const CompleteTrips = () => {
                           {doc.uploadedAt && ` • ${new Date(doc.uploadedAt).toLocaleDateString()}`}
                         </Text>
                       </View>
-                      <Ionicons name="download-outline" size={20} color="#2563eb" />
+                      <Ionicons name="download-outline" size={ri(20)} color={COLORS.accentBlue} />
                     </TouchableOpacity>
                   ))}
                 </View>
@@ -677,32 +705,32 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    paddingHorizontal: SPACING.base,
-    paddingVertical: SPACING.md,
+    paddingHorizontal: SP.base,
+    paddingVertical: SP.md,
   },
   headerTitle: {
-    fontSize: FONT_SIZE.lg,
+    fontSize: FS.lg,
     fontWeight: FONT_WEIGHT.bold,
     color: COLORS.textPrimary,
   },
   headerSubtitle: {
-    fontSize: FONT_SIZE.xs,
+    fontSize: FS.xs,
     color: COLORS.textSecondary,
-    marginTop: 2,
+    marginTop: rs(2),
   },
   countBadge: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: SPACING.xs,
+    gap: SP.xs,
     backgroundColor: 'rgba(0,255,163,0.10)',
-    paddingHorizontal: SPACING.md,
-    paddingVertical: SPACING.xs,
+    paddingHorizontal: SP.md,
+    paddingVertical: SP.xs,
     borderRadius: RADIUS.full,
     borderWidth: 1,
     borderColor: COLORS.accentGreen,
   },
   countBadgeText: {
-    fontSize: FONT_SIZE.sm,
+    fontSize: FS.sm,
     fontWeight: FONT_WEIGHT.bold,
     color: COLORS.accentGreen,
   },
@@ -714,25 +742,25 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   loadingText: {
-    marginTop: SPACING.md,
-    fontSize: FONT_SIZE.base,
+    marginTop: SP.md,
+    fontSize: FS.base,
     color: COLORS.textSecondary,
   },
   emptyContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    padding: SPACING['3xl'],
-    marginTop: 80,
+    padding: SP['3xl'],
+    marginTop: rs(80),
   },
   emptyText: {
-    fontSize: FONT_SIZE.lg,
+    fontSize: FS.lg,
     fontWeight: FONT_WEIGHT.semibold,
     color: COLORS.textPrimary,
-    marginBottom: SPACING.sm,
+    marginBottom: SP.sm,
   },
   emptySubtext: {
-    fontSize: FONT_SIZE.base,
+    fontSize: FS.base,
     color: COLORS.textSecondary,
     textAlign: 'center',
   },
@@ -740,255 +768,255 @@ const styles = StyleSheet.create({
   // ── Trip Card ────────────────────────────────────────────────────────────────
   tripCard: {
     backgroundColor: COLORS.bgCard,
-    margin: SPACING.md,
-    borderRadius: RADIUS.lg,
+    margin: SP.md,
+    borderRadius: RD.lg,
     borderWidth: 1,
     borderColor: COLORS.borderSubtle,
     overflow: 'hidden',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
+    shadowColor: COLORS.black,
+    shadowOffset: { width: 0, height: rs(2) },
     shadowOpacity: 0.15,
-    shadowRadius: 6,
+    shadowRadius: rs(6),
     elevation: 4,
   },
   tripHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'flex-start',
-    padding: SPACING.base,
+    padding: SP.base,
     borderBottomWidth: 1,
     borderBottomColor: COLORS.borderSubtle,
   },
   tripNumber: {
-    fontSize: FONT_SIZE.md,
+    fontSize: FS.md,
     fontWeight: FONT_WEIGHT.bold,
     color: COLORS.accentBlue,
-    marginBottom: 3,
+    marginBottom: rs(3),
   },
   tripDate: {
-    fontSize: FONT_SIZE.xs,
+    fontSize: FS.xs,
     color: COLORS.textSecondary,
   },
   statusBadge: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 4,
+    gap: rs(4),
     backgroundColor: 'rgba(0,255,163,0.12)',
-    paddingHorizontal: SPACING.md,
-    paddingVertical: 5,
+    paddingHorizontal: SP.md,
+    paddingVertical: rs(5),
     borderRadius: RADIUS.full,
     borderWidth: 1,
     borderColor: COLORS.accentGreen,
   },
   statusText: {
     color: COLORS.accentGreen,
-    fontSize: FONT_SIZE.xs,
+    fontSize: FS.xs,
     fontWeight: FONT_WEIGHT.semibold,
   },
 
   // ── Info rows ────────────────────────────────────────────────────────────────
   infoRow: {
     flexDirection: 'row',
-    marginBottom: SPACING.sm,
-    paddingHorizontal: SPACING.base,
+    marginBottom: SP.sm,
+    paddingHorizontal: SP.base,
   },
   infoLabel: {
-    fontSize: FONT_SIZE.sm,
+    fontSize: FS.sm,
     fontWeight: FONT_WEIGHT.semibold,
     color: COLORS.textSecondary,
-    width: 80,
+    width: rs(80),
   },
   infoValue: {
-    fontSize: FONT_SIZE.sm,
+    fontSize: FS.sm,
     color: COLORS.textPrimary,
     flex: 1,
   },
 
   // ── Orders section ───────────────────────────────────────────────────────────
   ordersSection: {
-    marginTop: SPACING.sm,
-    paddingTop: SPACING.md,
-    paddingHorizontal: SPACING.base,
+    marginTop: SP.sm,
+    paddingTop: SP.md,
+    paddingHorizontal: SP.base,
     borderTopWidth: 1,
     borderTopColor: COLORS.borderSubtle,
   },
   ordersTitle: {
-    fontSize: FONT_SIZE.base,
+    fontSize: FS.base,
     fontWeight: FONT_WEIGHT.semibold,
     color: COLORS.textPrimary,
-    marginBottom: SPACING.md,
+    marginBottom: SP.md,
   },
   orderItem: {
     backgroundColor: COLORS.bgCardLight,
-    padding: SPACING.md,
-    borderRadius: RADIUS.md,
-    marginBottom: SPACING.sm,
+    padding: SP.md,
+    borderRadius: RD.md,
+    marginBottom: SP.sm,
     borderWidth: 1,
     borderColor: COLORS.borderSubtle,
   },
   orderNumber: {
-    fontSize: FONT_SIZE.base,
+    fontSize: FS.base,
     fontWeight: FONT_WEIGHT.semibold,
     color: COLORS.accentBlue,
-    marginBottom: SPACING.xs,
+    marginBottom: SP.xs,
   },
   customerOrderNo: {
-    fontSize: FONT_SIZE.xs,
+    fontSize: FS.xs,
     color: COLORS.textSecondary,
-    marginBottom: SPACING.xs,
+    marginBottom: SP.xs,
   },
   customerName: {
-    fontSize: FONT_SIZE.xs,
+    fontSize: FS.xs,
     color: COLORS.textSecondary,
-    marginBottom: SPACING.xs,
+    marginBottom: SP.xs,
   },
   locationRow: {
     flexDirection: 'row',
-    marginBottom: SPACING.xs,
+    marginBottom: SP.xs,
   },
   locationLabel: {
-    fontSize: FONT_SIZE.xs,
+    fontSize: FS.xs,
     fontWeight: FONT_WEIGHT.semibold,
     color: COLORS.textSecondary,
-    width: 60,
+    width: rs(60),
   },
   locationValue: {
-    fontSize: FONT_SIZE.xs,
+    fontSize: FS.xs,
     color: COLORS.textPrimary,
     flex: 1,
   },
 
   // ── Notes ────────────────────────────────────────────────────────────────────
   notesSection: {
-    marginTop: SPACING.sm,
-    paddingTop: SPACING.md,
-    paddingHorizontal: SPACING.base,
-    paddingBottom: SPACING.md,
+    marginTop: SP.sm,
+    paddingTop: SP.md,
+    paddingHorizontal: SP.base,
+    paddingBottom: SP.md,
     borderTopWidth: 1,
     borderTopColor: COLORS.borderSubtle,
   },
   notesLabel: {
-    fontSize: FONT_SIZE.sm,
+    fontSize: FS.sm,
     fontWeight: FONT_WEIGHT.semibold,
     color: COLORS.textSecondary,
-    marginBottom: SPACING.xs,
+    marginBottom: SP.xs,
   },
   notesText: {
-    fontSize: FONT_SIZE.sm,
+    fontSize: FS.sm,
     color: COLORS.textPrimary,
-    lineHeight: 20,
+    lineHeight: rf(20),
   },
 
   // ── Documents ────────────────────────────────────────────────────────────────
   documentsSection: {
-    marginTop: SPACING.sm,
-    paddingTop: SPACING.md,
-    paddingHorizontal: SPACING.base,
-    paddingBottom: SPACING.base,
+    marginTop: SP.sm,
+    paddingTop: SP.md,
+    paddingHorizontal: SP.base,
+    paddingBottom: SP.base,
     borderTopWidth: 1,
     borderTopColor: COLORS.borderSubtle,
   },
   documentsTitle: {
-    fontSize: FONT_SIZE.base,
+    fontSize: FS.base,
     fontWeight: FONT_WEIGHT.semibold,
     color: COLORS.textPrimary,
-    marginBottom: SPACING.md,
+    marginBottom: SP.md,
   },
   documentItem: {
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: COLORS.bgCardLight,
-    padding: SPACING.md,
-    borderRadius: RADIUS.md,
-    marginBottom: SPACING.sm,
+    padding: SP.md,
+    borderRadius: RD.md,
+    marginBottom: SP.sm,
     borderWidth: 1,
     borderColor: COLORS.borderSubtle,
-    gap: SPACING.md,
+    gap: SP.md,
   },
   documentInfo: {
     flex: 1,
     minWidth: 0,
   },
   documentName: {
-    fontSize: FONT_SIZE.sm,
+    fontSize: FS.sm,
     fontWeight: FONT_WEIGHT.semibold,
     color: COLORS.accentBlue,
-    marginBottom: 3,
+    marginBottom: rs(3),
   },
   documentDescription: {
-    fontSize: FONT_SIZE.xs,
+    fontSize: FS.xs,
     color: COLORS.textSecondary,
-    marginBottom: 3,
+    marginBottom: rs(3),
   },
   documentMeta: {
-    fontSize: FONT_SIZE.xs,
+    fontSize: FS.xs,
     color: COLORS.textSecondary,
     opacity: 0.7,
   },
 
   // ── Section divider ──────────────────────────────────────────────────────────
   sectionDivider: {
-    marginTop: SPACING.md,
-    marginBottom: SPACING.sm,
-    paddingTop: SPACING.md,
+    marginTop: SP.md,
+    marginBottom: SP.sm,
+    paddingTop: SP.md,
     borderTopWidth: 1,
     borderTopColor: COLORS.borderSubtle,
   },
   sectionTitle: {
-    fontSize: FONT_SIZE.sm,
+    fontSize: FS.sm,
     fontWeight: FONT_WEIGHT.bold,
     color: COLORS.accentNavyBlue,
-    marginBottom: SPACING.sm,
+    marginBottom: SP.sm,
     letterSpacing: 0.3,
   },
 
   // ── Appointment ──────────────────────────────────────────────────────────────
   appointmentSection: {
     backgroundColor: 'rgba(0,209,255,0.05)',
-    padding: SPACING.md,
-    borderRadius: RADIUS.md,
-    marginTop: SPACING.sm,
-    marginBottom: SPACING.sm,
+    padding: SP.md,
+    borderRadius: RD.md,
+    marginTop: SP.sm,
+    marginBottom: SP.sm,
     borderWidth: 1,
     borderColor: COLORS.borderSubtle,
   },
   appointmentTitle: {
-    fontSize: FONT_SIZE.xs,
+    fontSize: FS.xs,
     fontWeight: FONT_WEIGHT.semibold,
     color: COLORS.accentBlue,
-    marginBottom: SPACING.sm,
+    marginBottom: SP.sm,
     letterSpacing: 0.3,
     textTransform: 'uppercase',
   },
 
   // ── Stops ────────────────────────────────────────────────────────────────────
   stopsSection: {
-    marginTop: SPACING.md,
-    padding: SPACING.md,
+    marginTop: SP.md,
+    padding: SP.md,
     backgroundColor: COLORS.bgCardLight,
-    borderRadius: RADIUS.md,
+    borderRadius: RD.md,
     borderWidth: 1,
     borderColor: COLORS.borderSubtle,
   },
   stopsTitle: {
-    fontSize: FONT_SIZE.sm,
+    fontSize: FS.sm,
     fontWeight: FONT_WEIGHT.semibold,
     color: COLORS.textSecondary,
-    marginBottom: SPACING.md,
+    marginBottom: SP.md,
   },
   stopItem: {
-    marginBottom: SPACING.md,
-    padding: SPACING.sm,
+    marginBottom: SP.md,
+    padding: SP.sm,
     backgroundColor: COLORS.bgCard,
-    borderRadius: RADIUS.sm,
-    borderLeftWidth: 3,
+    borderRadius: RD.sm,
+    borderLeftWidth: rs(3),
     borderLeftColor: COLORS.accentBlue,
   },
   stopNumber: {
-    fontSize: FONT_SIZE.xs,
+    fontSize: FS.xs,
     fontWeight: FONT_WEIGHT.semibold,
     color: COLORS.accentBlue,
-    marginBottom: SPACING.sm,
+    marginBottom: SP.sm,
   },
 });
 

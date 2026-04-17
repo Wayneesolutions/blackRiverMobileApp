@@ -19,7 +19,35 @@ import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { RootStackParamList } from '../../navigation/AppNavigator';
 import { apiService } from '../../services/api/apiService';
 import { logger } from '../../utils/loggerHelper';
-import { COLORS, SPACING, RADIUS, FONT_SIZE, FONT_WEIGHT } from '../../theme';
+import { COLORS, SPACING, RADIUS, FONT_SIZE, FONT_WEIGHT, rs, rf, ri } from '../../theme';
+
+// ─── Responsive scaled constants (computed once at module load) ───────────────
+const FS = {
+  xs:   rf(FONT_SIZE.xs),
+  sm:   rf(FONT_SIZE.sm),
+  base: rf(FONT_SIZE.base),
+  md:   rf(FONT_SIZE.md),
+  lg:   rf(FONT_SIZE.lg),
+  xl:   rf(FONT_SIZE.xl),
+};
+const SP = {
+  xs:   rs(SPACING.xs),
+  sm:   rs(SPACING.sm),
+  md:   rs(SPACING.md),
+  base: rs(SPACING.base),
+  lg:   rs(SPACING.lg),
+  xl:   rs(SPACING.xl),
+  '2xl': rs(SPACING['2xl']),
+  '3xl': rs(SPACING['3xl']),
+};
+const RD = {
+  sm:   rs(RADIUS.sm),
+  md:   rs(RADIUS.md),
+  lg:   rs(RADIUS.lg),
+  xl:   rs(RADIUS.xl),
+  '2xl': rs(RADIUS['2xl']),
+  full: RADIUS.full,
+};
 
 type NavigationProp = NativeStackNavigationProp<RootStackParamList>;
 type PendingTripsRouteProp = RouteProp<RootStackParamList, 'PendingTrips'>;
@@ -396,9 +424,17 @@ const PendingTrips = () => {
 
   const getStatusColor = (status: string) => {
     switch (status?.toLowerCase()) {
-      case "dispatched": return "#3498db";
-      case "planned": return "#f39c12";
-      default: return "#95a5a6";
+      case "dispatched": return COLORS.accentBlue;
+      case "planned": return COLORS.accentOrange;
+      default: return COLORS.textSecondary;
+    }
+  };
+
+  const getStatusBgColor = (status: string) => {
+    switch (status?.toLowerCase()) {
+      case "dispatched": return 'rgba(0,209,255,0.12)';
+      case "planned": return 'rgba(245,158,11,0.12)';
+      default: return 'rgba(139,155,180,0.12)';
     }
   };
 
@@ -406,7 +442,7 @@ const PendingTrips = () => {
     return (
       <SafeAreaView style={styles.container}>
         <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color="#2563eb" />
+          <ActivityIndicator size="large" color={COLORS.accentBlue} />
           <Text style={styles.loadingText}>Loading trips...</Text>
         </View>
       </SafeAreaView>
@@ -427,8 +463,8 @@ const PendingTrips = () => {
           >
             <Ionicons
               name="notifications-outline"
-              size={16}
-              color={activeTab === 'requests' ? '#2563eb' : '#9ca3af'}
+              size={ri(16)}
+              color={activeTab === 'requests' ? COLORS.accentBlue : COLORS.textSecondary}
             />
             <Text style={[styles.tabText, activeTab === 'requests' && styles.tabTextActive]}>
               Assignment Requests
@@ -445,14 +481,14 @@ const PendingTrips = () => {
           >
             <Ionicons
               name="checkmark-circle-outline"
-              size={16}
-              color={activeTab === 'accepted' ? '#2563eb' : '#9ca3af'}
+              size={ri(16)}
+              color={activeTab === 'accepted' ? COLORS.accentBlue : COLORS.textSecondary}
             />
             <Text style={[styles.tabText, activeTab === 'accepted' && styles.tabTextActive]}>
               Accepted Trips
             </Text>
             {acceptedTrips.length > 0 && (
-              <View style={[styles.tabBadge, { backgroundColor: '#16a34a' }]}>
+              <View style={[styles.tabBadge, { backgroundColor: COLORS.statusSuccess }]}>
                 <Text style={styles.tabBadgeText}>{acceptedTrips.length}</Text>
               </View>
             )}
@@ -468,14 +504,14 @@ const PendingTrips = () => {
       >
         {activeTab === 'requests' && assignmentRequests.length === 0 && (
           <View style={styles.emptyContainer}>
-            <Ionicons name="notifications-off-outline" size={48} color="#d1d5db" />
+            <Ionicons name="notifications-off-outline" size={ri(48)} color={COLORS.textSecondary} />
             <Text style={styles.emptyText}>No pending requests</Text>
             <Text style={styles.emptySubtext}>New trip assignments will appear here.</Text>
           </View>
         )}
         {activeTab === 'accepted' && acceptedTrips.length === 0 && (
           <View style={styles.emptyContainer}>
-            <Ionicons name="calendar-outline" size={48} color="#d1d5db" />
+            <Ionicons name="calendar-outline" size={ri(48)} color={COLORS.textSecondary} />
             <Text style={styles.emptyText}>No accepted trips</Text>
             <Text style={styles.emptySubtext}>Accept an assignment to see it here.</Text>
           </View>
@@ -489,8 +525,27 @@ const PendingTrips = () => {
                   Start: {formatDate(trip.plannedStartDate)}
                 </Text>
               </View>
-              <View style={styles.statusBadge}>
-                <Text style={styles.statusText}>Completed</Text>
+              <View style={[
+                styles.statusBadge,
+                {
+                  backgroundColor: activeTab === 'accepted'
+                    ? 'rgba(0,255,163,0.12)'
+                    : getStatusBgColor(trip.status),
+                  borderColor: activeTab === 'accepted'
+                    ? COLORS.accentGreen
+                    : getStatusColor(trip.status),
+                },
+              ]}>
+                <Text style={[
+                  styles.statusText,
+                  {
+                    color: activeTab === 'accepted'
+                      ? COLORS.accentGreen
+                      : getStatusColor(trip.status),
+                  },
+                ]}>
+                  {activeTab === 'accepted' ? 'Accepted' : getStatusDisplay(trip.status)}
+                </Text>
               </View>
             </View>
 
@@ -803,7 +858,7 @@ const PendingTrips = () => {
                                 }
                               }}
                             >
-                              <Ionicons name="document-text" size={20} color="#2563eb" />
+                              <Ionicons name="document-text" size={ri(20)} color={COLORS.accentBlue} />
                               <View style={styles.documentInfo}>
                                 <Text style={styles.documentName} numberOfLines={1}>
                                   {doc.name || 'Document'}
@@ -813,7 +868,7 @@ const PendingTrips = () => {
                                   {doc.uploadedAt && ` • ${new Date(doc.uploadedAt).toLocaleDateString()}`}
                                 </Text>
                               </View>
-                              <Ionicons name="download-outline" size={20} color="#2563eb" />
+                              <Ionicons name="download-outline" size={ri(20)} color={COLORS.accentBlue} />
                             </TouchableOpacity>
                           ))}
                         </View>
@@ -873,7 +928,7 @@ const PendingTrips = () => {
                       }
                     }}
                   >
-                    <Ionicons name="document-text" size={20} color="#2563eb" />
+                    <Ionicons name="document-text" size={ri(20)} color={COLORS.accentBlue} />
                     <View style={styles.documentInfo}>
                       <Text style={styles.documentName} numberOfLines={1}>
                         {doc.fileName}
@@ -888,7 +943,7 @@ const PendingTrips = () => {
                         {doc.uploadedAt && ` • ${new Date(doc.uploadedAt).toLocaleDateString()}`}
                       </Text>
                     </View>
-                    <Ionicons name="download-outline" size={20} color="#2563eb" />
+                    <Ionicons name="download-outline" size={ri(20)} color={COLORS.accentBlue} />
                   </TouchableOpacity>
                 ))}
               </View>
@@ -901,21 +956,21 @@ const PendingTrips = () => {
                   style={styles.acceptButton}
                   onPress={() => handleAccept(trip)}
                 >
-                  <Ionicons name="checkmark-circle-outline" size={18} color="#fff" />
+                  <Ionicons name="checkmark-circle-outline" size={ri(18)} color={COLORS.white} />
                   <Text style={styles.acceptButtonText}>Accept</Text>
                 </TouchableOpacity>
                 <TouchableOpacity
                   style={styles.rejectButton}
                   onPress={() => handleReject(trip)}
                 >
-                  <Ionicons name="close-circle-outline" size={18} color="#fff" />
+                  <Ionicons name="close-circle-outline" size={ri(18)} color={COLORS.white} />
                   <Text style={styles.rejectButtonText}>Reject</Text>
                 </TouchableOpacity>
               </View>
             ) : (
               <View>
                 <View style={styles.acceptedBanner}>
-                  <Ionicons name="checkmark-circle" size={16} color="#16a34a" />
+                  <Ionicons name="checkmark-circle" size={ri(16)} color={COLORS.accentGreen} />
                   <Text style={styles.acceptedBannerText}>You accepted this trip</Text>
                 </View>
                 <TouchableOpacity
@@ -941,45 +996,45 @@ const styles = StyleSheet.create({
   // ─── Tab Bar ───────────────────────────────────────────────────────────────
   tabBar: {
     flexDirection: 'row',
-    backgroundColor: '#fff',
+    backgroundColor: COLORS.bgCard,
     borderBottomWidth: 1,
-    borderBottomColor: '#e5e7eb',
+    borderBottomColor: COLORS.borderSubtle,
   },
   tab: {
     flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: 12,
-    gap: 6,
+    paddingVertical: SP.md,
+    gap: SP.xs + 2,
     borderBottomWidth: 2,
     borderBottomColor: 'transparent',
   },
   tabActive: {
-    borderBottomColor: '#2563eb',
+    borderBottomColor: COLORS.accentBlue,
   },
   tabText: {
-    fontSize: 13,
-    fontWeight: '500',
-    color: '#9ca3af',
+    fontSize: FS.sm,
+    fontWeight: FONT_WEIGHT.medium,
+    color: COLORS.textSecondary,
   },
   tabTextActive: {
-    color: '#2563eb',
-    fontWeight: '600',
+    color: COLORS.accentBlue,
+    fontWeight: FONT_WEIGHT.semibold,
   },
   tabBadge: {
-    backgroundColor: '#dc2626',
-    borderRadius: 10,
-    minWidth: 18,
-    height: 18,
+    backgroundColor: COLORS.accentRed,
+    borderRadius: RADIUS.full,
+    minWidth: rs(18),
+    height: rs(18),
     alignItems: 'center',
     justifyContent: 'center',
-    paddingHorizontal: 4,
+    paddingHorizontal: rs(4),
   },
   tabBadgeText: {
-    color: '#fff',
-    fontSize: 11,
-    fontWeight: '700',
+    color: COLORS.white,
+    fontSize: rf(9),
+    fontWeight: FONT_WEIGHT.bold,
   },
   scrollView: {
     flex: 1,
@@ -990,346 +1045,370 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   loadingText: {
-    marginTop: 10,
-    color: '#666',
+    marginTop: SP.md,
+    fontSize: FS.base,
+    color: COLORS.textSecondary,
   },
   emptyContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    padding: 40,
-    marginTop: 100,
+    padding: SP['3xl'],
+    marginTop: rs(80),
   },
   emptyText: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: '#333',
-    marginBottom: 8,
+    fontSize: FS.lg,
+    fontWeight: FONT_WEIGHT.semibold,
+    color: COLORS.textPrimary,
+    marginBottom: SP.sm,
   },
   emptySubtext: {
-    fontSize: 14,
-    color: '#666',
+    fontSize: FS.base,
+    color: COLORS.textSecondary,
     textAlign: 'center',
   },
   tripCard: {
     backgroundColor: COLORS.bgCard,
-    margin: SPACING.md,
-    borderRadius: RADIUS.lg,
+    margin: SP.md,
+    borderRadius: RD.lg,
     borderWidth: 1,
     borderColor: COLORS.borderSubtle,
     overflow: 'hidden',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
+    shadowColor: COLORS.black,
+    shadowOffset: { width: 0, height: rs(2) },
     shadowOpacity: 0.15,
-    shadowRadius: 6,
+    shadowRadius: rs(6),
     elevation: 4,
   },
   tripHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'flex-start',
-    padding: SPACING.base,
+    padding: SP.base,
     borderBottomWidth: 1,
     borderBottomColor: COLORS.borderSubtle,
   },
   tripNumber: {
-    fontSize: FONT_SIZE.md,
+    fontSize: FS.md,
     fontWeight: FONT_WEIGHT.bold,
     color: COLORS.accentBlue,
-    marginBottom: 3,
+    marginBottom: rs(3),
   },
   tripDate: {
-    fontSize: FONT_SIZE.xs,
+    fontSize: FS.xs,
     color: COLORS.textSecondary,
   },
   statusBadge: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 4,
-    backgroundColor: 'rgba(0,255,163,0.12)',
-    paddingHorizontal: SPACING.md,
-    paddingVertical: 5,
+    gap: rs(4),
+    paddingHorizontal: SP.md,
+    paddingVertical: rs(5),
     borderRadius: RADIUS.full,
     borderWidth: 1,
-    borderColor: COLORS.accentGreen,
   },
   statusText: {
-    color: COLORS.accentGreen,
-    fontSize: FONT_SIZE.xs,
+    fontSize: FS.xs,
     fontWeight: FONT_WEIGHT.semibold,
   },
   infoRow: {
     flexDirection: 'row',
-    marginBottom: SPACING.xs + 2,
+    marginBottom: SP.xs + 2,
   },
   infoLabel: {
-    fontSize: FONT_SIZE.sm,
+    fontSize: FS.sm,
     fontWeight: FONT_WEIGHT.semibold,
     color: COLORS.textSecondary,
-    width: 76,
-    marginLeft: 10
+    width: rs(76),
+    marginLeft: SP.sm + 2,
   },
   infoValue: {
-    fontSize: FONT_SIZE.sm,
+    fontSize: FS.sm,
     color: COLORS.textPrimary,
     flex: 1,
   },
   ordersSection: {
-    marginTop: SPACING.sm,
-    paddingTop: SPACING.md,
-    paddingHorizontal: SPACING.base,
+    marginTop: SP.sm,
+    paddingTop: SP.md,
+    paddingHorizontal: SP.base,
     borderTopWidth: 1,
     borderTopColor: COLORS.borderSubtle,
   },
   ordersTitle: {
-    fontSize: FONT_SIZE.base,
+    fontSize: FS.base,
     fontWeight: FONT_WEIGHT.semibold,
     color: COLORS.textPrimary,
-    marginBottom: SPACING.md,
+    marginBottom: SP.md,
   },
   orderItem: {
     backgroundColor: COLORS.bgCardLight,
-    padding: SPACING.md,
-    borderRadius: RADIUS.md,
-    marginBottom: SPACING.sm,
+    padding: SP.md,
+    borderRadius: RD.md,
+    marginBottom: SP.sm,
     borderWidth: 1,
     borderColor: COLORS.borderSubtle,
   },
   orderNumber: {
-    fontSize: FONT_SIZE.base,
+    fontSize: FS.base,
     fontWeight: FONT_WEIGHT.semibold,
     color: COLORS.accentBlue,
-    marginBottom: SPACING.xs,
+    marginBottom: SP.xs,
   },
   customerOrderNo: {
-    fontSize: FONT_SIZE.xs,
+    fontSize: FS.xs,
     color: COLORS.textSecondary,
-    marginBottom: SPACING.xs,
+    marginBottom: SP.xs,
   },
   customerName: {
-    fontSize: FONT_SIZE.xs,
+    fontSize: FS.xs,
     color: COLORS.textSecondary,
-    marginBottom: SPACING.xs,
+    marginBottom: SP.xs,
   },
   locationRow: {
     flexDirection: 'row',
-    marginBottom: SPACING.xs,
+    marginBottom: SP.xs,
   },
   locationLabel: {
-    fontSize: FONT_SIZE.xs,
+    fontSize: FS.xs,
     fontWeight: FONT_WEIGHT.semibold,
     color: COLORS.textSecondary,
-    width: 60,
+    width: rs(60),
   },
   locationValue: {
-    fontSize: FONT_SIZE.xs,
+    fontSize: FS.xs,
     color: COLORS.textPrimary,
     flex: 1,
   },
   notesSection: {
-    marginTop: SPACING.sm,
-    paddingTop: SPACING.md,
-    paddingHorizontal: SPACING.base,
-    paddingBottom: SPACING.md,
+    marginTop: SP.sm,
+    paddingTop: SP.md,
+    paddingHorizontal: SP.base,
+    paddingBottom: SP.md,
     borderTopWidth: 1,
     borderTopColor: COLORS.borderSubtle,
   },
   notesLabel: {
-    fontSize: FONT_SIZE.sm,
+    fontSize: FS.sm,
     fontWeight: FONT_WEIGHT.semibold,
     color: COLORS.textSecondary,
-    marginBottom: SPACING.xs,
+    marginBottom: SP.xs,
   },
   notesText: {
-    fontSize: FONT_SIZE.sm,
+    fontSize: FS.sm,
     color: COLORS.textPrimary,
-    lineHeight: 20,
+    lineHeight: rf(20),
   },
 
   // ── Documents ────────────────────────────────────────────────────────────────
   documentsSection: {
-    marginTop: SPACING.sm,
-    paddingTop: SPACING.md,
-    paddingHorizontal: SPACING.base,
-    paddingBottom: SPACING.base,
+    marginTop: SP.sm,
+    paddingTop: SP.md,
+    paddingHorizontal: SP.base,
+    paddingBottom: SP.base,
     borderTopWidth: 1,
     borderTopColor: COLORS.borderSubtle,
   },
   documentsTitle: {
-    fontSize: FONT_SIZE.base,
+    fontSize: FS.base,
     fontWeight: FONT_WEIGHT.semibold,
     color: COLORS.textPrimary,
-    marginBottom: SPACING.md,
+    marginBottom: SP.md,
   },
   documentItem: {
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: COLORS.bgCardLight,
-    padding: SPACING.md,
-    borderRadius: RADIUS.md,
-    marginBottom: SPACING.sm,
+    padding: SP.md,
+    borderRadius: RD.md,
+    marginBottom: SP.sm,
     borderWidth: 1,
     borderColor: COLORS.borderSubtle,
-    gap: SPACING.md,
+    gap: SP.md,
   },
   documentInfo: {
     flex: 1,
     minWidth: 0,
   },
   documentName: {
-    fontSize: FONT_SIZE.sm,
+    fontSize: FS.sm,
     fontWeight: FONT_WEIGHT.semibold,
     color: COLORS.accentBlue,
-    marginBottom: 3,
+    marginBottom: rs(3),
   },
   documentDescription: {
-    fontSize: FONT_SIZE.xs,
+    fontSize: FS.xs,
     color: COLORS.textSecondary,
-    marginBottom: 3,
+    marginBottom: rs(3),
   },
   documentMeta: {
-    fontSize: FONT_SIZE.xs,
+    fontSize: FS.xs,
     color: COLORS.textSecondary,
     opacity: 0.7,
   },
   startButton: {
-    backgroundColor: '#2563eb',
-    padding: 14,
-    borderRadius: 8,
-    marginTop: 12,
+    backgroundColor: COLORS.accentNavyBlue,
+    padding: SP.base,
+    borderRadius: RD.md,
+    marginTop: SP.md,
+    marginHorizontal: SP.base,
+    marginBottom: SP.base,
     alignItems: 'center',
+    shadowColor: COLORS.accentNavyBlue,
+    shadowOffset: { width: 0, height: rs(2) },
+    shadowOpacity: 0.3,
+    shadowRadius: rs(4),
+    elevation: 3,
   },
   startButtonText: {
-    color: '#fff',
-    fontSize: 16,
-    fontWeight: '600',
+    color: COLORS.white,
+    fontSize: FS.base,
+    fontWeight: FONT_WEIGHT.bold,
   },
   // ── Section divider ──────────────────────────────────────────────────────────
   sectionDivider: {
-    marginTop: SPACING.md,
-    marginBottom: SPACING.sm,
-    paddingTop: SPACING.md,
+    marginTop: SP.md,
+    marginBottom: SP.sm,
+    paddingTop: SP.md,
     borderTopWidth: 1,
     borderTopColor: COLORS.borderSubtle,
   },
   sectionTitle: {
-    fontSize: FONT_SIZE.sm,
+    fontSize: FS.sm,
     fontWeight: FONT_WEIGHT.bold,
     color: COLORS.accentNavyBlue,
-    marginBottom: SPACING.sm,
+    marginBottom: SP.sm,
     letterSpacing: 0.3,
   },
 
   // ── Appointment ──────────────────────────────────────────────────────────────
   appointmentSection: {
     backgroundColor: 'rgba(0,209,255,0.05)',
-    padding: SPACING.md,
-    borderRadius: RADIUS.md,
-    marginTop: SPACING.sm,
-    marginBottom: SPACING.sm,
+    padding: SP.md,
+    borderRadius: RD.md,
+    marginTop: SP.sm,
+    marginBottom: SP.sm,
     borderWidth: 1,
     borderColor: COLORS.borderSubtle,
   },
   appointmentTitle: {
-    fontSize: FONT_SIZE.xs,
+    fontSize: FS.xs,
     fontWeight: FONT_WEIGHT.semibold,
     color: COLORS.accentBlue,
-    marginBottom: SPACING.sm,
+    marginBottom: SP.sm,
     letterSpacing: 0.3,
     textTransform: 'uppercase',
   },
 
   // ── Stops ────────────────────────────────────────────────────────────────────
   stopsSection: {
-    marginTop: SPACING.md,
-    padding: SPACING.md,
+    marginTop: SP.md,
+    padding: SP.md,
     backgroundColor: COLORS.bgCardLight,
-    borderRadius: RADIUS.md,
+    borderRadius: RD.md,
     borderWidth: 1,
     borderColor: COLORS.borderSubtle,
   },
   stopsTitle: {
-    fontSize: FONT_SIZE.sm,
+    fontSize: FS.sm,
     fontWeight: FONT_WEIGHT.semibold,
     color: COLORS.textSecondary,
-    marginBottom: SPACING.md,
+    marginBottom: SP.md,
   },
   stopItem: {
-    marginBottom: SPACING.md,
-    padding: SPACING.sm,
+    marginBottom: SP.md,
+    padding: SP.sm,
     backgroundColor: COLORS.bgCard,
-    borderRadius: RADIUS.sm,
-    borderLeftWidth: 3,
+    borderRadius: RD.sm,
+    borderLeftWidth: rs(3),
     borderLeftColor: COLORS.accentBlue,
   },
   stopNumber: {
-    fontSize: FONT_SIZE.xs,
+    fontSize: FS.xs,
     fontWeight: FONT_WEIGHT.semibold,
     color: COLORS.accentBlue,
-    marginBottom: SPACING.sm,
+    marginBottom: SP.sm,
   },
   actionRow: {
     flexDirection: 'row',
-    gap: 10,
-    marginTop: 12,
+    gap: SP.sm,
+    marginTop: SP.md,
+    marginHorizontal: SP.base,
+    marginBottom: SP.base,
+    paddingTop: SP.md,
+    borderTopWidth: 1,
+    borderTopColor: COLORS.borderSubtle,
   },
   acceptButton: {
     flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#16a34a',
-    padding: 13,
-    borderRadius: 8,
-    gap: 6,
+    backgroundColor: COLORS.statusSuccess,
+    paddingVertical: SP.sm + 2,
+    paddingHorizontal: SP.sm,
+    borderRadius: RD.md,
+    gap: SP.xs + 2,
+    shadowColor: COLORS.statusSuccess,
+    shadowOffset: { width: 0, height: rs(2) },
+    shadowOpacity: 0.3,
+    shadowRadius: rs(4),
+    elevation: 3,
+    minHeight: rs(42),
   },
   acceptButtonText: {
-    color: '#fff',
-    fontSize: 15,
-    fontWeight: '600',
+    color: COLORS.white,
+    fontSize: FS.sm,
+    fontWeight: FONT_WEIGHT.bold,
   },
   rejectButton: {
     flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#dc2626',
-    padding: 13,
-    borderRadius: 8,
-    gap: 6,
+    backgroundColor: COLORS.statusDanger,
+    paddingVertical: SP.sm + 2,
+    paddingHorizontal: SP.sm,
+    borderRadius: RD.md,
+    gap: SP.xs + 2,
+    minHeight: rs(42),
   },
   rejectButtonText: {
-    color: '#fff',
-    fontSize: 15,
-    fontWeight: '600',
+    color: COLORS.white,
+    fontSize: FS.sm,
+    fontWeight: FONT_WEIGHT.bold,
   },
   acceptedBanner: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#dcfce7',
-    padding: 10,
-    borderRadius: 8,
-    marginTop: 12,
-    gap: 8,
+    backgroundColor: 'rgba(0,255,163,0.10)',
+    padding: SP.md,
+    borderRadius: RD.md,
+    marginTop: SP.md,
+    marginHorizontal: SP.base,
+    gap: SP.sm,
+    borderWidth: 1,
+    borderColor: 'rgba(0,255,163,0.25)',
   },
   acceptedBannerText: {
-    color: '#16a34a',
-    fontSize: 14,
-    fontWeight: '600',
+    color: COLORS.accentGreen,
+    fontSize: FS.sm,
+    fontWeight: FONT_WEIGHT.semibold,
   },
   rejectedBanner: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#fee2e2',
-    padding: 10,
-    borderRadius: 8,
-    marginTop: 12,
-    gap: 8,
+    backgroundColor: 'rgba(244,63,94,0.10)',
+    padding: SP.md,
+    borderRadius: RD.md,
+    marginTop: SP.md,
+    gap: SP.sm,
+    borderWidth: 1,
+    borderColor: 'rgba(244,63,94,0.25)',
   },
   rejectedBannerText: {
-    color: '#dc2626',
-    fontSize: 14,
-    fontWeight: '500',
+    color: COLORS.accentRed,
+    fontSize: FS.sm,
+    fontWeight: FONT_WEIGHT.medium,
     flex: 1,
   },
 });
