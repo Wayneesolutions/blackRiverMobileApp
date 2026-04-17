@@ -574,7 +574,7 @@ const LoadMapScreen: React.FC = () => {
 
         {loading ? (
           <View style={styles.loadingContainer}>
-            <ActivityIndicator size="large" color="#8B5CF6" />
+            <ActivityIndicator size="large" color={COLORS.accentNavyBlue} />
             <Text style={styles.loadingText}>Loading active trips...</Text>
           </View>
         ) : (
@@ -591,7 +591,7 @@ const LoadMapScreen: React.FC = () => {
           >
             {loads.length === 0 ? (
               <View style={styles.emptyState}>
-                <Ionicons name="map-outline" size={64} color="#cbd5f5" />
+                <Ionicons name="map-outline" size={64} color={COLORS.textPrimary} />
                 <Text style={styles.emptyTitle}>No Active Trips</Text>
                 <Text style={styles.emptySubtitle}>
                   You don't have any active trips assigned yet. Pull down to refresh.
@@ -794,7 +794,7 @@ const styles = StyleSheet.create({
     color: '#6B7280',
   },
   emptyState: {
-    backgroundColor: '#fff',
+    backgroundColor: COLORS.bgCardLight,
     borderRadius: 16,
     paddingVertical: 40,
     paddingHorizontal: 24,
@@ -902,8 +902,8 @@ const styles = StyleSheet.create({
   },
   routeDetails: {
     flex: 1,
-    borderBottomWidth: 1,
-    borderBottomColor: COLORS.accentNavyBlue,
+    // borderBottomWidth: 1,
+    // borderBottomColor: COLORS.accentNavyBlue,
     paddingBottom: 12,
   },
   routeLocation: {

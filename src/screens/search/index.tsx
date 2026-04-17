@@ -512,6 +512,7 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.1,
     shadowRadius: 4,
     elevation: 3,
+
   },
   searchInput: {
     flex: 1,
@@ -519,6 +520,7 @@ const styles = StyleSheet.create({
     color: COLORS.textSecondary,
     marginLeft: 8,
     marginRight: 8,
+    border: '2px solid red'
   },
   content: {
     flex: 1,
@@ -529,6 +531,7 @@ const styles = StyleSheet.create({
     margin: 16,
     borderRadius: 12,
     padding: 16,
+
 
   },
   sectionHeader: {
