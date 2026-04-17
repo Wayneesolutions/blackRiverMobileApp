@@ -14,6 +14,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import { apiService } from '../../services/api/apiService';
+import { COLORS, rs, rf, ri } from '../../theme';
 
 type TestType = 'TDG' | 'VEHICLE' | 'HOS' | 'WINTER';
 
@@ -466,244 +467,295 @@ const TakeTestScreen = () => {
 
 const styles = StyleSheet.create({
   container: {
-    flex: 1,
-    backgroundColor: '#F3F4F6',
-  },
-  loadingContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  loadingText: {
-    marginTop: 16,
-    fontSize: 16,
-    color: '#6B7280',
-  },
-  errorContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: 24,
-  },
-  errorText: {
-    marginTop: 16,
-    marginBottom: 24,
-    fontSize: 16,
-    color: '#EF4444',
-    textAlign: 'center',
-  },
-  header: {
-    backgroundColor: '#FFFFFF',
-    padding: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: '#E5E7EB',
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-  },
-  backButton: {
-    padding: 8,
-  },
-  placeholder: {
-    width: 40,
-  },
-  headerContent: {
-    flex: 1,
-    alignItems: 'center',
-  },
-  headerTitle: {
-    fontSize: 18,
-    fontWeight: '700',
-    color: '#1F2937',
-  },
-  headerSubtitle: {
-    fontSize: 14,
-    color: '#6B7280',
-    marginTop: 4,
-  },
-  progressSection: {
-    backgroundColor: '#FFFFFF',
-    padding: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: '#E5E7EB',
-  },
-  progressHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 8,
-  },
-  progressLabel: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#1F2937',
-  },
-  progressPercent: {
-    fontSize: 14,
-    fontWeight: '700',
-    color: '#0ea3d8',
-  },
-  progressBarContainer: {
-    height: 6,
-    backgroundColor: '#E5E7EB',
-    borderRadius: 3,
-    overflow: 'hidden',
-  },
-  progressBar: {
-    height: '100%',
-    borderRadius: 3,
-  },
-  scrollView: {
-    flex: 1,
-  },
-  contentContainer: {
-    padding: 16,
-    paddingBottom: Platform.OS === 'android' ? 80 : 32,
-    paddingTop: Platform.OS === 'android' ? 8 : 0,
-  },
-  questionCard: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: 12,
-    padding: 20,
-    marginBottom: 20,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
-  },
-  questionNumber: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#0ea3d8',
-    marginBottom: 12,
-  },
-  questionText: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#1F2937',
-    lineHeight: 24,
-  },
-  optionsContainer: {
-    marginBottom: 20,
-  },
-  optionCard: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#FFFFFF',
-    borderRadius: 12,
-    padding: 16,
-    marginBottom: 12,
-    borderWidth: 2,
-    borderColor: '#E5E7EB',
-  },
-  optionCardSelected: {
-    borderColor: '#0ea3d8',
-    backgroundColor: '#EFF6FF',
-  },
-  optionRadio: {
-    width: 24,
-    height: 24,
-    borderRadius: 12,
-    borderWidth: 2,
-    borderColor: '#D1D5DB',
-    marginRight: 12,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  optionRadioSelected: {
-    borderColor: '#0ea3d8',
-  },
-  optionRadioInner: {
-    width: 12,
-    height: 12,
-    borderRadius: 6,
-    backgroundColor: '#0ea3d8',
-  },
-  optionText: {
-    flex: 1,
-    fontSize: 15,
-    color: '#374151',
-    lineHeight: 22,
-  },
-  optionTextSelected: {
-    color: '#1F2937',
-    fontWeight: '600',
-  },
-  navigationContainer: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginBottom: 20,
-  },
-  navButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingVertical: 14,
-    paddingHorizontal: 24,
-    borderRadius: 12,
-    flex: 1,
-    marginHorizontal: 4,
-    justifyContent: 'center',
-  },
-  navButtonSecondary: {
-    backgroundColor: '#F3F4F6',
-    borderWidth: 1,
-    borderColor: '#D1D5DB',
-  },
-  navButtonPrimary: {
-    backgroundColor: '#0ea3d8',
-  },
-  navButtonSubmit: {
-    backgroundColor: '#059669',
-  },
-  navButtonDisabled: {
-    opacity: 0.5,
-  },
-  navButtonText: {
-    fontSize: 15,
-    fontWeight: '600',
-    color: '#1F2937',
-    marginLeft: 4,
-  },
-  navButtonTextPrimary: {
-    fontSize: 15,
-    fontWeight: '600',
-    color: '#FFFFFF',
-    marginRight: 4,
-  },
-  navButtonTextDisabled: {
-    color: '#9CA3AF',
-  },
-  testInfo: {
-    backgroundColor: '#F9FAFB',
-    borderRadius: 12,
-    padding: 16,
-    marginBottom: 20,
-  },
-  testInfoRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 8,
-  },
-  testInfoText: {
-    fontSize: 14,
-    color: '#4B5563',
-    marginLeft: 8,
-  },
-  button: {
-    backgroundColor: '#0ea3d8',
-    paddingVertical: 12,
-    paddingHorizontal: 24,
-    borderRadius: 8,
-  },
-  buttonText: {
-    color: '#FFFFFF',
-    fontSize: 16,
-    fontWeight: '600',
-  },
-  bottomSpacer: {
-    height: 20,
-  },
+  flex: 1,
+  backgroundColor: COLORS.bgMain,
+},
+
+loadingContainer: {
+  flex: 1,
+  justifyContent: 'center',
+  alignItems: 'center',
+},
+
+loadingText: {
+  marginTop: rs(16),
+  fontSize: rf(16),
+  color: COLORS.textSecondary,
+},
+
+errorContainer: {
+  flex: 1,
+  justifyContent: 'center',
+  alignItems: 'center',
+  padding: rs(24),
+},
+
+errorText: {
+  marginTop: rs(16),
+  marginBottom: rs(24),
+  fontSize: rf(14),
+  color: COLORS.accentOrange,
+  textAlign: 'center',
+},
+
+// ✅ HEADER (same as other screens)
+header: {
+  flexDirection: 'row',
+  alignItems: 'center',
+  justifyContent: 'space-between',
+  paddingHorizontal: rs(16),
+  paddingVertical: rs(12),
+  backgroundColor: COLORS.bgCard,
+  borderTopWidth: 2,
+  borderTopColor: COLORS.accentBlue,
+  borderBottomWidth: 1,
+  borderBottomColor: COLORS.borderSubtle,
+},
+
+backButton: {
+  padding: rs(8),
+},
+
+placeholder: {
+  width: rs(40),
+},
+
+headerContent: {
+  flex: 1,
+  alignItems: 'center',
+},
+
+headerTitle: {
+  fontSize: rf(18),
+  fontWeight: '700',
+  color: COLORS.textPrimary,
+},
+
+headerSubtitle: {
+  fontSize: rf(13),
+  color: COLORS.textSecondary,
+  marginTop: rs(2),
+},
+
+// ✅ PROGRESS
+progressSection: {
+  backgroundColor: COLORS.bgCard,
+  padding: rs(16),
+  borderBottomWidth: 1,
+  borderBottomColor: COLORS.borderSubtle,
+},
+
+progressHeader: {
+  flexDirection: 'row',
+  justifyContent: 'space-between',
+  alignItems: 'center',
+  marginBottom: rs(8),
+},
+
+progressLabel: {
+  fontSize: rf(13),
+  fontWeight: '600',
+  color: COLORS.textSecondary,
+},
+
+progressPercent: {
+  fontSize: rf(13),
+  fontWeight: '700',
+  color: COLORS.accentBlue,
+},
+
+progressBarContainer: {
+  height: rs(6),
+  backgroundColor: COLORS.borderSubtle,
+  borderRadius: rs(6),
+  overflow: 'hidden',
+},
+
+progressBar: {
+  height: '100%',
+  borderRadius: rs(6),
+},
+
+scrollView: {
+  flex: 1,
+},
+
+contentContainer: {
+  padding: rs(16),
+  paddingBottom: Platform.OS === 'android' ? rs(80) : rs(32),
+  paddingTop: rs(16),
+},
+
+// ✅ QUESTION CARD (same card system)
+questionCard: {
+  backgroundColor: COLORS.bgCard,
+  borderRadius: rs(12),
+  padding: rs(16),
+  marginBottom: rs(16),
+  borderWidth: 1,
+  borderColor: COLORS.borderSubtle,
+  elevation: 2,
+},
+
+questionNumber: {
+  fontSize: rf(13),
+  fontWeight: '600',
+  color: COLORS.accentBlue,
+  marginBottom: rs(8),
+},
+
+questionText: {
+  fontSize: rf(15),
+  fontWeight: '600',
+  color: COLORS.textPrimary,
+  lineHeight: rf(22),
+},
+
+// ✅ OPTIONS
+optionsContainer: {
+  marginBottom: rs(16),
+},
+
+optionCard: {
+  flexDirection: 'row',
+  alignItems: 'center',
+  backgroundColor: COLORS.bgCard,
+  borderRadius: rs(12),
+  padding: rs(14),
+  marginBottom: rs(10),
+  borderWidth: 1,
+  borderColor: COLORS.borderSubtle,
+},
+
+optionCardSelected: {
+  borderColor: COLORS.accentBlue,
+  backgroundColor: 'rgba(0,209,255,0.08)',
+},
+
+optionRadio: {
+  width: rs(22),
+  height: rs(22),
+  borderRadius: rs(11),
+  borderWidth: 2,
+  borderColor: COLORS.borderSubtle,
+  marginRight: rs(10),
+  justifyContent: 'center',
+  alignItems: 'center',
+},
+
+optionRadioSelected: {
+  borderColor: COLORS.accentBlue,
+},
+
+optionRadioInner: {
+  width: rs(10),
+  height: rs(10),
+  borderRadius: rs(5),
+  backgroundColor: COLORS.accentBlue,
+},
+
+optionText: {
+  flex: 1,
+  fontSize: rf(14),
+  color: COLORS.textSecondary,
+  lineHeight: rf(20),
+},
+
+optionTextSelected: {
+  color: COLORS.textPrimary,
+  fontWeight: '600',
+},
+
+// ✅ NAVIGATION BUTTONS
+navigationContainer: {
+  flexDirection: 'row',
+  justifyContent: 'space-between',
+  marginBottom: rs(16),
+},
+
+navButton: {
+  flexDirection: 'row',
+  alignItems: 'center',
+  paddingVertical: rs(12),
+  borderRadius: rs(10),
+  flex: 1,
+  marginHorizontal: rs(4),
+  justifyContent: 'center',
+},
+
+navButtonSecondary: {
+  backgroundColor: COLORS.bgCard,
+  borderWidth: 1,
+  borderColor: COLORS.borderSubtle,
+},
+
+navButtonPrimary: {
+  backgroundColor: COLORS.accentNavyBlue,
+},
+
+navButtonSubmit: {
+  backgroundColor: COLORS.accentGreen,
+},
+
+navButtonDisabled: {
+  opacity: 0.5,
+},
+
+navButtonText: {
+  fontSize: rf(14),
+  fontWeight: '600',
+  color: COLORS.textPrimary,
+  marginLeft: rs(4),
+},
+
+navButtonTextPrimary: {
+  fontSize: rf(14),
+  fontWeight: '600',
+  color: COLORS.white,
+  marginRight: rs(4),
+},
+
+navButtonTextDisabled: {
+  color: COLORS.statusNeutral,
+},
+
+// ✅ TEST INFO
+testInfo: {
+  backgroundColor: COLORS.bgCardLight,
+  borderRadius: rs(12),
+  padding: rs(14),
+  marginBottom: rs(16),
+},
+
+testInfoRow: {
+  flexDirection: 'row',
+  alignItems: 'center',
+  marginBottom: rs(8),
+},
+
+testInfoText: {
+  fontSize: rf(13),
+  color: COLORS.textSecondary,
+  marginLeft: rs(8),
+},
+
+// ✅ GENERIC BUTTON
+button: {
+  backgroundColor: COLORS.accentNavyBlue,
+  paddingVertical: rs(12),
+  paddingHorizontal: rs(20),
+  borderRadius: rs(10),
+},
+
+buttonText: {
+  color: COLORS.white,
+  fontSize: rf(15),
+  fontWeight: '600',
+},
+
+bottomSpacer: {
+  height: rs(16),
+},
 });
 
 export default TakeTestScreen;

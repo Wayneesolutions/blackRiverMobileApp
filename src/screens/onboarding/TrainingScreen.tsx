@@ -15,6 +15,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { apiService } from '../../services/api/apiService';
+import { COLORS, rs, rf, ri } from '../../theme';
 
 type TestType = 'TDG' | 'VEHICLE' | 'HOS' | 'WINTER';
 type ContentType = 'PDF' | 'IMAGE' | 'VIDEO';
@@ -67,17 +68,17 @@ const TrainingScreen = () => {
   const fetchTrainingContent = async () => {
     try {
       setLoading(true);
-      
+
       console.log('📱 Fetching training content...');
-      
+
       // Call the API to get training content
       const response = await apiService.getTrainingContent();
-      
+
       console.log('📱 Training content response:', response);
 
       // Handle nested response structure from apiService
       const trainingData = response.data?.data || response.data;
-      
+
       console.log('📱 Training data:', trainingData);
 
       if (response.success && trainingData && Array.isArray(trainingData) && trainingData.length > 0) {
@@ -93,15 +94,15 @@ const TrainingScreen = () => {
         }));
 
         console.log('📱 Training content loaded:', content.length, 'items');
-        
+
         setTrainingContent(content);
-        
+
         // Load viewed status from AsyncStorage
         const viewed = await AsyncStorage.getItem('viewedTrainingContent');
         if (viewed) {
           const viewedSet = new Set(JSON.parse(viewed));
           setViewedContent(viewedSet);
-          
+
           // Check if all content viewed
           const allViewed = content.every(item => viewedSet.has(item.id));
           setTrainingCompleted(allViewed);
@@ -131,45 +132,45 @@ const TrainingScreen = () => {
       // Get signed URL for the content
       console.log('📱 Requesting signed URL...');
       const response = await apiService.getTrainingContentSignedUrl(content.id, 'inline');
-      
+
       console.log('📱 Signed URL response:', JSON.stringify(response, null, 2));
       console.log('📱 Response success:', response.success);
       console.log('📱 Response URL:', response.url);
       console.log('📱 Response data:', response.data);
-      
+
       // Handle nested response structure
       const signedUrl = response.url || response.data?.url;
-      
+
       console.log('📱 Extracted signed URL:', signedUrl);
-      
+
       if (response.success && signedUrl) {
         console.log('📱 Checking if URL can be opened...');
         console.log('📱 URL to open:', signedUrl);
-        
+
         const supported = await Linking.canOpenURL(signedUrl);
         console.log('📱 URL supported:', supported);
-        
+
         if (supported) {
           console.log('📱 Opening URL...');
           await Linking.openURL(signedUrl);
           console.log('✅ URL opened successfully');
-          
+
           // Mark as viewed after opening
           await saveViewedContent(content.id);
-          
+
           // Update local state
           setTrainingContent(prev =>
             prev.map(item =>
               item.id === content.id ? { ...item, viewed: true } : item
             )
           );
-          
+
           // Check if all viewed
           const newViewed = new Set(viewedContent);
           newViewed.add(content.id);
           const allViewed = trainingContent.every(item => newViewed.has(item.id));
           setTrainingCompleted(allViewed);
-          
+
           Alert.alert('Success', 'Training material opened. It has been marked as viewed.');
         } else {
           console.log('❌ URL not supported by device');
@@ -178,13 +179,13 @@ const TrainingScreen = () => {
       } else {
         console.log('⚠️ Signed URL request failed, trying fallback...');
         console.log('📱 Fallback URL:', content.fileUrl);
-        
+
         // Fallback to direct URL if signed URL fails
         if (content.fileUrl) {
           console.log('📱 Using direct URL as fallback');
           const supported = await Linking.canOpenURL(content.fileUrl);
           console.log('📱 Direct URL supported:', supported);
-          
+
           if (supported) {
             console.log('📱 Opening direct URL...');
             await Linking.openURL(content.fileUrl);
@@ -215,7 +216,7 @@ const TrainingScreen = () => {
     console.log('📝 Total content:', trainingContent.length);
     console.log('📝 Viewed content:', viewedContent.size);
     console.log('========================================');
-    
+
     if (!trainingCompleted) {
       Alert.alert(
         'Incomplete Training',
@@ -227,23 +228,23 @@ const TrainingScreen = () => {
 
     try {
       console.log('📚 Calling backend API to mark training complete...');
-      
+
       // Call backend API to mark training as complete
       const response = await apiService.markTrainingComplete();
-      
+
       console.log('📚 Backend response:', response);
-      
+
       if (response.success) {
         // Save to AsyncStorage for local reference
         await AsyncStorage.setItem('trainingCompleted', 'true');
         console.log('✅ Training marked as complete on backend and locally');
-        
+
         Alert.alert(
           'Training Complete!',
           'Great job! You have completed all training materials. You can now take the required tests.',
           [
-            { 
-              text: 'Take Tests Now', 
+            {
+              text: 'Take Tests Now',
               onPress: () => {
                 console.log('📝 Navigating to TestsScreen...');
                 try {
@@ -252,7 +253,7 @@ const TrainingScreen = () => {
                 } catch (error) {
                   console.error('❌ Navigation error:', error);
                 }
-              } 
+              }
             },
             {
               text: 'Later',
@@ -334,20 +335,20 @@ const TrainingScreen = () => {
       {/* Header */}
       <View style={styles.header}>
         <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
-          <Ionicons name="arrow-back" size={24} color="#1F2937" />
+          <Ionicons name="arrow-back" size={ri(24)} color={COLORS.textPrimary} />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Driver Training</Text>
         <View style={styles.placeholder} />
       </View>
 
-      <ScrollView 
-        style={styles.scrollView} 
+      <ScrollView
+        style={styles.scrollView}
         contentContainerStyle={styles.contentContainer}
         showsVerticalScrollIndicator={false}
       >
         {/* Instructions */}
         <View style={styles.instructionsCard}>
-          <Ionicons name="information-circle" size={24} color="#0ea3d8" />
+          <Ionicons name="information-circle" size={ri(24)} color={COLORS.accentBlue} />
           <Text style={styles.instructionsText}>
             Review all training materials before proceeding to tests. Tap on any material to view it.
           </Text>
@@ -356,7 +357,7 @@ const TrainingScreen = () => {
         {/* Empty State */}
         {trainingContent.length === 0 && (
           <View style={styles.emptyState}>
-            <Ionicons name="folder-open-outline" size={64} color="#9CA3AF" />
+            <Ionicons name="folder-open-outline" size={ri(64)} color={COLORS.textSecondary} />
             <Text style={styles.emptyStateTitle}>No Training Materials Yet</Text>
             <Text style={styles.emptyStateText}>
               Training materials will appear here once uploaded by HR. Please check back later or contact your administrator.
@@ -400,7 +401,7 @@ const TrainingScreen = () => {
                     <View style={styles.contentIconContainer}>
                       <Ionicons
                         name={getContentIcon(content.type) as any}
-                        size={24}
+                        size={ri(24)}
                         color={getTestTypeColor(content.testType)}
                       />
                     </View>
@@ -416,7 +417,7 @@ const TrainingScreen = () => {
                     <View style={styles.contentActions}>
                       {isViewed ? (
                         <View style={styles.viewedBadge}>
-                          <Ionicons name="checkmark-circle" size={20} color="#10B981" />
+                          <Ionicons name="checkmark-circle" size={ri(20)} color={COLORS.accentGreen} />
                           <Text style={styles.viewedText}>Viewed</Text>
                         </View>
                       ) : (
@@ -431,10 +432,10 @@ const TrainingScreen = () => {
                         <Text style={styles.viewButtonText}>
                           {content.type === 'VIDEO' ? 'Play' : 'View'}
                         </Text>
-                        <Ionicons 
-                          name={content.type === 'VIDEO' ? 'play-circle' : 'open-outline'} 
-                          size={16} 
-                          color="#FFFFFF" 
+                        <Ionicons
+                          name={content.type === 'VIDEO' ? 'play-circle' : 'open-outline'}
+                          size={ri(16)}
+                          color={COLORS.white}
                         />
                       </TouchableOpacity>
                     </View>
@@ -464,205 +465,14 @@ const TrainingScreen = () => {
 };
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#F3F4F6',
-  },
-  loadingContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  loadingText: {
-    marginTop: 16,
-    fontSize: 16,
-    color: '#6B7280',
-  },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    padding: 16,
-    backgroundColor: '#FFFFFF',
-    borderBottomWidth: 1,
-    borderBottomColor: '#E5E7EB',
-  },
-  backButton: {
-    padding: 8,
-  },
-  headerTitle: {
-    fontSize: 20,
-    fontWeight: '700',
-    color: '#1F2937',
-  },
-  placeholder: {
-    width: 40,
-  },
-  scrollView: {
-    flex: 1,
-  },
-  contentContainer: {
-    padding: 16,
-    paddingBottom: Platform.OS === 'android' ? 80 : 32,
-    paddingTop: Platform.OS === 'android' ? 8 : 0,
-  },
-  instructionsCard: {
-    flexDirection: 'row',
-    backgroundColor: '#EFF6FF',
-    padding: 16,
-    borderRadius: 12,
-    marginBottom: 24,
-    borderLeftWidth: 4,
-    borderLeftColor: '#0ea3d8',
-  },
-  instructionsText: {
-    flex: 1,
-    marginLeft: 12,
-    fontSize: 14,
-    color: '#1E40AF',
-    lineHeight: 20,
-  },
-  section: {
-    marginBottom: 24,
-  },
-  sectionHeader: {
-    marginBottom: 12,
-  },
-  testTypeBadge: {
-    alignSelf: 'flex-start',
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 16,
-  },
-  testTypeText: {
-    fontSize: 16,
-    fontWeight: '700',
-  },
-  contentCard: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: 12,
-    padding: 16,
-    marginBottom: 12,
-    flexDirection: 'row',
-    alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
-  },
-  contentCardViewed: {
-    backgroundColor: '#F0FDF4',
-    borderWidth: 1,
-    borderColor: '#10B981',
-  },
-  contentIconContainer: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
-    backgroundColor: '#F3F4F6',
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginRight: 12,
-  },
-  contentInfo: {
-    flex: 1,
-  },
-  contentName: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#1F2937',
-    marginBottom: 4,
-  },
-  contentType: {
-    fontSize: 12,
-    color: '#6B7280',
-  },
-  contentDescription: {
-    fontSize: 12,
-    color: '#6B7280',
-    marginTop: 4,
-    lineHeight: 16,
-  },
-  contentActions: {
-    alignItems: 'flex-end',
-  },
-  viewedBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 8,
-  },
-  viewedText: {
-    marginLeft: 4,
-    fontSize: 12,
-    fontWeight: '600',
-    color: '#10B981',
-  },
-  notViewedBadge: {
-    marginBottom: 8,
-  },
-  notViewedText: {
-    fontSize: 12,
-    fontWeight: '600',
-    color: '#F59E0B',
-  },
-  viewButton: {
-    backgroundColor: '#0ea3d8',
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderRadius: 8,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-  },
-  viewButtonText: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#FFFFFF',
-  },
-  completeButton: {
-    backgroundColor: '#0ea3d8',
-    padding: 16,
-    borderRadius: 12,
-    alignItems: 'center',
-    marginTop: 24,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.2,
-    shadowRadius: 4,
-    elevation: 3,
-  },
-  completeButtonDisabled: {
-    backgroundColor: '#9CA3AF',
-  },
-  completeButtonText: {
-    fontSize: 16,
-    fontWeight: '700',
-    color: '#FFFFFF',
-  },
-  emptyState: {
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: 48,
-    paddingHorizontal: 24,
-  },
-  emptyStateTitle: {
-    fontSize: 18,
-    fontWeight: '700',
-    color: '#1F2937',
-    marginTop: 16,
-    marginBottom: 8,
-  },
-  emptyStateText: {
-    fontSize: 14,
-    color: '#6B7280',
-    textAlign: 'center',
-    lineHeight: 20,
-  },
-  bottomSpacer: {
-    height: 16,
-  },
+  container: { flex: 1, backgroundColor: COLORS.bgMain, }, loadingContainer: { flex: 1, justifyContent: 'center', alignItems: 'center', },
+  loadingText: { marginTop: rs(16), fontSize: rf(16), color: COLORS.textSecondary, },
+  header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: rs(16), paddingVertical: rs(12), backgroundColor: COLORS.bgCard, borderTopWidth: 2, borderTopColor: COLORS.accentBlue, borderBottomWidth: 1, borderBottomColor: COLORS.borderSubtle, }, backButton: { padding: rs(8), }, headerTitle: { fontSize: rf(18), fontWeight: '700', color: COLORS.textPrimary, }, placeholder: { width: rs(40), }, scrollView: { flex: 1, }, contentContainer: { padding: rs(16), paddingBottom: Platform.OS === 'android' ? rs(80) : rs(32), paddingTop: rs(16), },
+  instructionsCard: { flexDirection: 'row', backgroundColor: 'rgba(0,209,255,0.08)', padding: rs(16), borderRadius: rs(12), marginBottom: rs(24), borderLeftWidth: 3, borderLeftColor: COLORS.accentBlue, }, instructionsText: { flex: 1, marginLeft: rs(12), fontSize: rf(14), color: COLORS.textSecondary, lineHeight: rf(20), },
+  section: { marginBottom: rs(24), }, sectionHeader: { marginBottom: rs(12), }, testTypeBadge: { alignSelf: 'flex-start', paddingHorizontal: rs(12), paddingVertical: rs(6), borderRadius: rs(16), }, testTypeText: { fontSize: rf(15), fontWeight: '700', },
+  contentCard: { backgroundColor: COLORS.bgCard, borderRadius: rs(12), padding: rs(16), marginBottom: rs(12), flexDirection: 'row', alignItems: 'center', borderWidth: 1, borderColor: COLORS.borderSubtle, }, contentCardViewed: { borderColor: COLORS.accentGreen, backgroundColor: 'rgba(0,255,163,0.06)', }, contentIconContainer: { width: rs(48), height: rs(48), borderRadius: rs(24), backgroundColor: COLORS.bgCardLight, justifyContent: 'center', alignItems: 'center', marginRight: rs(12), }, contentInfo: { flex: 1, }, contentName: { fontSize: rf(15), fontWeight: '600', color: COLORS.textPrimary, marginBottom: rs(4), }, contentType: { fontSize: rf(12), color: COLORS.textSecondary, }, contentDescription: { fontSize: rf(12), color: COLORS.textSecondary, marginTop: rs(4), lineHeight: rf(16), }, contentActions: { alignItems: 'flex-end', }, viewedBadge: { flexDirection: 'row', alignItems: 'center', marginBottom: rs(8), }, viewedText: { marginLeft: rs(4), fontSize: rf(12), fontWeight: '600', color: COLORS.accentGreen, }, notViewedBadge: { marginBottom: rs(8), }, notViewedText: { fontSize: rf(12), fontWeight: '600', color: COLORS.accentOrange, }, viewButton: { backgroundColor: COLORS.accentNavyBlue, paddingHorizontal: rs(14), paddingVertical: rs(7), borderRadius: rs(8), flexDirection: 'row', alignItems: 'center', gap: rs(6), }, viewButtonText: { fontSize: rf(13), fontWeight: '600', color: COLORS.white, },
+  completeButton: { backgroundColor: COLORS.accentNavyBlue, padding: rs(16), borderRadius: rs(12), alignItems: 'center', marginTop: rs(8), }, completeButtonDisabled: { backgroundColor: COLORS.statusNeutral, }, completeButtonText: { fontSize: rf(16), fontWeight: '700', color: COLORS.white, },
+  emptyState: { alignItems: 'center', justifyContent: 'center', paddingVertical: rs(48), paddingHorizontal: rs(24), }, emptyStateTitle: { fontSize: rf(18), fontWeight: '700', color: COLORS.textPrimary, marginTop: rs(16), marginBottom: rs(8), }, emptyStateText: { fontSize: rf(14), color: COLORS.textSecondary, textAlign: 'center', lineHeight: rf(20), }, bottomSpacer: { height: rs(16), },
 });
 
 export default TrainingScreen;
-

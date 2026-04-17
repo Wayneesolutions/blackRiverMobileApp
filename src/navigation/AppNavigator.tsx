@@ -81,27 +81,11 @@ interface PlaceholderScreenProps {
     title: string;
 }
 
-// Navigation Types - Include all screens in MainTabParamList
+// Navigation Types - MainTabParamList only contains the Dashboard tab.
+// All other screens live exclusively in RootStack so that navigation.navigate()
+// pushes them onto the native stack — enabling iOS swipe-back gestures.
 export type MainTabParamList = {
     Dashboard: { refresh?: boolean } | undefined;
-    NewTrip: undefined;
-    Vehicle: undefined;
-    Trailer: undefined;
-    HOS: undefined;
-    AssetIncidents: undefined;
-    Documents: undefined;
-    Settings: undefined;
-    Transfer: undefined;
-    LoadMap: undefined;
-    Fuel: undefined;
-    ActiveTrips: undefined;
-    CompleteTrips: undefined;
-    PendingTrips: { initialTab?: 'requests' | 'accepted' } | undefined;
-    Notifications: undefined;
-    Help: undefined;
-    Search: undefined;
-    Trips: undefined;
-    MileageSheet: undefined;
 };
 
 export type RootStackParamList = {
@@ -352,25 +336,6 @@ function MainTabNavigator({ onLogout, navigation }: MainTabNavigatorProps) {
                     }}
                 >
                     <MainTab.Screen name="Dashboard" component={DashboardScreen} />
-                    <MainTab.Screen name="NewTrip" component={NewTripScreen} />
-                    <MainTab.Screen name="Vehicle" component={VehicleScreen} />
-                    <MainTab.Screen name="Trailer" component={TrailerScreen} />
-                    <MainTab.Screen name="HOS" component={HosScreen} />
-                    <MainTab.Screen name="AssetIncidents" component={AssetIncidentsScreen} />
-                    <MainTab.Screen name="Documents" component={DocumentsScreen} />
-                    <MainTab.Screen name="Settings">
-                        {(props) => <SettingsScreen {...props} onLogout={onLogout} />}
-                    </MainTab.Screen>
-                    <MainTab.Screen name="LoadMap" component={LoadMapScreen} />
-                    <MainTab.Screen name="Transfer" component={TransferScreen} />
-                    <MainTab.Screen name="Fuel" component={FuelScreen} />
-                    <MainTab.Screen name="ActiveTrips" component={ActiveTrips} />
-                    <MainTab.Screen name="CompleteTrips" component={CompleteTrips} />
-                    <MainTab.Screen name="PendingTrips" component={PendingTrips} />
-                    <MainTab.Screen name="Notifications" component={NotificationsScreen} />
-                    <MainTab.Screen name="Help" component={HelpScreen} />
-                    <MainTab.Screen name="Search" component={SearchScreen} />
-                    <MainTab.Screen name="Trips" component={TripInfoScreen} />
                 </MainTab.Navigator>
             </View>
             <Footer onLogout={onLogout} />

@@ -14,6 +14,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { apiService } from '../../services/api/apiService';
+import { COLORS, rs, rf, ri } from '../../theme';
 
 type OnboardingStatus = 'PENDING_TESTS' | 'IN_PROGRESS' | 'WAITING_FOR_HR_APPROVAL' | 'APPROVED' | 'REJECTED';
 
@@ -43,42 +44,42 @@ const HRApprovalScreen = ({ onLogout }: HRApprovalScreenProps) => {
   const fetchApprovalStatus = async () => {
     try {
       setLoading(true);
-      
+
       // Get driver ID from storage
-      const userDataStr = await AsyncStorage.getItem('user_data') || 
-                         await AsyncStorage.getItem('@fleetgo_user_data') ||
-                         await AsyncStorage.getItem('userData');
-      
+      const userDataStr = await AsyncStorage.getItem('user_data') ||
+        await AsyncStorage.getItem('@fleetgo_user_data') ||
+        await AsyncStorage.getItem('userData');
+
       if (!userDataStr) {
         console.error('❌ No user data found');
         setLoading(false);
         setRefreshing(false);
         return;
       }
-      
+
       const userData = JSON.parse(userDataStr);
       const driverId = userData._id || userData.id || userData.userId;
-      
+
       if (!driverId) {
         console.error('❌ No driver ID found');
         setLoading(false);
         setRefreshing(false);
         return;
       }
-      
+
       console.log('📋 Fetching HR approval status for driver:', driverId);
-      
+
       // Call backend API
       const response = await apiService.getDriverOnboardingStatus(driverId);
-      
+
       console.log('📋 HR Approval response:', JSON.stringify(response, null, 2));
-      
+
       if (response.success && response.data) {
         const data = response.data.data || response.data;
-        
+
         // Map backend status to local status
         let mappedStatus: OnboardingStatus = 'WAITING_FOR_HR_APPROVAL';
-        
+
         if (data.allTestsApprovedByHR || data.hrApprovalStatus === 'APPROVED') {
           mappedStatus = 'APPROVED';
           setAllTestsApproved(true);
@@ -87,9 +88,9 @@ const HRApprovalScreen = ({ onLogout }: HRApprovalScreenProps) => {
         } else if (data.hrApprovalStatus === 'IN_REVIEW' || data.onboardingStatus === 'AWAITING_HR_APPROVAL') {
           mappedStatus = 'WAITING_FOR_HR_APPROVAL';
         }
-        
+
         setStatus(mappedStatus);
-        
+
         // Set submitted date from tests completed date or onboarding status
         if (data.testsCompleted && data.tests) {
           const completedTests = data.tests.filter((t: any) => t.passed);
@@ -136,10 +137,11 @@ const HRApprovalScreen = ({ onLogout }: HRApprovalScreenProps) => {
 
   return (
     <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
-      {/* Header */}
+
+      {/* HEADER (same as other screens) */}
       <View style={styles.header}>
         <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
-          <Ionicons name="arrow-back" size={24} color="#1F2937" />
+          <Ionicons name="arrow-back" size={ri(24)} color={COLORS.textPrimary} />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>HR Approval</Text>
         <View style={styles.placeholder} />
@@ -151,97 +153,112 @@ const HRApprovalScreen = ({ onLogout }: HRApprovalScreenProps) => {
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
         showsVerticalScrollIndicator={false}
       >
-        {/* Status Card */}
-        <View style={styles.statusCard}>
+
+        {/* STATUS CARD (converted to contentCard style) */}
+        <View style={styles.contentCard}>
+
+          {/* APPROVED */}
           {isApproved && (
             <>
-              <View style={styles.approvedIconContainer}>
-                <Ionicons name="checkmark-circle" size={64} color="#10B981" />
+              <View style={styles.contentIconContainer}>
+                <Ionicons name="checkmark-circle" size={ri(40)} color={COLORS.accentGreen} />
               </View>
-              <Text style={styles.statusTitle}>Approved! ✅</Text>
-              <Text style={styles.statusMessage}>
-                Congratulations! Your onboarding has been approved by HR. You can now access all features of the app.
-              </Text>
+
+              <View style={styles.contentInfo}>
+                <Text style={styles.contentName}>Approved</Text>
+                <Text style={styles.contentDescription}>
+                  Congratulations! Your onboarding has been approved. You now have full access to the app.
+                </Text>
+              </View>
+
               <TouchableOpacity
-                style={styles.continueButton}
+                activeOpacity={0.85}
+                style={styles.completeButton}
                 onPress={() => {
-                  // Navigate to dashboard - app is now unlocked
                   navigation.navigate('MainTabs' as never, { screen: 'Dashboard' } as never);
                 }}
               >
-                <Text style={styles.continueButtonText}>Go to Dashboard →</Text>
+                <Text style={styles.completeButtonText}>Go to Dashboard →</Text>
               </TouchableOpacity>
             </>
           )}
 
+          {/* REJECTED */}
           {isRejected && (
             <>
-              <View style={styles.rejectedIconContainer}>
-                <Ionicons name="close-circle" size={64} color="#EF4444" />
+              <View style={styles.contentIconContainer}>
+                <Ionicons name="close-circle" size={ri(40)} color={COLORS.accentOrange} />
               </View>
-              <Text style={styles.statusTitle}>Rejected ❌</Text>
-              <Text style={styles.statusMessage}>
-                Your onboarding has been rejected. Please contact HR for more information about what needs to be corrected.
-              </Text>
-              <View style={styles.contactInfo}>
-                <Ionicons name="mail-outline" size={20} color="#6B7280" />
-                <Text style={styles.contactText}>Contact HR for assistance</Text>
+
+              <View style={styles.contentInfo}>
+                <Text style={styles.contentName}>Rejected</Text>
+                <Text style={styles.contentDescription}>
+                  Your onboarding was rejected. Please contact HR to correct the required details.
+                </Text>
+              </View>
+
+              <View style={styles.viewedBadge}>
+                <Ionicons name="mail-outline" size={ri(16)} color={COLORS.textSecondary} />
+                <Text style={styles.viewedText}>Contact HR</Text>
               </View>
             </>
           )}
 
+          {/* PENDING */}
           {isPending && (
             <>
-              <View style={styles.pendingIconContainer}>
-                <Ionicons name="time-outline" size={64} color="#F59E0B" />
+              <View style={styles.contentIconContainer}>
+                <Ionicons name="time-outline" size={ri(40)} color={COLORS.accentBlue} />
               </View>
-              <Text style={styles.statusTitle}>Pending HR Approval ⏳</Text>
-              <Text style={styles.statusMessage}>
-                Your documents are under review. You will be notified once approved.
-              </Text>
-              {submittedDate && (
-                <View style={styles.submittedInfo}>
-                  <Ionicons name="calendar-outline" size={16} color="#6B7280" />
-                  <Text style={styles.submittedText}>
+
+              <View style={styles.contentInfo}>
+                <Text style={styles.contentName}>Pending Approval</Text>
+                <Text style={styles.contentDescription}>
+                  Your documents are under review. You will be notified once HR completes verification.
+                </Text>
+
+                {submittedDate && (
+                  <Text style={[styles.contentType, { marginTop: rs(6) }]}>
                     Submitted: {new Date(submittedDate).toLocaleDateString()}
                   </Text>
-                </View>
-              )}
+                )}
+              </View>
             </>
           )}
         </View>
 
-        {/* Information Card */}
-        <View style={styles.infoCard}>
-          <Ionicons name="information-circle" size={24} color="#0ea3d8" />
-          <View style={styles.infoContent}>
-            <Text style={styles.infoTitle}>What happens next?</Text>
-            <Text style={styles.infoText}>
-              {isPending && 'HR will review your submitted documents and test results. This process typically takes 1-2 business days.'}
-              {isApproved && 'You now have full access to the app. You can view trips, track mileage, and manage your documents.'}
-              {isRejected && 'Please review the requirements and resubmit your documents. Contact HR if you need clarification.'}
-            </Text>
-          </View>
+        {/* INFO CARD (same style as instruction banner) */}
+        <View style={styles.instructionsCard}>
+          <Ionicons name="information-circle" size={ri(24)} color={COLORS.accentBlue} />
+          <Text style={styles.instructionsText}>
+            {isPending && 'HR typically reviews submissions within 1–2 business days.'}
+            {isApproved && 'You now have full access to features like trips, mileage tracking, and documents.'}
+            {isRejected && 'Please review requirements and resubmit your documents. Contact HR if needed.'}
+          </Text>
         </View>
 
-        {/* Actions */}
-        <View style={styles.actionsContainer}>
+        {/* ACTIONS */}
+        <View style={{ marginTop: rs(16), gap: rs(12) }}>
+
           <TouchableOpacity
-            style={styles.refreshButton}
+            activeOpacity={0.85}
+            style={styles.viewButton}
             onPress={onRefresh}
             disabled={refreshing}
           >
-            <Ionicons name="refresh" size={20} color="#0ea3d8" />
-            <Text style={styles.refreshButtonText}>Refresh Status</Text>
+            <Ionicons name="refresh" size={ri(16)} color={COLORS.white} />
+            <Text style={styles.viewButtonText}>Refresh Status</Text>
           </TouchableOpacity>
 
           <TouchableOpacity
-            style={styles.logoutButton}
+            activeOpacity={0.85}
+            style={[styles.viewButton, { backgroundColor: COLORS.statusNeutral }]}
             onPress={handleLogout}
           >
-            <Ionicons name="log-out-outline" size={20} color="#EF4444" />
-            <Text style={styles.logoutButtonText}>Logout</Text>
+            <Ionicons name="log-out-outline" size={ri(16)} color={COLORS.white} />
+            <Text style={styles.viewButtonText}>Logout</Text>
           </TouchableOpacity>
+
         </View>
 
         <View style={styles.bottomSpacer} />
@@ -253,182 +270,330 @@ const HRApprovalScreen = ({ onLogout }: HRApprovalScreenProps) => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F3F4F6',
+    backgroundColor: COLORS.bgMain, // ✅ fixed (was grey)
   },
+
   loadingContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
   },
+
   loadingText: {
-    marginTop: 16,
-    fontSize: 16,
-    color: '#6B7280',
+    marginTop: rs(16),
+    fontSize: rf(16),
+    color: COLORS.textSecondary,
   },
+  contentCard: {
+  backgroundColor: COLORS.bgCard,
+  borderRadius: rs(12),
+  padding: rs(16),
+  marginBottom: rs(16),
+
+  borderWidth: 1,
+  borderColor: COLORS.borderSubtle,
+
+  elevation: 2,
+},
+
+contentIconContainer: {
+  width: rs(60),
+  height: rs(60),
+  borderRadius: rs(30),
+  backgroundColor: COLORS.bgCardLight,
+  justifyContent: 'center',
+  alignItems: 'center',
+  alignSelf: 'center',
+  marginBottom: rs(12),
+},
+
+contentInfo: {
+  alignItems: 'center',
+},
+
+contentName: {
+  fontSize: rf(18),
+  fontWeight: '700',
+  color: COLORS.textPrimary,
+  marginBottom: rs(6),
+  textAlign: 'center',
+},
+
+contentDescription: {
+  fontSize: rf(14),
+  color: COLORS.textSecondary,
+  textAlign: 'center',
+  lineHeight: rf(20),
+},
+
+contentType: {
+  fontSize: rf(12),
+  color: COLORS.textSecondary,
+},
+
+// ✅ BUTTON (same as training)
+viewButton: {
+  backgroundColor: COLORS.accentNavyBlue,
+  paddingVertical: rs(14),
+  borderRadius: rs(10),
+  alignItems: 'center',
+  flexDirection: 'row',
+  justifyContent: 'center',
+  gap: rs(6),
+},
+
+viewButtonText: {
+  fontSize: rf(14),
+  fontWeight: '600',
+  color: COLORS.white,
+},
+
+completeButton: {
+  backgroundColor: COLORS.accentNavyBlue,
+  padding: rs(16),
+  borderRadius: rs(12),
+  alignItems: 'center',
+  marginTop: rs(16),
+},
+
+completeButtonText: {
+  fontSize: rf(16),
+  fontWeight: '700',
+  color: COLORS.white,
+},
+
+// ✅ INFO / INSTRUCTION CARD
+instructionsCard: {
+  flexDirection: 'row',
+  backgroundColor: 'rgba(0,209,255,0.08)',
+  padding: rs(16),
+  borderRadius: rs(12),
+  marginBottom: rs(16),
+  borderLeftWidth: 3,
+  borderLeftColor: COLORS.accentBlue,
+},
+
+instructionsText: {
+  flex: 1,
+  marginLeft: rs(12),
+  fontSize: rf(14),
+  color: COLORS.textSecondary,
+  lineHeight: rf(20),
+},
+
+// ✅ SMALL BADGE (for rejected contact)
+viewedBadge: {
+  flexDirection: 'row',
+  alignItems: 'center',
+  marginTop: rs(12),
+},
+
+viewedText: {
+  marginLeft: rs(6),
+  fontSize: rf(13),
+  color: COLORS.textSecondary,
+},
+
+  // ✅ HEADER (match training screen)
   header: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    padding: 16,
-    backgroundColor: '#FFFFFF',
+    paddingHorizontal: rs(16),
+    paddingVertical: rs(12),
+    backgroundColor: COLORS.bgCard,
+    borderTopWidth: 2,
+    borderTopColor: COLORS.accentBlue,
     borderBottomWidth: 1,
-    borderBottomColor: '#E5E7EB',
+    borderBottomColor: COLORS.borderSubtle,
   },
+
   backButton: {
-    padding: 8,
+    padding: rs(8),
   },
+
   headerTitle: {
-    fontSize: 20,
+    fontSize: rf(18),
     fontWeight: '700',
-    color: '#1F2937',
+    color: COLORS.textPrimary,
   },
+
   placeholder: {
-    width: 40,
+    width: rs(40),
   },
+
   scrollView: {
     flex: 1,
   },
+
   contentContainer: {
-    padding: 16,
-    paddingBottom: Platform.OS === 'android' ? 80 : 32,
-    paddingTop: Platform.OS === 'android' ? 8 : 0,
+    padding: rs(16),
+    paddingBottom: Platform.OS === 'android' ? rs(80) : rs(32),
+    paddingTop: rs(16),
   },
+
+  // ❌ REMOVE statusCard → we now use contentCard
+  // but if still needed, convert it:
+
   statusCard: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: 12,
-    padding: 32,
+    backgroundColor: COLORS.bgCard,
+    borderRadius: rs(12),
+    padding: rs(20),
     alignItems: 'center',
-    marginBottom: 16,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
+    marginBottom: rs(16),
+
+    borderWidth: 1,
+    borderColor: COLORS.borderSubtle,
+
+    elevation: 2,
   },
+
+  // ✅ ICON CONTAINERS (match training cards)
   approvedIconContainer: {
-    marginBottom: 16,
+    marginBottom: rs(12),
   },
+
   rejectedIconContainer: {
-    marginBottom: 16,
+    marginBottom: rs(12),
   },
+
   pendingIconContainer: {
-    marginBottom: 16,
+    marginBottom: rs(12),
   },
+
+  // ✅ TITLE (consistent typography)
   statusTitle: {
-    fontSize: 24,
+    fontSize: rf(18),
     fontWeight: '700',
-    color: '#1F2937',
-    marginBottom: 16,
+    color: COLORS.textPrimary,
+    marginBottom: rs(12),
     textAlign: 'center',
   },
+
+  // ✅ MESSAGE TEXT
   statusMessage: {
-    fontSize: 16,
-    color: '#6B7280',
+    fontSize: rf(14),
+    color: COLORS.textSecondary,
     textAlign: 'center',
-    lineHeight: 24,
-    marginBottom: 24,
+    lineHeight: rf(20),
+    marginBottom: rs(16),
   },
   submittedInfo: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginTop: 16,
+    marginTop: rs(12),
   },
+
   submittedText: {
-    marginLeft: 8,
-    fontSize: 14,
-    color: '#6B7280',
+    marginLeft: rs(8),
+    fontSize: rf(13),
+    color: COLORS.textSecondary,
   },
+
   contactInfo: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginTop: 16,
-    padding: 12,
-    backgroundColor: '#F3F4F6',
-    borderRadius: 8,
+    marginTop: rs(12),
+    padding: rs(12),
+    backgroundColor: COLORS.bgCardLight, // ✅ fixed
+    borderRadius: rs(10),
   },
+
   contactText: {
-    marginLeft: 8,
-    fontSize: 14,
-    color: '#6B7280',
+    marginLeft: rs(8),
+    fontSize: rf(13),
+    color: COLORS.textSecondary,
   },
+
+  // ✅ PRIMARY CTA (same as training complete button)
   continueButton: {
-    backgroundColor: '#10B981',
-    paddingHorizontal: 32,
-    paddingVertical: 16,
-    borderRadius: 12,
-    marginTop: 16,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.2,
-    shadowRadius: 4,
-    elevation: 3,
+    backgroundColor: COLORS.accentNavyBlue,
+    paddingHorizontal: rs(24),
+    paddingVertical: rs(14),
+    borderRadius: rs(12),
+    marginTop: rs(16),
+    alignItems: 'center',
+
+    elevation: 2,
   },
+
   continueButtonText: {
-    fontSize: 16,
+    fontSize: rf(16),
     fontWeight: '700',
-    color: '#FFFFFF',
+    color: COLORS.white,
   },
+
+  // ✅ INFO CARD → SAME AS instructionsCard (reuse system)
   infoCard: {
     flexDirection: 'row',
-    backgroundColor: '#EFF6FF',
-    padding: 16,
-    borderRadius: 12,
-    marginBottom: 16,
-    borderLeftWidth: 4,
-    borderLeftColor: '#0ea3d8',
+    backgroundColor: 'rgba(0,209,255,0.08)', // ✅ match instructions
+    padding: rs(16),
+    borderRadius: rs(12),
+    marginBottom: rs(16),
+    borderLeftWidth: 3,
+    borderLeftColor: COLORS.accentBlue,
   },
+
   infoContent: {
     flex: 1,
-    marginLeft: 12,
+    marginLeft: rs(12),
   },
+
   infoTitle: {
-    fontSize: 16,
+    fontSize: rf(15),
     fontWeight: '700',
-    color: '#1E40AF',
-    marginBottom: 8,
+    color: COLORS.textPrimary,
+    marginBottom: rs(6),
   },
+
   infoText: {
-    fontSize: 14,
-    color: '#1E40AF',
-    lineHeight: 20,
+    fontSize: rf(14),
+    color: COLORS.textSecondary,
+    lineHeight: rf(20),
   },
+
   actionsContainer: {
-    gap: 12,
+    gap: rs(12),
   },
+
+  // ✅ SECONDARY BUTTON (outline style)
   refreshButton: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#FFFFFF',
-    padding: 16,
-    borderRadius: 12,
+    backgroundColor: COLORS.bgCard,
+    padding: rs(14),
+    borderRadius: rs(12),
     borderWidth: 1,
-    borderColor: '#0ea3d8',
+    borderColor: COLORS.accentBlue,
   },
+
   refreshButtonText: {
-    marginLeft: 8,
-    fontSize: 16,
+    marginLeft: rs(8),
+    fontSize: rf(14),
     fontWeight: '600',
-    color: '#0ea3d8',
+    color: COLORS.accentBlue,
   },
   logoutButton: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#FFFFFF',
-    padding: 16,
-    borderRadius: 12,
+    backgroundColor: COLORS.bgCard, // ✅ match system
+    padding: rs(14),
+    borderRadius: rs(12),
     borderWidth: 1,
-    borderColor: '#EF4444',
+    borderColor: COLORS.accentOrange, // ✅ use system color
   },
+
   logoutButtonText: {
-    marginLeft: 8,
-    fontSize: 16,
+    marginLeft: rs(8),
+    fontSize: rf(14),
     fontWeight: '600',
-    color: '#EF4444',
+    color: COLORS.accentOrange,
   },
+
   bottomSpacer: {
-    height: 16,
+    height: rs(16),
   },
 });
 
