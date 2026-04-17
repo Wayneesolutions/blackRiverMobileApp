@@ -354,14 +354,14 @@ const styles = StyleSheet.create({
     headerTitle: {
         fontSize: 24,
         fontWeight: 'bold',
-        color: '#1F2937',
+        color: COLORS.textPrimary,
         flex: 1,
         textAlign: 'left',
         marginRight: 40, // Offset for back button
     },
     markAllButton: {
         fontSize: 14,
-        color: '#906AD1',
+        color: COLORS.textSecondary,
         fontWeight: '600',
     },
     filterContainer: {
@@ -374,10 +374,10 @@ const styles = StyleSheet.create({
         paddingVertical: 8,
         marginRight: 12,
         borderRadius: 20,
-        backgroundColor: '#F3F4F6',
+        backgroundColor: COLORS.bgCardLight,
     },
     activeFilterTab: {
-        backgroundColor: '#906AD1',
+        backgroundColor: COLORS.accentNavyBlue,
     },
     filterText: {
         fontSize: 14,
@@ -391,7 +391,7 @@ const styles = StyleSheet.create({
         padding: 16,
     },
     notificationItem: {
-        backgroundColor: '#fff',
+        backgroundColor: COLORS.bgCard,
         borderRadius: 12,
         padding: 16,
         marginBottom: 12,
@@ -406,11 +406,11 @@ const styles = StyleSheet.create({
     },
     unreadNotification: {
         borderLeftWidth: 4,
-        borderLeftColor: '#906AD1',
-        backgroundColor: '#F9FAFB',
+        borderLeftColor: COLORS.accentNavyBlue,
+        backgroundColor: COLORS.bgCardLight,
     },
     readNotification: {
-        backgroundColor: '#FFFFFF',
+        backgroundColor: COLORS.bgCard,
         opacity: 0.9,
     },
     notificationContent: {
@@ -439,11 +439,11 @@ const styles = StyleSheet.create({
     notificationTitle: {
         fontSize: 16,
         fontWeight: '600',
-        color: '#1F2937',
+        color: COLORS.textPrimary,
         flex: 1,
     },
     unreadTitle: {
-        color: '#111827',
+        color: COLORS.textPrimary,
     },
     unreadDot: {
         width: 8,
@@ -454,13 +454,13 @@ const styles = StyleSheet.create({
     },
     notificationMessage: {
         fontSize: 14,
-        color: '#6B7280',
+        color: COLORS.textSecondary,
         lineHeight: 20,
         marginBottom: 8,
     },
     timestamp: {
         fontSize: 12,
-        color: '#9CA3AF',
+        color: COLORS.textSecondary,
     },
     priorityBadge: {
         position: 'absolute',
