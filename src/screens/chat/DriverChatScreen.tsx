@@ -6,7 +6,6 @@ import {
   ScrollView,
   TextInput,
   TouchableOpacity,
-  SafeAreaView,
   ActivityIndicator,
   Alert,
   KeyboardAvoidingView,
@@ -14,6 +13,7 @@ import {
   Image,
   Linking,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
 import * as DocumentPicker from 'expo-document-picker';
@@ -496,7 +496,7 @@ const DriverChatScreen = () => {
   const currentUserId = currentUserIdRef.current;
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
       <KeyboardAvoidingView
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         style={styles.keyboardView}
@@ -507,14 +507,21 @@ const DriverChatScreen = () => {
           <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
             <Ionicons name="arrow-back" size={22} color="#fff" />
           </TouchableOpacity>
-          <View style={styles.headerAvatar}>
-            <Text style={styles.headerAvatarText}>D</Text>
-            <View style={styles.headerOnlineDot} />
+
+          <View style={styles.headerCenter}>
+            <View style={styles.headerAvatar}>
+              <Text style={styles.headerAvatarText}>D</Text>
+              <View style={styles.headerOnlineDot} />
+            </View>
+            <View style={styles.headerContent}>
+              <Text style={styles.headerTitle}>Dispatcher</Text>
+              <View style={styles.headerStatusRow}>
+                <View style={styles.headerOnlineDotInline} />
+                <Text style={styles.headerSubtitle}>Online</Text>
+              </View>
+            </View>
           </View>
-          <View style={styles.headerContent}>
-            <Text style={styles.headerTitle}>Dispatcher</Text>
-            <Text style={styles.headerSubtitle}>● Online</Text>
-          </View>
+
         </View>
 
         {/* Messages Container */}
@@ -744,66 +751,90 @@ const DriverChatScreen = () => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: COLORS.bgMain,
+    backgroundColor: COLORS.accentNavyBlue,
   },
   keyboardView: {
     flex: 1,
+    backgroundColor: COLORS.bgMain,
   },
   header: {
     backgroundColor: COLORS.accentNavyBlue,
-    paddingTop: Platform.OS === 'ios' ? 12 : 16,
-    paddingBottom: 14,
-    paddingHorizontal: 16,
+    paddingTop: 10,
+    paddingBottom: 10,
+    paddingHorizontal: 8,
     flexDirection: 'row',
     alignItems: 'center',
-    elevation: 6,
-    shadowColor: '#4C1D95',
+    elevation: 8,
+    shadowColor: '#000',
     shadowOffset: { width: 0, height: 3 },
-    shadowOpacity: 0.25,
+    shadowOpacity: 0.3,
     shadowRadius: 6,
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(255,255,255,0.08)',
   },
   backButton: {
-    marginRight: 10,
-    padding: 4,
+    padding: 8,
+    borderRadius: 20,
+  },
+  headerCenter: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginLeft: 4,
   },
   headerAvatar: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: 'rgba(255,255,255,0.25)',
+    width: 42,
+    height: 42,
+    borderRadius: 21,
+    backgroundColor: 'rgba(255,255,255,0.18)',
     justifyContent: 'center',
     alignItems: 'center',
     marginRight: 10,
+    borderWidth: 2,
+    borderColor: 'rgba(255,255,255,0.3)',
   },
   headerAvatarText: {
     color: '#fff',
-    fontSize: 16,
-    fontWeight: '700',
+    fontSize: 17,
+    fontWeight: '800',
+    letterSpacing: 0.5,
   },
   headerOnlineDot: {
     position: 'absolute',
-    bottom: 1,
-    right: 1,
-    width: 11,
-    height: 11,
+    bottom: 0,
+    right: 0,
+    width: 12,
+    height: 12,
     borderRadius: 6,
     backgroundColor: '#4ADE80',
     borderWidth: 2,
-    borderColor: COLORS.bgMain,
+    borderColor: COLORS.accentNavyBlue,
   },
   headerContent: {
     flex: 1,
+    justifyContent: 'center',
   },
   headerTitle: {
-    fontSize: 17,
+    fontSize: 16,
     fontWeight: '700',
     color: '#fff',
-    letterSpacing: 0.2,
+    letterSpacing: 0.3,
+  },
+  headerStatusRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 2,
+  },
+  headerOnlineDotInline: {
+    width: 7,
+    height: 7,
+    borderRadius: 4,
+    backgroundColor: '#4ADE80',
+    marginRight: 5,
   },
   headerSubtitle: {
     fontSize: 12,
-    color: '#A5F3FC',
-    marginTop: 1,
+    color: 'rgba(255,255,255,0.7)',
     fontWeight: '500',
   },
   messagesContainer: {

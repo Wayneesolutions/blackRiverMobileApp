@@ -1183,173 +1183,92 @@ useEffect(() => {
     }
 
     try {
-      const apiKey = await fetchGoogleMapsApiKey();
-      if (!apiKey) {
-        setRoutePath(routeCoordinates.slice());
-        return;
-      }
+      // Build ordered list of all coordinates for the route:
+      // origin → intermediate stops → destination
+      // OSRM expects coordinates as "lng,lat" (longitude first)
+      const allCoords: string[] = [];
+      allCoords.push(`${pickupLng},${pickupLat}`);
 
-      // For multiple dropoffs, use waypoints in order
-      // Otherwise use the single dropoff location
-      let destinationLat: number;
-      let destinationLng: number;
-      let waypointParams: string[] = [];
-      
       if (multipleDropOffs && wayPoints.length > 0) {
-        // Process waypoints in array order (preserving sequence)
-        const waypointCoords: Array<{ lat: number; lng: number; coord: string }> = [];
-        
         wayPoints.forEach((waypoint) => {
-          // Skip pickup waypoint if it's being used as origin
-          if (waypoint.pickup === true && pickup && 
-              parseCoordinate(waypoint.address?.latitude) === pickupLat &&
-              parseCoordinate(waypoint.address?.longitude) === pickupLng) {
+          // Skip the pickup waypoint — it's already the origin
+          if (
+            waypoint.pickup === true &&
+            pickup &&
+            parseCoordinate(waypoint.address?.latitude) === pickupLat &&
+            parseCoordinate(waypoint.address?.longitude) === pickupLng
+          ) {
             return;
           }
-          
-          // Try multiple ways to get coordinates
+
           let lat = parseCoordinate(waypoint.address?.latitude);
           let lng = parseCoordinate(waypoint.address?.longitude);
-          
-          // If not found in address, try direct on waypoint
+
           if (lat === null || lng === null) {
             lat = parseCoordinate((waypoint as any)?.latitude);
             lng = parseCoordinate((waypoint as any)?.longitude);
           }
-          
-          // If still not found, try coordinates array
+
           if ((lat === null || lng === null) && (waypoint.address as any)?.coordinates) {
             const coords = (waypoint.address as any).coordinates;
             if (Array.isArray(coords) && coords.length >= 2) {
-              lng = parseCoordinate(coords[0]); // longitude first in GeoJSON
-              lat = parseCoordinate(coords[1]); // latitude second in GeoJSON
+              lng = parseCoordinate(coords[0]);
+              lat = parseCoordinate(coords[1]);
             }
           }
-          
+
           if (lat !== null && lng !== null) {
-            waypointCoords.push({
-              lat,
-              lng,
-              coord: `${lat},${lng}`
-            });
+            allCoords.push(`${lng},${lat}`);
           }
         });
 
-        if (waypointCoords.length > 0) {
-          // Use the last waypoint coordinate as destination
-          const lastWaypoint = waypointCoords[waypointCoords.length - 1];
-          destinationLat = lastWaypoint.lat;
-          destinationLng = lastWaypoint.lng;
-          
-          // Use all waypoints except the last one as intermediate stops
-          // This preserves the order from the array
-          const intermediateWaypoints = waypointCoords.slice(0, -1);
-          if (intermediateWaypoints.length > 0) {
-            waypointParams.push(`waypoints=${encodeURIComponent(intermediateWaypoints.map(w => w.coord).join('|'))}`);
+        // If no waypoints resolved, add the dropoff as destination
+        if (allCoords.length === 1) {
+          if (dropoffLat !== null && dropoffLng !== null) {
+            allCoords.push(`${dropoffLng},${dropoffLat}`);
+          } else {
+            allCoords.push(`${pickupLng},${pickupLat}`);
           }
-        } else {
-          // If no valid waypoints, use pickup as both origin and destination
-          destinationLat = pickupLat;
-          destinationLng = pickupLng;
         }
       } else {
-        // Single dropoff - use dropoff as destination
-        destinationLat = dropoffLat!;
-        destinationLng = dropoffLng!;
-      }
-      
-      // Call Directions API through backend to avoid API key restriction issues
-      const origin = `${pickupLat},${pickupLng}`;
-      const destination = `${destinationLat},${destinationLng}`;
-      const waypointsParam = waypointParams.length > 0 
-        ? waypointParams.map(p => p.replace('waypoints=', '')).join('|')
-        : undefined;
-
-      console.log('🛣️ Fetching route from Directions API via backend...');
-      console.log('📍 Origin:', origin);
-      console.log('📍 Destination:', destination);
-      
-      // Build query parameters - include frontend API key
-      const queryParams = new URLSearchParams({
-        origin: origin,
-        destination: destination,
-        mode: 'driving',
-        apiKey: GOOGLE_MAPS_API_KEY || '' // Pass frontend API key to backend
-      });
-      
-      if (waypointsParam) {
-        queryParams.append('waypoints', waypointsParam);
-      }
-      
-      // Call backend endpoint
-      const endpoint = `/driver/directions?${queryParams.toString()}`;
-      console.log('🛣️ Calling backend directions endpoint:', endpoint);
-      
-      const response = await apiService.get<any>(endpoint, true);
-      
-      console.log('📦 Backend response structure:', {
-        success: response?.success,
-        hasData: !!response?.data,
-        responseKeys: response ? Object.keys(response) : [],
-        dataKeys: response?.data ? Object.keys(response.data) : [],
-        nestedDataKeys: response?.data?.data ? Object.keys(response.data.data) : []
-      });
-      
-      if (!response || !response.success) {
-        const errorMsg = response?.message || response?.error || 'Directions request failed';
-        console.error('❌ Directions API error:', errorMsg);
-        throw new Error(`Directions request failed: ${errorMsg}`);
+        // Single dropoff
+        allCoords.push(`${dropoffLng!},${dropoffLat!}`);
       }
 
-      if (!response.data) {
-        console.error('❌ No data in response:', response);
-        throw new Error('Directions API returned no data');
+      const osrmCoords = allCoords.join(';');
+      const osrmUrl = `https://router.project-osrm.org/route/v1/driving/${osrmCoords}?overview=full&geometries=polyline`;
+
+      console.log('🛣️ Fetching road route via OSRM...');
+      console.log('📍 OSRM URL:', osrmUrl);
+
+      const osrmResponse = await fetch(osrmUrl);
+      if (!osrmResponse.ok) {
+        throw new Error(`OSRM request failed: ${osrmResponse.status}`);
       }
 
-      // Backend returns: { success: true, data: { status: 'OK', routes: [...] } }
-      // apiService wraps it: { success: true, data: { success: true, data: { status: 'OK', routes: [...] } } }
-      // So we need to check if there's nested data
-      const googleResponse = response.data.data || response.data;
-      
-      console.log('📦 Google Directions response:', {
-        hasStatus: 'status' in googleResponse,
-        status: googleResponse.status,
-        hasRoutes: 'routes' in googleResponse,
-        routesLength: googleResponse.routes?.length
-      });
-      
-      // Check for API errors in the Google response
-      if (googleResponse.status && googleResponse.status !== 'OK') {
-        const errorMsg = (googleResponse as any).error_message || googleResponse.error || 'Unknown error';
-        console.error('❌ Directions API returned error:', googleResponse.status, errorMsg);
-        throw new Error(`Directions API error: ${googleResponse.status} - ${errorMsg}`);
-      }
+      const osrmData = await osrmResponse.json();
 
-      // Extract polyline from Google Directions API response
-      const polyline = googleResponse?.routes?.[0]?.overview_polyline?.points;
-      
-      console.log('📍 Polyline extracted:', {
-        hasPolyline: !!polyline,
-        polylineLength: polyline?.length,
-        routesCount: googleResponse?.routes?.length,
-        firstRoute: googleResponse?.routes?.[0] ? Object.keys(googleResponse.routes[0]) : []
+      console.log('📦 OSRM response:', {
+        code: osrmData.code,
+        routesCount: osrmData.routes?.length,
+        hasGeometry: !!osrmData.routes?.[0]?.geometry,
       });
 
+      if (osrmData.code !== 'Ok' || !osrmData.routes?.length) {
+        throw new Error(`OSRM returned no route: ${osrmData.code}`);
+      }
+
+      const polyline = osrmData.routes[0].geometry;
       if (polyline) {
-        console.log('✅ Route polyline received, decoding...');
         const decoded = decodePolyline(polyline);
         if (decoded.length > 1) {
-          console.log(`✅ Route decoded successfully: ${decoded.length} points`);
+          console.log(`✅ OSRM road route decoded: ${decoded.length} points`);
           setRoutePath(decoded);
           return;
-        } else {
-          console.warn('⚠️ Decoded polyline has less than 2 points');
         }
-      } else {
-        console.warn('⚠️ No polyline found in Directions API response');
       }
 
-      // Fallback to straight line if Directions API fails
+      // Fallback to straight line if OSRM fails
       console.warn('⚠️ Falling back to straight line route');
       setRoutePath(routeCoordinates.slice());
     } catch (directionsError: any) {
@@ -1359,7 +1278,6 @@ useEffect(() => {
       setRoutePath(routeCoordinates.slice());
     }
   }, [
-    fetchGoogleMapsApiKey,
     multipleDropOffs,
     pickupLat,
     pickupLng,

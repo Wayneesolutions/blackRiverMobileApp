@@ -99,7 +99,7 @@ export default function App() {
             },
           }}
         >
-          <StatusBar style="dark" />
+          <StatusBar style="light" backgroundColor="transparent" translucent={false} />
           <AppNavigator />
         </NavigationContainer>
       </SafeAreaProvider>
