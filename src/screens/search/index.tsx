@@ -198,16 +198,7 @@ export default function SearchScreen({ navigation }: Props) {
       }
     }
 
-    // Check if we're trying to navigate to a tab screen
-    const tabScreens = ['Settings', 'Documents', 'LoadMap', 'ActiveTrips', 'CompleteTrips', 'PendingTrips'];
-
-    if (tabScreens.includes(page.route as string)) {
-      // Navigate to MainTabs first, then to the specific screen
-      navigation.navigate('MainTabs', { screen: page.route } as any);
-    } else {
-      // Direct navigation for modal screens
-      navigation.navigate(page.route);
-    }
+    navigation.navigate(page.route as any);
   };
 
   // Updated category list in the "All Pages" section

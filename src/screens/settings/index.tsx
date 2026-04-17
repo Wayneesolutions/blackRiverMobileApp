@@ -348,7 +348,7 @@ const SettingsScreen = ({ route, navigation: navProp, onLogout }: SettingsScreen
                 onPress={() => setShowPasswordModal(false)}
                 style={styles.modalCloseButton}
               >
-                <Ionicons name="close" size={24} color="#666" />
+                <Ionicons name="close" size={24} color={COLORS.textSecondary} />
               </TouchableOpacity>
             )}
           </View>
@@ -454,6 +454,7 @@ const SettingsScreen = ({ route, navigation: navProp, onLogout }: SettingsScreen
           <TextInput
             style={styles.textArea}
             placeholder="Describe your feedback, problem, or feature request..."
+            placeholderTextColor={COLORS.textSecondary}
             multiline
             numberOfLines={4}
             value={feedbackText}
@@ -1001,16 +1002,18 @@ const styles = StyleSheet.create({
   // Modal styles
   modalOverlay: {
     flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.5)',
+    backgroundColor: 'rgba(0,0,0,0.7)',
     justifyContent: 'center',
     alignItems: 'center',
   },
   modalContent: {
-    backgroundColor: 'white',
+    backgroundColor: COLORS.bgCard,
     borderRadius: 15,
     padding: 20,
     width: '90%',
     maxWidth: 400,
+    borderWidth: 1,
+    borderColor: COLORS.accentNavyBlue,
   },
   modalHeader: {
     flexDirection: 'row',
@@ -1024,29 +1027,31 @@ const styles = StyleSheet.create({
   modalTitle: {
     fontSize: 20,
     fontWeight: '600',
-    color: '#1F2937',
+    color: COLORS.textPrimary,
     flex: 1,
   },
   input: {
     borderWidth: 1,
-    borderColor: '#e5e5e5',
+    borderColor: COLORS.accentNavyBlue,
     borderRadius: 12,
     paddingHorizontal: 16,
     paddingVertical: 14,
     marginBottom: 16,
     fontSize: 16,
-    backgroundColor: '#fff',
-    color: '#1F2937',
+    backgroundColor: COLORS.bgCardLight,
+    color: COLORS.textPrimary,
   },
   textArea: {
     borderWidth: 1,
-    borderColor: '#ddd',
+    borderColor: COLORS.accentNavyBlue,
     borderRadius: 8,
     paddingHorizontal: 12,
     paddingVertical: 10,
     marginBottom: 15,
     fontSize: 16,
     height: 100,
+    backgroundColor: COLORS.bgCardLight,
+    color: COLORS.textPrimary,
   },
   feedbackTypes: {
     flexDirection: 'row',
@@ -1058,19 +1063,22 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     paddingVertical: 6,
     borderRadius: 20,
-    backgroundColor: '#f0f0f0',
+    backgroundColor: COLORS.bgCardLight,
+    borderWidth: 1,
+    borderColor: COLORS.accentNavyBlue,
     marginRight: 8,
     marginBottom: 8,
   },
   selectedType: {
-    backgroundColor: '#8B5CF6',
+    backgroundColor: COLORS.accentNavyBlue,
+    borderColor: COLORS.accentNavyBlue,
   },
   typeBtnText: {
     fontSize: 12,
-    color: '#555',
+    color: COLORS.textSecondary,
   },
   selectedTypeText: {
-    color: 'white',
+    color: COLORS.white,
   },
   modalButtons: {
     flexDirection: 'row',
@@ -1084,19 +1092,21 @@ const styles = StyleSheet.create({
     marginHorizontal: 5,
   },
   cancelBtn: {
-    backgroundColor: '#f0f0f0',
+    backgroundColor: COLORS.bgCardLight,
+    borderWidth: 1,
+    borderColor: COLORS.accentNavyBlue,
   },
   submitBtn: {
-    backgroundColor: '#8B5CF6',
+    backgroundColor: COLORS.accentNavyBlue,
   },
   cancelBtnText: {
     textAlign: 'center',
-    color: '#555',
+    color: COLORS.textSecondary,
     fontWeight: '600',
   },
   submitBtnText: {
     textAlign: 'center',
-    color: 'white',
+    color: COLORS.white,
     fontWeight: '600',
   },
 });
