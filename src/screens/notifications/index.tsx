@@ -17,6 +17,7 @@ import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { RootStackParamList } from '../../navigation/AppNavigator';
 import apiService from '../../services/api/apiService';
 import { logger } from '../../utils/loggerHelper';
+import { COLORS, SPACING, RADIUS, FONT_SIZE, FONT_WEIGHT, SHADOWS } from '../../theme';
 
 type NavigationProp = NativeStackNavigationProp<RootStackParamList>;
 
@@ -46,10 +47,10 @@ export default function NotificationsScreen({ }) {
             setLoading(true);
             const response = await apiService.getNotifications();
             console.log('📦 Notifications API Response:', JSON.stringify(response, null, 2));
-            
+
             // Handle nested response structure: response.data.data.notifications
             const notificationsData = response.data?.data?.notifications || response.data?.notifications || [];
-            
+
             if (response.success && notificationsData.length >= 0) {
                 // Transform API response to match our notification format
                 const formattedNotifications = notificationsData.map((notif: any) => {
@@ -129,7 +130,7 @@ export default function NotificationsScreen({ }) {
     // Mark notification as read
     const markAsRead = (id: string) => {
         const notification = notifications.find(n => n._id === id || n.id === id);
-        
+
         // Only mark as read if it's not already read
         if (notification && !notification.isRead) {
             setNotifications(prev =>
@@ -139,7 +140,7 @@ export default function NotificationsScreen({ }) {
                         : notif
                 )
             );
-            
+
             // Optional: Show brief feedback (you can remove this if you don't want it)
             // The visual change (removing unread indicator) already provides feedback
         }
@@ -334,7 +335,7 @@ export default function NotificationsScreen({ }) {
 const styles = StyleSheet.create({
     container: {
         flex: 1,
-        backgroundColor: '#F8FAFC',
+        backgroundColor: COLORS.bgMain,
     },
     scrollContainer: {
         flex: 1,

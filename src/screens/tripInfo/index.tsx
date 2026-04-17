@@ -17,6 +17,8 @@ import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { RootStackParamList } from '../../navigation/AppNavigator';
 import { apiService } from '../../services/api/apiService';
 import { logger } from '../../utils/loggerHelper';
+import { COLORS, SPACING, RADIUS, FONT_SIZE, FONT_WEIGHT, SHADOWS } from '../../theme';
+
 
 type NavigationProp = NativeStackNavigationProp<RootStackParamList>;
 
@@ -173,7 +175,7 @@ const TripInfoScreen = () => {
     try {
       setLoading(true);
       const response = await apiService.getActiveTrips();
-      
+
       if (response.success && response.data) {
         const tripsData = response.data.data || response.data || [];
         setTrips(Array.isArray(tripsData) ? tripsData : []);
@@ -352,7 +354,7 @@ const TripInfoScreen = () => {
                       {order.customer?.name && (
                         <Text style={styles.customerName}>Customer: {order.customer.name}</Text>
                       )}
-                      
+
                       {/* Shipper Information */}
                       <View style={styles.sectionDivider}>
                         <Text style={styles.sectionTitle}>Shipper Information</Text>
@@ -395,7 +397,7 @@ const TripInfoScreen = () => {
                           <Text style={styles.infoValue}>{order.shipper.postalCode}</Text>
                         </View>
                       )}
-                      
+
                       {/* Multiple Pickup Stops */}
                       {order.stops && order.stops.length > 0 && (
                         <View style={styles.stopsSection}>
@@ -443,7 +445,7 @@ const TripInfoScreen = () => {
                           ))}
                         </View>
                       )}
-                      
+
                       {/* Pickup Appointment Details */}
                       {(order.pickupAppointment || order.pickupDate) && (
                         <View style={styles.appointmentSection}>
@@ -457,21 +459,21 @@ const TripInfoScreen = () => {
                           <View style={styles.infoRow}>
                             <Text style={styles.infoLabel}>Date:</Text>
                             <Text style={styles.infoValue}>
-                              {order.pickupAppointment?.date 
+                              {order.pickupAppointment?.date
                                 ? formatDateOnly(order.pickupAppointment.date)
-                                : order.pickupDate 
-                                ? formatDateOnly(order.pickupDate)
-                                : 'N/A'}
+                                : order.pickupDate
+                                  ? formatDateOnly(order.pickupDate)
+                                  : 'N/A'}
                             </Text>
                           </View>
                           <View style={styles.infoRow}>
                             <Text style={styles.infoLabel}>Time:</Text>
                             <Text style={styles.infoValue}>
-                              {order.pickupAppointment?.time 
+                              {order.pickupAppointment?.time
                                 ? order.pickupAppointment.time
-                                : order.pickupDate 
-                                ? formatTime(order.pickupDate)
-                                : 'N/A'}
+                                : order.pickupDate
+                                  ? formatTime(order.pickupDate)
+                                  : 'N/A'}
                             </Text>
                           </View>
                         </View>
@@ -505,7 +507,7 @@ const TripInfoScreen = () => {
                           {order.receiver?.address || formatAddress(order.deliveryLocation) || 'N/A'}
                         </Text>
                       </View>
-                      
+
                       {/* Multiple Delivery Stops */}
                       {order.receiverStops && order.receiverStops.length > 0 && (
                         <View style={styles.stopsSection}>
@@ -553,7 +555,7 @@ const TripInfoScreen = () => {
                           ))}
                         </View>
                       )}
-                      
+
                       {/* Delivery Appointment Details */}
                       {(order.deliveryAppointment || order.deliveryDate) && (
                         <View style={styles.appointmentSection}>
@@ -561,21 +563,21 @@ const TripInfoScreen = () => {
                           <View style={styles.infoRow}>
                             <Text style={styles.infoLabel}>Date:</Text>
                             <Text style={styles.infoValue}>
-                              {order.deliveryAppointment?.date 
+                              {order.deliveryAppointment?.date
                                 ? formatDateOnly(order.deliveryAppointment.date)
-                                : order.deliveryDate 
-                                ? formatDateOnly(order.deliveryDate)
-                                : 'N/A'}
+                                : order.deliveryDate
+                                  ? formatDateOnly(order.deliveryDate)
+                                  : 'N/A'}
                             </Text>
                           </View>
                           <View style={styles.infoRow}>
                             <Text style={styles.infoLabel}>Time:</Text>
                             <Text style={styles.infoValue}>
-                              {order.deliveryAppointment?.time 
+                              {order.deliveryAppointment?.time
                                 ? order.deliveryAppointment.time
-                                : order.deliveryDate 
-                                ? formatTime(order.deliveryDate)
-                                : 'N/A'}
+                                : order.deliveryDate
+                                  ? formatTime(order.deliveryDate)
+                                  : 'N/A'}
                             </Text>
                           </View>
                         </View>
@@ -586,8 +588,8 @@ const TripInfoScreen = () => {
                           <Text style={styles.orderStatusLabel}>Status: </Text>
                           <Text style={[styles.orderStatusValue, {
                             color: order.status === 'in-delivery' ? '#3498db' :
-                                   order.status === 'completed' ? '#2ecc71' :
-                                   '#95a5a6'
+                              order.status === 'completed' ? '#2ecc71' :
+                                '#95a5a6'
                           }]}>
                             {order.status}
                           </Text>
@@ -679,7 +681,7 @@ const TripInfoScreen = () => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f5f5f5',
+    backgroundColor: COLORS.bgMain,
   },
   loadingContainer: {
     flex: 1,
@@ -691,10 +693,10 @@ const styles = StyleSheet.create({
     color: '#666',
   },
   header: {
-    backgroundColor: '#fff',
+    backgroundColor: COLORS.bgCardLight,
     padding: 16,
     borderBottomWidth: 1,
-    borderBottomColor: '#e5e5e5',
+    borderBottomColor: COLORS.accentNavyBlue,
   },
   headerContent: {
     alignItems: 'center',
@@ -702,12 +704,12 @@ const styles = StyleSheet.create({
   headerTitle: {
     fontSize: 24,
     fontWeight: 'bold',
-    color: '#333',
+    color: COLORS.textPrimary,
     marginBottom: 4,
   },
   headerSubtitle: {
     fontSize: 14,
-    color: '#666',
+    color: COLORS.textSecondary,
     marginBottom: 12,
   },
   statsContainer: {
@@ -724,7 +726,7 @@ const styles = StyleSheet.create({
   },
   statLabel: {
     fontSize: 12,
-    color: '#666',
+    color: COLORS.textSecondary,
   },
   emptyContainer: {
     flex: 1,
@@ -751,7 +753,7 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   tripCard: {
-    backgroundColor: '#fff',
+    backgroundColor: COLORS.bgCardLight,
     margin: 12,
     padding: 16,
     borderRadius: 12,
@@ -778,7 +780,7 @@ const styles = StyleSheet.create({
   },
   tripDate: {
     fontSize: 12,
-    color: '#666',
+    color: COLORS.textSecondary,
   },
   statusBadge: {
     paddingHorizontal: 12,
@@ -786,7 +788,7 @@ const styles = StyleSheet.create({
     borderRadius: 12,
   },
   statusText: {
-    color: '#fff',
+    color: COLORS.textPrimary,
     fontSize: 12,
     fontWeight: '600',
   },
@@ -797,28 +799,28 @@ const styles = StyleSheet.create({
   infoLabel: {
     fontSize: 14,
     fontWeight: '600',
-    color: '#333',
+    color: COLORS.textPrimary,
     width: 80,
   },
   infoValue: {
     fontSize: 14,
-    color: '#666',
+    color: COLORS.textSecondary,
     flex: 1,
   },
   ordersSection: {
     marginTop: 12,
     paddingTop: 12,
     borderTopWidth: 1,
-    borderTopColor: '#e5e5e5',
+    borderTopColor: COLORS.accentNavyBlue,
   },
   ordersTitle: {
     fontSize: 16,
     fontWeight: '600',
-    color: '#333',
+    color: COLORS.textPrimary,
     marginBottom: 8,
   },
   orderItem: {
-    backgroundColor: '#f9f9f9',
+    backgroundColor: COLORS.bgCardLight,
     padding: 12,
     borderRadius: 8,
     marginBottom: 8,
@@ -831,12 +833,12 @@ const styles = StyleSheet.create({
   },
   customerOrderNo: {
     fontSize: 12,
-    color: '#666',
+    color: COLORS.textSecondary,
     marginBottom: 4,
   },
   customerName: {
     fontSize: 12,
-    color: '#666',
+    color: COLORS.textSecondary,
     marginBottom: 4,
   },
   locationRow: {
@@ -846,11 +848,11 @@ const styles = StyleSheet.create({
   locationLabel: {
     fontSize: 12,
     fontWeight: '600',
-    color: '#333',
+    color: COLORS.textPrimary,
   },
   locationValue: {
     fontSize: 12,
-    color: '#666',
+    color: COLORS.textSecondary,
     flex: 1,
   },
   orderStatusRow: {
@@ -860,7 +862,7 @@ const styles = StyleSheet.create({
   orderStatusLabel: {
     fontSize: 12,
     fontWeight: '600',
-    color: '#333',
+    color: COLORS.textPrimary,
   },
   orderStatusValue: {
     fontSize: 12,
@@ -870,34 +872,34 @@ const styles = StyleSheet.create({
     marginTop: 12,
     paddingTop: 12,
     borderTopWidth: 1,
-    borderTopColor: '#e5e5e5',
+    borderTopColor: COLORS.accentNavyBlue,
   },
   notesLabel: {
     fontSize: 14,
     fontWeight: '600',
-    color: '#333',
+    color: COLORS.textPrimary,
     marginBottom: 4,
   },
   notesText: {
     fontSize: 14,
-    color: '#666',
+    color: COLORS.textSecondary,
   },
   documentsSection: {
     marginTop: 12,
     paddingTop: 12,
     borderTopWidth: 1,
-    borderTopColor: '#e5e5e5',
+    borderTopColor: COLORS.accentNavyBlue,
   },
   documentsTitle: {
     fontSize: 16,
     fontWeight: '600',
-    color: '#333',
+    color: COLORS.textPrimary,
     marginBottom: 8,
   },
   documentItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#f9f9f9',
+    backgroundColor: COLORS.bgCardLight,
     padding: 12,
     borderRadius: 8,
     marginBottom: 8,
@@ -954,19 +956,19 @@ const styles = StyleSheet.create({
   stopsSection: {
     marginTop: 12,
     padding: 8,
-    backgroundColor: '#f9f9f9',
+    backgroundColor: COLORS.bgCardLight,
     borderRadius: 6,
   },
   stopsTitle: {
     fontSize: 14,
     fontWeight: '600',
-    color: '#333',
+    color: COLORS.textPrimary,
     marginBottom: 8,
   },
   stopItem: {
     marginBottom: 12,
     padding: 8,
-    backgroundColor: '#fff',
+    backgroundColor: COLORS.bgCard,
     borderRadius: 6,
   },
   stopNumber: {
@@ -991,7 +993,7 @@ const styles = StyleSheet.create({
   appointmentSection: {
     marginTop: 8,
     padding: 8,
-    backgroundColor: '#f0f9ff',
+    backgroundColor: COLORS.bgCard,
     borderRadius: 6,
     borderLeftWidth: 3,
     borderLeftColor: '#2563eb',
@@ -999,7 +1001,7 @@ const styles = StyleSheet.create({
   appointmentTitle: {
     fontSize: 13,
     fontWeight: '600',
-    color: '#333',
+    color: COLORS.textPrimary,
     marginBottom: 6,
   },
 });
