@@ -324,7 +324,7 @@ const styles = StyleSheet.create({
   downloadButtonText: {
     fontSize: 14,
     fontWeight: '600',
-    color: COLORS.textPrimary,
+    color: COLORS.black,
   },
 });
 

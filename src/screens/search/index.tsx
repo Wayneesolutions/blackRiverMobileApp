@@ -520,7 +520,7 @@ const styles = StyleSheet.create({
     color: COLORS.textSecondary,
     marginLeft: 8,
     marginRight: 8,
-    border: '2px solid red'
+
   },
   content: {
     flex: 1,
