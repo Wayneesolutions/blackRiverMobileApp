@@ -1,7 +1,6 @@
 // src/services/ApiService.ts - CORRECTED VERSION
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Platform } from 'react-native';
-import * as FileSystem from 'expo-file-system';
 import { API_BASE_URL, API_ENDPOINTS, IS_DEV, getAPIBaseURL } from '../../config/env';
 import { logger } from '../../utils/loggerHelper';
 import { authManager } from '../../types/AuthManager';
@@ -776,78 +775,35 @@ class ApiService {
 
     // Order document upload and completion
     async uploadOrderDocument(orderId: string, documentFile: any, documentType: string, description?: string): Promise<ApiResponse> {
-        // Use expo-file-system uploadAsync — this is the only reliable way to upload
-        // binary files in Expo SDK 54 / React Native 0.81. The {uri,type,name} trick
-        // inside XHR/fetch FormData was being stringified as "[object Object]" in
-        // newer RN versions, causing the server to receive no file.
         try {
-            await this.ensureInitialized();
-        } catch (_) { /* non-blocking */ }
+            const formData = new FormData();
 
-        console.log('📤 uploadOrderDocument (FileSystem):', { orderId, documentType, fileName: documentFile?.name });
-
-        const url = `${this.baseURL}/driver/orders/${orderId}/documents`;
-        console.log('📤 POST →', url);
-
-        if (Platform.OS === 'web') {
-            // Web path: use fetch + FormData (standard Blob handling)
-            try {
-                const formData = new FormData();
-                formData.append('document', documentFile.file || documentFile);
-                formData.append('documentType', documentType);
-                if (description) formData.append('description', description);
-
-                const response = await fetch(url, {
-                    method: 'POST',
-                    headers: this.token ? { Authorization: `Bearer ${this.token}` } : {},
-                    body: formData,
-                });
-                const data = await response.json();
-                return {
-                    success: data?.success === true,
-                    data,
-                    error: data?.success !== true ? (data?.message || data?.error || 'Upload failed') : undefined,
-                    statusCode: response.status,
-                };
-            } catch (error: any) {
-                logger.error('Error uploading order document (web)', error);
-                return { success: false, error: error.message || 'Network error', statusCode: 0 };
-            }
-        }
-
-        // Native path: use FileSystem.uploadAsync for reliable multipart upload
-        try {
-            const parameters: Record<string, string> = { documentType };
-            if (description) parameters.description = description;
-
-            const uploadResult = await FileSystem.uploadAsync(url, documentFile.uri, {
-                fieldName: 'document',
-                httpMethod: 'POST',
-                uploadType: FileSystem.FileSystemUploadType.MULTIPART,
-                mimeType: documentFile.mimeType || documentFile.type || 'application/pdf',
-                parameters,
-                headers: this.token ? { Authorization: `Bearer ${this.token}` } : {},
-            });
-
-            console.log('📤 FileSystem upload response:', uploadResult.status, uploadResult.body);
-
-            let data: any;
-            try {
-                data = JSON.parse(uploadResult.body);
-            } catch (_) {
-                return { success: false, error: 'Invalid server response', statusCode: uploadResult.status };
+            if (documentFile) {
+                if (Platform.OS === 'web') {
+                    formData.append('document', documentFile.file || documentFile);
+                } else {
+                    formData.append('document', {
+                        uri: documentFile.uri,
+                        type: documentFile.mimeType || documentFile.type || 'application/pdf',
+                        name: documentFile.name || 'document.pdf',
+                    } as any);
+                }
             }
 
-            return {
-                success: data?.success === true,
-                data,
-                error: data?.success !== true ? (data?.message || data?.error || 'Upload failed') : undefined,
-                statusCode: uploadResult.status,
-            };
+            formData.append('documentType', documentType);
+            if (description) formData.append('description', description);
+
+            return this.request(`/driver/orders/${orderId}/documents`, {
+                method: 'POST',
+                body: formData,
+            }, true);
         } catch (error: any) {
-            console.error('❌ FileSystem upload error:', error);
             logger.error('Error uploading order document', error);
-            return { success: false, error: error.message || 'Network error. Please check your connection.', statusCode: 0 };
+            return {
+                success: false,
+                error: error.message || 'Failed to upload document',
+                statusCode: 0,
+            };
         }
     }
 
