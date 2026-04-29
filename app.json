@@ -26,7 +26,8 @@
         "NSPhotoLibraryUsageDescription": "This app needs access to your photos to upload document images.",
         "NSCameraUsageDescription": "This app needs access to your camera to take photos of documents.",
         "ITSAppUsesNonExemptEncryption": false,
-        "UIBackgroundModes": ["location", "remote-notification", "fetch"]
+        "UIBackgroundModes": ["location", "remote-notification", "fetch"],
+        "NSMicrophoneUsageDescription": "Required for voice calls"
       },
       "entitlements": {
         "aps-environment": "production"
@@ -60,7 +61,8 @@
         "READ_EXTERNAL_STORAGE",
         "WRITE_EXTERNAL_STORAGE",
         "INTERNET",
-        "ACCESS_NETWORK_STATE"
+        "ACCESS_NETWORK_STATE",
+        "RECORD_AUDIO"
       ],
       "intentFilters": [
         {
@@ -80,6 +82,7 @@
     },
     "plugins": [
       "expo-font",
+     
       [
         "expo-build-properties",
         {

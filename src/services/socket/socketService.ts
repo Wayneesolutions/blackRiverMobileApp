@@ -648,6 +648,20 @@ class SocketService {
     this.socket.emit('sendDriverChatMessage', data);
   }
 
+  // ==================== WEBRTC ====================
+
+callUser(data: { to: string; offer: any }) {
+  this.socket?.emit("call-user", data);
+}
+
+answerCall(data: { to: string; answer: any }) {
+  this.socket?.emit("answer-call", data);
+}
+
+sendIceCandidate(data: { to: string; candidate: any }) {
+  this.socket?.emit("call-ice", data);
+}
+
   // Typing indicator for driver chat
   setDriverTyping(driverId: string, isTyping: boolean): void {
     if (!this.socket || !this.isConnected) {

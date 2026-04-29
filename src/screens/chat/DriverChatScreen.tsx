@@ -23,6 +23,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { logger } from '../../utils/loggerHelper';
 import { authManager } from '../../types/AuthManager';
 import { apiService } from '../../services/api/apiService';
+import { useRNWebRTC } from '../../hooks/useWebRTC';
 // ─── Global Theme ─────────────────────────────────────────────────────────────
 import { COLORS, SPACING, RADIUS, FONT_SIZE, FONT_WEIGHT, SHADOWS } from '../../theme';
 const DriverChatScreen = () => {
@@ -39,6 +40,14 @@ const DriverChatScreen = () => {
   const scrollViewRef = useRef<ScrollView>(null);
   const typingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const currentUserIdRef = useRef<string | null>(null);
+  const [callState, setCallState] = useState<"idle" | "incoming" | "connected">("idle");
+const [incomingCall, setIncomingCall] = useState<any>(null);
+const {
+  handleIncomingCall,
+  handleAnswer,
+  handleICE,
+  endCall
+} = useRNWebRTC();
 
   // Normalize message format from API or socket
   const normalizeMessage = (message: any): ChatMessage => {
@@ -495,6 +504,62 @@ const DriverChatScreen = () => {
 
   const currentUserId = currentUserIdRef.current;
 
+  useEffect(() => {
+  const socket = socketService.getSocket();
+  if (!socket) return;
+
+  const onIncoming = ({ from, offer }: any) => {
+    console.log("📞 Incoming call");
+
+    setIncomingCall({ from, offer });
+    setCallState("incoming");
+  };
+
+  const onAnswer = ({ answer }: any) => {
+    console.log("📞 Answer received");
+    handleAnswer(answer);
+    setCallState("connected");
+  };
+
+  const onIce = ({ candidate }: any) => {
+    console.log("🧊 ICE received");
+    handleICE(candidate);
+  };
+
+  socket.on("incoming-call", onIncoming);
+  socket.on("call-answered", onAnswer);
+  socket.on("call-ice", onIce);
+
+  return () => {
+    socket.off("incoming-call", onIncoming);
+    socket.off("call-answered", onAnswer);
+    socket.off("call-ice", onIce);
+  };
+}, []);
+
+
+const acceptCall = async () => {
+  if (!incomingCall) return;
+
+  await handleIncomingCall(incomingCall.offer, incomingCall.from);
+  setCallState("connected");
+};
+
+const rejectCall = () => {
+  setIncomingCall(null);
+  setCallState("idle");
+
+  socketService.getSocket()?.emit("call-rejected", {
+    to: incomingCall?.from
+  });
+};
+
+const handleEndCall = () => {
+  endCall();
+  setCallState("idle");
+  setIncomingCall(null);
+};
+
   return (
     <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
       <KeyboardAvoidingView
@@ -744,7 +809,33 @@ const DriverChatScreen = () => {
           </TouchableOpacity>
         </View>
       </KeyboardAvoidingView>
+      {callState === "incoming" && (
+  <View style={styles.callOverlay}>
+    <Text style={styles.callText}>Incoming Call</Text>
+
+    <View style={{ flexDirection: "row", gap: 20 }}>
+      <TouchableOpacity onPress={acceptCall} style={styles.acceptBtn}>
+        <Text style={{ color: "#fff" }}>Accept</Text>
+      </TouchableOpacity>
+
+      <TouchableOpacity onPress={rejectCall} style={styles.rejectBtn}>
+        <Text style={{ color: "#fff" }}>Reject</Text>
+      </TouchableOpacity>
+    </View>
+  </View>
+)}
+
+{callState === "connected" && (
+  <View style={styles.callOverlay}>
+    <Text style={styles.callText}>Call Connected</Text>
+
+    <TouchableOpacity onPress={handleEndCall} style={styles.rejectBtn}>
+      <Text style={{ color: "#fff" }}>End Call</Text>
+    </TouchableOpacity>
+  </View>
+)}
     </SafeAreaView>
+    
   );
 };
 
@@ -1125,6 +1216,35 @@ const styles = StyleSheet.create({
     opacity: 0.45,
     elevation: 0,
   },
+  callOverlay: {
+  position: "absolute",
+  top: 0,
+  left: 0,
+  right: 0,
+  bottom: 0,
+  backgroundColor: "rgba(0,0,0,0.9)",
+  justifyContent: "center",
+  alignItems: "center",
+  zIndex: 999,
+},
+
+callText: {
+  color: "#fff",
+  fontSize: 20,
+  marginBottom: 20,
+},
+
+acceptBtn: {
+  backgroundColor: "green",
+  padding: 15,
+  borderRadius: 50,
+},
+
+rejectBtn: {
+  backgroundColor: "red",
+  padding: 15,
+  borderRadius: 50,
+},
 });
 
 export default DriverChatScreen;
