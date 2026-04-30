@@ -1,9 +1,11 @@
 // src/navigation/AppNavigator.tsx
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { Ionicons } from '@expo/vector-icons';
-import { View, Text, StyleSheet, ActivityIndicator, Image, Animated, TouchableOpacity } from 'react-native';
+import { View, Text, StyleSheet, ActivityIndicator, Image, Animated, TouchableOpacity, Modal, Vibration } from 'react-native';
+import { RTCPeerConnection, RTCSessionDescription, RTCIceCandidate, mediaDevices } from 'react-native-webrtc';
+import { PermissionsAndroid, Platform } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { NavigationProp } from '@react-navigation/native';
 import { authManager } from '../types/AuthManager';
@@ -249,6 +251,117 @@ const ScreenWithHeaderFooter: React.FC<{
 
 // Main Tab Navigator with Authentication Context
 function MainTabNavigator({ onLogout, navigation }: MainTabNavigatorProps) {
+    const [globalCallState, setGlobalCallState] = useState<'idle' | 'incoming' | 'connected' | 'declined'>('idle');
+    const [globalIncomingCall, setGlobalIncomingCall] = useState<{ from: string; offer: any } | null>(null);
+    const [isMuted, setIsMuted] = useState(false);
+    const [isSpeaker, setIsSpeaker] = useState(false);
+    const globalPcRef = useRef<any>(null);
+    const globalStreamRef = useRef<any>(null);
+    const localAudioStreamRef = useRef<any>(null);
+    const peerSocketIdRef = useRef<string | null>(null);
+
+    // Vibration ring pattern — fires whenever incoming call arrives
+    useEffect(() => {
+        if (globalCallState === 'incoming') {
+            Vibration.vibrate([0, 600, 400, 600], true);
+        } else {
+            Vibration.cancel();
+        }
+        return () => Vibration.cancel();
+    }, [globalCallState]);
+
+    const toggleMute = () => {
+        const track = localAudioStreamRef.current?.getAudioTracks?.()[0];
+        if (track) {
+            track.enabled = !track.enabled;
+            setIsMuted(prev => !prev);
+        }
+    };
+
+    const toggleSpeaker = async () => {
+        try {
+            // eslint-disable-next-line @typescript-eslint/no-var-requires
+            const InCallManager = require('react-native-incall-manager').default;
+            InCallManager.setSpeakerphoneOn(!isSpeaker);
+            setIsSpeaker(prev => !prev);
+        } catch {
+            console.warn('react-native-incall-manager not installed — speaker toggle unavailable');
+        }
+    };
+
+    const cleanupCall = () => {
+        globalPcRef.current?.close();
+        globalPcRef.current = null;
+        localAudioStreamRef.current?.getTracks().forEach((t: any) => t.stop());
+        localAudioStreamRef.current = null;
+        globalStreamRef.current = null;
+        peerSocketIdRef.current = null;
+        setIsMuted(false);
+        setIsSpeaker(false);
+        setGlobalIncomingCall(null);
+    };
+
+    const endGlobalCall = (notifyPeer = true) => {
+        if (notifyPeer && peerSocketIdRef.current) {
+            socketService.getSocket()?.emit('call-end', { to: peerSocketIdRef.current });
+        }
+        cleanupCall();
+        setGlobalCallState('idle');
+    };
+
+    const rejectGlobalCall = () => {
+        if (peerSocketIdRef.current) {
+            socketService.getSocket()?.emit('call-rejected', { to: peerSocketIdRef.current });
+        }
+        cleanupCall();
+        setGlobalCallState('idle');
+    };
+
+    const showDeclined = () => {
+        cleanupCall();
+        setGlobalCallState('declined');
+        setTimeout(() => setGlobalCallState('idle'), 2500);
+    };
+
+    const acceptGlobalCall = async () => {
+        if (!globalIncomingCall) return;
+        try {
+            if (Platform.OS === 'android') {
+                await PermissionsAndroid.request(PermissionsAndroid.PERMISSIONS.RECORD_AUDIO);
+            }
+            const pc: any = new RTCPeerConnection({
+                iceServers: [
+                    { urls: 'stun:stun.l.google.com:19302' },
+                    { urls: 'stun:stun1.l.google.com:19302' },
+                ]
+            });
+            pc.onicecandidate = (e: any) => {
+                if (e.candidate) socketService.getSocket()?.emit('call-ice', { to: globalIncomingCall.from, candidate: e.candidate });
+            };
+            pc.onaddstream = (e: any) => {
+                console.log('🎧 Remote stream received in global call');
+                globalStreamRef.current = e.stream;
+            };
+            pc.ontrack = (e: any) => {
+                if (e.streams?.[0]) globalStreamRef.current = e.streams[0];
+            };
+            const stream = await mediaDevices.getUserMedia({ audio: true, video: false });
+            localAudioStreamRef.current = stream;
+            globalStreamRef.current = stream;
+            if (pc.addStream) {
+                (pc as any).addStream(stream);
+            } else {
+                stream.getTracks().forEach((t: any) => pc.addTrack(t, stream));
+            }
+            await pc.setRemoteDescription(new RTCSessionDescription(globalIncomingCall.offer));
+            const answer = await pc.createAnswer();
+            await pc.setLocalDescription(answer);
+            globalPcRef.current = pc;
+            peerSocketIdRef.current = globalIncomingCall.from;
+            socketService.getSocket()?.emit('answer-call', { to: globalIncomingCall.from, answer });
+            setGlobalCallState('connected');
+        } catch (err) { console.error('❌ Accept call error:', err); }
+    };
 
     useEffect(() => {
         const currentUser = authManager.getCurrentUser();
@@ -307,6 +420,28 @@ function MainTabNavigator({ onLogout, navigation }: MainTabNavigatorProps) {
 
                 const rawSocket = socketService.getSocket();
                 if (rawSocket) {
+                    // Global incoming call listener — works on any screen
+                    rawSocket.off('incoming-call-global');
+                    rawSocket.on('incoming-call', async ({ from, offer }: any) => {
+                        if (!isMounted) return;
+                        setGlobalIncomingCall({ from, offer });
+                        setGlobalCallState('incoming');
+                        notificationService.sendLocalNotification(
+                            '📞 Incoming Call',
+                            'Dispatcher is calling you',
+                            { type: 'incoming_call', from }
+                        );
+                    });
+                    rawSocket.on('call-answered', ({ answer, from }: any) => {
+                        if (from) peerSocketIdRef.current = from;
+                        globalPcRef.current?.setRemoteDescription(new RTCSessionDescription(answer));
+                        setGlobalCallState('connected');
+                    });
+                    rawSocket.on('call-ended', () => endGlobalCall(false));
+                    rawSocket.on('call-rejected', () => showDeclined());
+                    rawSocket.on('call-ice', ({ candidate }: any) => {
+                        globalPcRef.current?.addIceCandidate(new RTCIceCandidate(candidate));
+                    });
                     rawSocket.once('disconnect', (reason: string) => {
                         if (!isMounted) return;
                         setTimeout(() => {
@@ -341,6 +476,65 @@ function MainTabNavigator({ onLogout, navigation }: MainTabNavigatorProps) {
                 </MainTab.Navigator>
             </View>
             <Footer onLogout={onLogout} />
+
+            {/* Global call overlay — visible on ANY screen */}
+            <Modal visible={globalCallState !== 'idle'} transparent animationType="fade">
+                <View style={navStyles.callOverlay}>
+                    {globalCallState === 'declined' ? (
+                        <>
+                            <View style={[navStyles.callAvatar, { backgroundColor: '#ef4444' }]}>
+                                <Ionicons name="call" size={40} color="#fff" style={{ transform: [{ rotate: '135deg' }] }} />
+                            </View>
+                            <Text style={navStyles.callName}>Call Declined</Text>
+                            <Text style={navStyles.callStatus}>The call was not accepted</Text>
+                        </>
+                    ) : (
+                        <>
+                            <View style={navStyles.callAvatar}>
+                                <Text style={navStyles.callAvatarText}>D</Text>
+                            </View>
+                            <Text style={navStyles.callName}>Dispatcher</Text>
+                            <Text style={navStyles.callStatus}>
+                                {globalCallState === 'incoming' ? 'Incoming Call' : '● Connected'}
+                            </Text>
+
+                            {/* Mute + Speaker controls (connected only) */}
+                            {globalCallState === 'connected' && (
+                                <View style={navStyles.controlRow}>
+                                    <TouchableOpacity style={[navStyles.controlBtn, isMuted && navStyles.controlBtnOn]} onPress={toggleMute}>
+                                        <Ionicons name={isMuted ? 'mic-off' : 'mic'} size={22} color="#fff" />
+                                        <Text style={navStyles.controlLabel}>{isMuted ? 'Unmute' : 'Mute'}</Text>
+                                    </TouchableOpacity>
+                                    <TouchableOpacity style={[navStyles.controlBtn, isSpeaker && navStyles.controlBtnOn]} onPress={toggleSpeaker}>
+                                        <Ionicons name={isSpeaker ? 'volume-high' : 'volume-medium'} size={22} color="#fff" />
+                                        <Text style={navStyles.controlLabel}>{isSpeaker ? 'Speaker' : 'Earpiece'}</Text>
+                                    </TouchableOpacity>
+                                </View>
+                            )}
+
+                            <View style={navStyles.callButtons}>
+                                {globalCallState === 'incoming' && (
+                                    <View style={navStyles.callBtnWrap}>
+                                        <TouchableOpacity style={navStyles.acceptBtn} onPress={acceptGlobalCall}>
+                                            <Ionicons name="call" size={28} color="#fff" />
+                                        </TouchableOpacity>
+                                        <Text style={navStyles.callBtnLabel}>Accept</Text>
+                                    </View>
+                                )}
+                                <View style={navStyles.callBtnWrap}>
+                                    <TouchableOpacity
+                                        style={navStyles.rejectBtn}
+                                        onPress={globalCallState === 'incoming' ? rejectGlobalCall : endGlobalCall}
+                                    >
+                                        <Ionicons name="call" size={28} color="#fff" style={{ transform: [{ rotate: '135deg' }] }} />
+                                    </TouchableOpacity>
+                                    <Text style={navStyles.callBtnLabel}>{globalCallState === 'incoming' ? 'Decline' : 'End'}</Text>
+                                </View>
+                            </View>
+                        </>
+                    )}
+                </View>
+            </Modal>
         </View>
     );
 }
@@ -720,6 +914,23 @@ export default function AppNavigator() {
         </RootStack.Navigator>
     );
 }
+
+const navStyles = StyleSheet.create({
+    callOverlay: { flex: 1, backgroundColor: '#1a1a2e', justifyContent: 'center', alignItems: 'center' },
+    callAvatar: { width: 100, height: 100, borderRadius: 50, backgroundColor: '#1976D2', justifyContent: 'center', alignItems: 'center', marginBottom: 20, borderWidth: 3, borderColor: 'rgba(255,255,255,0.3)' },
+    callAvatarText: { color: '#fff', fontSize: 40, fontWeight: '700' },
+    callName: { color: '#fff', fontSize: 26, fontWeight: '700', marginBottom: 8 },
+    callStatus: { color: 'rgba(255,255,255,0.6)', fontSize: 16, marginBottom: 60 },
+    callButtons: { flexDirection: 'row', gap: 40 },
+    callBtnWrap: { alignItems: 'center', gap: 8 },
+    callBtnLabel: { color: '#fff', fontSize: 12 },
+    acceptBtn: { width: 70, height: 70, borderRadius: 35, backgroundColor: '#22c55e', justifyContent: 'center', alignItems: 'center' },
+    rejectBtn: { width: 70, height: 70, borderRadius: 35, backgroundColor: '#ef4444', justifyContent: 'center', alignItems: 'center' },
+    controlRow: { flexDirection: 'row', gap: 20, marginBottom: 32 },
+    controlBtn: { alignItems: 'center', backgroundColor: 'rgba(255,255,255,0.15)', borderRadius: 50, width: 64, height: 64, justifyContent: 'center' },
+    controlBtnOn: { backgroundColor: 'rgba(255,255,255,0.35)' },
+    controlLabel: { color: 'rgba(255,255,255,0.7)', fontSize: 10, marginTop: 4 },
+});
 
 const styles = StyleSheet.create({
     loadingContainer: {

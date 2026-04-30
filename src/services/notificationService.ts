@@ -183,6 +183,8 @@ class NotificationService {
         if (!data) return null;
 
         switch (data.type) {
+            case 'incoming_call':
+                return null; // Global call overlay handles it — no navigation needed
             case 'chat':
             case 'message':
                 return { screen: 'DriverChat' };

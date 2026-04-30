@@ -40,9 +40,11 @@ const DriverChatScreen = () => {
   const scrollViewRef = useRef<ScrollView>(null);
   const typingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const currentUserIdRef = useRef<string | null>(null);
-  const [callState, setCallState] = useState<"idle" | "incoming" | "connected">("idle");
+  const [callState, setCallState] = useState<"idle" | "calling" | "incoming" | "connected" | "declined">("idle");
 const [incomingCall, setIncomingCall] = useState<any>(null);
+const peerSocketRef = useRef<string | null>(null);
 const {
+  startCall,
   handleIncomingCall,
   handleAnswer,
   handleICE,
@@ -267,9 +269,43 @@ const {
           throw new Error(`Authentication failed: ${authError.message}`);
         }
 
-        // Set up listeners (safe to register even before socket fully connected)
+        // Set up chat listeners
         socketService.onNewChatMessage(handleNewMessage);
         socketService.onUserTyping(handleTyping);
+
+        // Set up WebRTC listeners now that socket is connected
+        const socket = socketService.getSocket();
+        if (socket) {
+          socket.on('incoming-call', async ({ from, offer }: any) => {
+            console.log('📞 Incoming call');
+            setIncomingCall({ from, offer });
+            setCallState('incoming');
+            // Local notification so it shows even if screen is off
+            const { notificationService } = await import('../../services/notificationService');
+            notificationService.sendLocalNotification(
+              '📞 Incoming Call',
+              'Dispatcher is calling you',
+              { type: 'incoming_call', from },
+            );
+          });
+          socket.on('call-answered', ({ answer, from }: any) => {
+            console.log('📞 Answer received');
+            if (from) peerSocketRef.current = from;
+            handleAnswer(answer);
+            setCallState('connected');
+          });
+          socket.on('call-ice', ({ candidate }: any) => {
+            handleICE(candidate);
+          });
+          socket.on('call-ended', () => handleEndCall(false));
+          socket.on('call-rejected', () => {
+            endCall();
+            peerSocketRef.current = null;
+            setIncomingCall(null);
+            setCallState('declined');
+            setTimeout(() => setCallState('idle'), 2500);
+          });
+        }
 
         // Wait a bit to ensure authentication is fully processed on backend
         // This gives the backend time to set socketUser
@@ -312,6 +348,12 @@ const {
     return () => {
       socketService.offNewChatMessage(handleNewMessage);
       socketService.offUserTyping(handleTyping);
+      const socket = socketService.getSocket();
+      if (socket) {
+        socket.off('incoming-call');
+        socket.off('call-answered');
+        socket.off('call-ice');
+      }
       // Do NOT call leaveDriverChat here — MainTabNavigator keeps the socket
       // in the driver chat room for global dispatcher message notifications.
     };
@@ -364,7 +406,7 @@ const {
           message: messageText,
           fileUrl: null,
           fileName: null,
-          fileType: null,
+          fileType: undefined,
           fileSize: null,
           readBy: [],
           createdAt: new Date().toISOString(),
@@ -504,58 +546,37 @@ const {
 
   const currentUserId = currentUserIdRef.current;
 
-  useEffect(() => {
-  const socket = socketService.getSocket();
-  if (!socket) return;
+  // WebRTC listeners are registered inside initializeChat after socket connects
 
-  const onIncoming = ({ from, offer }: any) => {
-    console.log("📞 Incoming call");
 
-    setIncomingCall({ from, offer });
-    setCallState("incoming");
-  };
-
-  const onAnswer = ({ answer }: any) => {
-    console.log("📞 Answer received");
-    handleAnswer(answer);
-    setCallState("connected");
-  };
-
-  const onIce = ({ candidate }: any) => {
-    console.log("🧊 ICE received");
-    handleICE(candidate);
-  };
-
-  socket.on("incoming-call", onIncoming);
-  socket.on("call-answered", onAnswer);
-  socket.on("call-ice", onIce);
-
-  return () => {
-    socket.off("incoming-call", onIncoming);
-    socket.off("call-answered", onAnswer);
-    socket.off("call-ice", onIce);
-  };
-}, []);
-
+const handleStartCall = async () => {
+  if (callState !== "idle") return;
+  setCallState("calling");
+  await startCall(driverId);
+};
 
 const acceptCall = async () => {
   if (!incomingCall) return;
-
+  peerSocketRef.current = incomingCall.from;
   await handleIncomingCall(incomingCall.offer, incomingCall.from);
   setCallState("connected");
 };
 
 const rejectCall = () => {
+  if (incomingCall?.from) {
+    socketService.getSocket()?.emit('call-end', { to: incomingCall.from });
+  }
   setIncomingCall(null);
+  peerSocketRef.current = null;
   setCallState("idle");
-
-  socketService.getSocket()?.emit("call-rejected", {
-    to: incomingCall?.from
-  });
 };
 
-const handleEndCall = () => {
+const handleEndCall = (notifyPeer = true) => {
+  if (notifyPeer && peerSocketRef.current) {
+    socketService.getSocket()?.emit('call-end', { to: peerSocketRef.current });
+  }
   endCall();
+  peerSocketRef.current = null;
   setCallState("idle");
   setIncomingCall(null);
 };
@@ -586,6 +607,10 @@ const handleEndCall = () => {
               </View>
             </View>
           </View>
+
+          <TouchableOpacity onPress={handleStartCall} style={styles.callButton} disabled={callState !== "idle"}>
+            <Ionicons name={callState === "calling" ? "call" : "call-outline"} size={22} color={callState === "calling" ? "#4ADE80" : "#fff"} />
+          </TouchableOpacity>
 
         </View>
 
@@ -809,29 +834,42 @@ const handleEndCall = () => {
           </TouchableOpacity>
         </View>
       </KeyboardAvoidingView>
-      {callState === "incoming" && (
+      {(callState === "calling" || callState === "incoming" || callState === "connected" || callState === "declined") && (
   <View style={styles.callOverlay}>
-    <Text style={styles.callText}>Incoming Call</Text>
-
-    <View style={{ flexDirection: "row", gap: 20 }}>
-      <TouchableOpacity onPress={acceptCall} style={styles.acceptBtn}>
-        <Text style={{ color: "#fff" }}>Accept</Text>
-      </TouchableOpacity>
-
-      <TouchableOpacity onPress={rejectCall} style={styles.rejectBtn}>
-        <Text style={{ color: "#fff" }}>Reject</Text>
-      </TouchableOpacity>
-    </View>
-  </View>
-)}
-
-{callState === "connected" && (
-  <View style={styles.callOverlay}>
-    <Text style={styles.callText}>Call Connected</Text>
-
-    <TouchableOpacity onPress={handleEndCall} style={styles.rejectBtn}>
-      <Text style={{ color: "#fff" }}>End Call</Text>
-    </TouchableOpacity>
+    {callState === "declined" ? (
+      <>
+        <View style={[styles.callAvatar, { backgroundColor: '#ef4444' }]}>
+          <Ionicons name="call" size={40} color="#fff" style={{ transform: [{ rotate: "135deg" }] }} />
+        </View>
+        <Text style={styles.callName}>Call Declined</Text>
+        <Text style={styles.callStatusText}>The call was not accepted</Text>
+      </>
+    ) : (
+      <>
+        <View style={styles.callAvatar}>
+          <Text style={styles.callAvatarText}>D</Text>
+        </View>
+        <Text style={styles.callName}>Dispatcher</Text>
+        <Text style={styles.callStatusText}>
+          {callState === "calling" ? "Calling..." : callState === "incoming" ? "Incoming Call" : "● Connected"}
+        </Text>
+        <View style={styles.callButtons}>
+          {callState === "incoming" && (
+            <TouchableOpacity onPress={acceptCall} style={styles.acceptBtn}>
+              <Ionicons name="call" size={28} color="#fff" />
+              <Text style={styles.callBtnLabel}>Accept</Text>
+            </TouchableOpacity>
+          )}
+          <TouchableOpacity
+            onPress={callState === "incoming" ? rejectCall : () => handleEndCall()}
+            style={styles.rejectBtn}
+          >
+            <Ionicons name="call" size={28} color="#fff" style={{ transform: [{ rotate: "135deg" }] }} />
+            <Text style={styles.callBtnLabel}>{callState === "incoming" ? "Decline" : "End"}</Text>
+          </TouchableOpacity>
+        </View>
+      </>
+    )}
   </View>
 )}
     </SafeAreaView>
@@ -1216,35 +1254,77 @@ const styles = StyleSheet.create({
     opacity: 0.45,
     elevation: 0,
   },
+  callButton: {
+    padding: 8,
+    borderRadius: 20,
+    marginLeft: 8,
+  },
   callOverlay: {
-  position: "absolute",
-  top: 0,
-  left: 0,
-  right: 0,
-  bottom: 0,
-  backgroundColor: "rgba(0,0,0,0.9)",
-  justifyContent: "center",
-  alignItems: "center",
-  zIndex: 999,
-},
-
-callText: {
-  color: "#fff",
-  fontSize: 20,
-  marginBottom: 20,
-},
-
-acceptBtn: {
-  backgroundColor: "green",
-  padding: 15,
-  borderRadius: 50,
-},
-
-rejectBtn: {
-  backgroundColor: "red",
-  padding: 15,
-  borderRadius: 50,
-},
+    position: 'absolute',
+    top: 0, left: 0, right: 0, bottom: 0,
+    backgroundColor: '#1a1a2e',
+    justifyContent: 'center',
+    alignItems: 'center',
+    zIndex: 999,
+  },
+  callAvatar: {
+    width: 100,
+    height: 100,
+    borderRadius: 50,
+    backgroundColor: '#1976D2',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 20,
+    borderWidth: 3,
+    borderColor: 'rgba(255,255,255,0.3)',
+  },
+  callAvatarText: {
+    color: '#fff',
+    fontSize: 40,
+    fontWeight: '700',
+  },
+  callName: {
+    color: '#fff',
+    fontSize: 26,
+    fontWeight: '700',
+    marginBottom: 8,
+  },
+  callStatusText: {
+    color: 'rgba(255,255,255,0.6)',
+    fontSize: 16,
+    marginBottom: 60,
+  },
+  callButtons: {
+    flexDirection: 'row',
+    gap: 40,
+  },
+  callText: {
+    color: '#fff',
+    fontSize: 20,
+    marginBottom: 20,
+  },
+  callBtnLabel: {
+    color: '#fff',
+    fontSize: 12,
+    marginTop: 6,
+    textAlign: 'center',
+  },
+  acceptBtn: {
+    alignItems: 'center',
+    backgroundColor: '#22c55e',
+    width: 70,
+    height: 70,
+    borderRadius: 35,
+    justifyContent: 'center',
+  },
+  rejectBtn: {
+    alignItems: 'center',
+    backgroundColor: '#ef4444',
+    width: 70,
+    height: 70,
+    borderRadius: 35,
+    justifyContent: 'center',
+  },
 });
 
 export default DriverChatScreen;
