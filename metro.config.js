@@ -4,64 +4,45 @@ const { getDefaultConfig } = require('expo/metro-config');
 /** @type {import('expo/metro-config').MetroConfig} */
 const config = getDefaultConfig(__dirname);
 
+const webStubs = {
+  'react-native-maps': './src/utils/webMapsStub.js',
+  'react-native-webrtc': './src/utils/webRTCStub.js',
+  'react-native-incall-manager': './src/utils/inCallManagerStub.js',
+};
+
+const resolveWebStub = (moduleName) => {
+  for (const [pkg, stub] of Object.entries(webStubs)) {
+    if (moduleName === pkg || moduleName.startsWith(pkg + '/')) {
+      return require.resolve(stub);
+    }
+  }
+  return null;
+};
+
+const originComesFromStubbed = (originPath) => {
+  return Object.keys(webStubs).some(pkg =>
+    originPath.includes(`node_modules/${pkg}`) || originPath.includes(pkg)
+  );
+};
+
 // Store original resolveRequest if it exists
 const originalResolveRequest = config.resolver?.resolveRequest;
 
-// Only customize resolver if we need to handle react-native-maps for web
-if (originalResolveRequest) {
-  config.resolver = {
-    ...config.resolver,
-    resolveRequest: (context, moduleName, platform) => {
-      // On web, redirect react-native-maps and ALL its sub-modules to web stub
-      if (platform === 'web') {
-        // Check if it's react-native-maps or any sub-path
-        if (moduleName === 'react-native-maps' || 
-            moduleName.startsWith('react-native-maps/') ||
-            moduleName.includes('react-native-maps')) {
-          return {
-            filePath: require.resolve('./src/utils/webMapsStub.js'),
-            type: 'sourceFile',
-          };
-        }
-        // Check if the import originated from react-native-maps package
-        const originPath = context.originModulePath || '';
-        if (originPath && (
-          originPath.includes('node_modules/react-native-maps') ||
-          originPath.includes('react-native-maps')
-        )) {
-          return {
-            filePath: require.resolve('./src/utils/webMapsStub.js'),
-            type: 'sourceFile',
-          };
-        }
-        // Handle nested imports from react-native-maps (like MapMarkerNativeComponent)
-        if (moduleName.includes('codegenNativeCommands') && originPath && originPath.includes('react-native-maps')) {
-          return {
-            filePath: require.resolve('./src/utils/webMapsStub.js'),
-            type: 'sourceFile',
-          };
-        }
-      }
-      // For all other cases, use default resolution
-      return originalResolveRequest(context, moduleName, platform);
-    },
-  };
-} else {
-  // Fallback if originalResolveRequest doesn't exist
-  config.resolver = {
-    ...config.resolver,
-    resolveRequest: (context, moduleName, platform) => {
-      if (platform === 'web' && moduleName === 'react-native-maps') {
-        return {
-          filePath: require.resolve('./src/utils/webMapsStub.js'),
-          type: 'sourceFile',
-        };
-      }
-      // Use default Metro resolver
-      return context.resolveRequest(context, moduleName, platform);
-    },
-  };
-}
+const webResolver = (context, moduleName, platform) => {
+  if (platform === 'web') {
+    const stub = resolveWebStub(moduleName);
+    if (stub) return { filePath: stub, type: 'sourceFile' };
+
+    const originPath = context.originModulePath || '';
+    if (originPath && originComesFromStubbed(originPath)) {
+      return { filePath: require.resolve('./src/utils/webMapsStub.js'), type: 'sourceFile' };
+    }
+  }
+  if (originalResolveRequest) return originalResolveRequest(context, moduleName, platform);
+  return context.resolveRequest(context, moduleName, platform);
+};
+
+config.resolver = { ...config.resolver, resolveRequest: webResolver };
 
 // Suppress the expo-platform error by providing a default platform
 config.server = {

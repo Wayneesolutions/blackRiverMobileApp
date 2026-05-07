@@ -1,9 +1,9 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import {
   View,
   Text,
   StyleSheet,
-  ScrollView,
+  FlatList,
   TextInput,
   TouchableOpacity,
   ActivityIndicator,
@@ -12,6 +12,8 @@ import {
   Platform,
   Image,
   Linking,
+  Vibration,
+  Modal,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -24,6 +26,7 @@ import { logger } from '../../utils/loggerHelper';
 import { authManager } from '../../types/AuthManager';
 import { apiService } from '../../services/api/apiService';
 import { useRNWebRTC } from '../../hooks/useWebRTC';
+import { useCallMiniBar, forceHideMiniBar } from '../../contexts/CallMiniBarContext';
 // ─── Global Theme ─────────────────────────────────────────────────────────────
 import { COLORS, SPACING, RADIUS, FONT_SIZE, FONT_WEIGHT, SHADOWS } from '../../theme';
 const DriverChatScreen = () => {
@@ -37,19 +40,53 @@ const DriverChatScreen = () => {
   const [sending, setSending] = useState(false);
   const [selectedFile, setSelectedFile] = useState<any>(null);
   const [typingUsers, setTypingUsers] = useState<Set<string>>(new Set());
-  const scrollViewRef = useRef<ScrollView>(null);
-  const typingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const flatListRef = useRef<FlatList<any>>(null);
+  const typingTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const currentUserIdRef = useRef<string | null>(null);
   const [callState, setCallState] = useState<"idle" | "calling" | "incoming" | "connected" | "declined">("idle");
-const [incomingCall, setIncomingCall] = useState<any>(null);
-const peerSocketRef = useRef<string | null>(null);
-const {
-  startCall,
-  handleIncomingCall,
-  handleAnswer,
-  handleICE,
-  endCall
-} = useRNWebRTC();
+  const [incomingCall, setIncomingCall] = useState<any>(null);
+  const [isMuted, setIsMuted] = useState(false);
+  const [audioOutput, setAudioOutput] = useState<'earpiece' | 'speaker' | 'bluetooth'>('earpiece');
+  const [showAudioPicker, setShowAudioPicker] = useState(false);
+  const [isMinimized, setIsMinimized] = useState(false);
+  const [callSeconds, setCallSeconds] = useState(0);
+  const peerSocketRef = useRef<string | null>(null);
+  const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const {
+    startCall,
+    handleIncomingCall,
+    handleAnswer,
+    handleICE,
+    endCall,
+    localStreamRef,
+    updateICETarget,
+  } = useRNWebRTC();
+
+  const { showMiniBar, updateMiniBar, hideMiniBar } = useCallMiniBar();
+
+  // Show/hide global mini bar when outgoing call is minimized
+  useEffect(() => {
+    if (callState === 'connected' && isMinimized) {
+      showMiniBar({
+        seconds: callSeconds,
+        isMuted,
+        callerLabel: 'Dispatcher',
+        onEnd: () => handleEndCall(),
+        onToggleMute: toggleMute,
+        onExpand: () => setIsMinimized(false),
+      });
+    } else {
+      hideMiniBar();
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [callState, isMinimized]);
+
+  useEffect(() => {
+    if (callState === 'connected' && isMinimized) {
+      updateMiniBar({ seconds: callSeconds, isMuted });
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [callSeconds, isMuted]);
 
   // Normalize message format from API or socket
   const normalizeMessage = (message: any): ChatMessage => {
@@ -89,14 +126,15 @@ const {
       logger.info('Driver chat messages API response', {
         success: response.success,
         hasData: !!response.data,
-        messagesCount: response.data?.messages?.length || response.data?.data?.messages?.length || 0
+        messagesCount: response.data?.messages?.length || (response.data as any)?.data?.messages?.length || 0
       });
 
       // Handle nested response structure
       let messagesArray: any[] = [];
       if (response.success && response.data) {
-        if (response.data.data && response.data.data.messages) {
-          messagesArray = response.data.data.messages;
+        const rd = response.data as any;
+        if (rd.data && rd.data.messages) {
+          messagesArray = rd.data.messages;
         } else if (response.data.messages) {
           messagesArray = response.data.messages;
         } else if (Array.isArray(response.data)) {
@@ -122,7 +160,7 @@ const {
   // Scroll to bottom
   const scrollToBottom = () => {
     setTimeout(() => {
-      scrollViewRef.current?.scrollToEnd({ animated: true });
+      flatListRef.current?.scrollToEnd({ animated: true });
     }, 100);
   };
 
@@ -273,38 +311,20 @@ const {
         socketService.onNewChatMessage(handleNewMessage);
         socketService.onUserTyping(handleTyping);
 
-        // Set up WebRTC listeners now that socket is connected
+        // Set up WebRTC listeners for OUTGOING calls initiated from this screen.
+        // incoming-call is handled globally by AppNavigator — do NOT register it here.
         const socket = socketService.getSocket();
         if (socket) {
-          socket.on('incoming-call', async ({ from, offer }: any) => {
-            console.log('📞 Incoming call');
-            setIncomingCall({ from, offer });
-            setCallState('incoming');
-            // Local notification so it shows even if screen is off
-            const { notificationService } = await import('../../services/notificationService');
-            notificationService.sendLocalNotification(
-              '📞 Incoming Call',
-              'Dispatcher is calling you',
-              { type: 'incoming_call', from },
-            );
-          });
-          socket.on('call-answered', ({ answer, from }: any) => {
-            console.log('📞 Answer received');
-            if (from) peerSocketRef.current = from;
-            handleAnswer(answer);
-            setCallState('connected');
-          });
-          socket.on('call-ice', ({ candidate }: any) => {
-            handleICE(candidate);
-          });
-          socket.on('call-ended', () => handleEndCall(false));
-          socket.on('call-rejected', () => {
-            endCall();
-            peerSocketRef.current = null;
-            setIncomingCall(null);
-            setCallState('declined');
-            setTimeout(() => setCallState('idle'), 2500);
-          });
+          // Remove stale listeners from a previous mount before adding fresh ones
+          socket.off('call-answered', onCallAnswered);
+          socket.off('call-ice', onCallIce);
+          socket.off('call-ended', onCallEnded);
+          socket.off('call-rejected', onCallRejected);
+
+          socket.on('call-answered', onCallAnswered);
+          socket.on('call-ice', onCallIce);
+          socket.on('call-ended', onCallEnded);
+          socket.on('call-rejected', onCallRejected);
         }
 
         // Wait a bit to ensure authentication is fully processed on backend
@@ -344,17 +364,20 @@ const {
 
     initializeChat();
 
-    // Cleanup
+    // Cleanup — only remove the specific callbacks this screen owns.
+    // NEVER call socket.off('incoming-call') here: that listener belongs to
+    // AppNavigator and removing it would silently kill incoming call alerts.
     return () => {
       socketService.offNewChatMessage(handleNewMessage);
       socketService.offUserTyping(handleTyping);
       const socket = socketService.getSocket();
       if (socket) {
-        socket.off('incoming-call');
-        socket.off('call-answered');
-        socket.off('call-ice');
+        socket.off('call-answered', onCallAnswered);
+        socket.off('call-ice', onCallIce);
+        socket.off('call-ended', onCallEnded);
+        socket.off('call-rejected', onCallRejected);
       }
-      // Do NOT call leaveDriverChat here — MainTabNavigator keeps the socket
+      // Do NOT call leaveDriverChat here — AppNavigator keeps the socket
       // in the driver chat room for global dispatcher message notifications.
     };
   }, [driverId]);
@@ -404,10 +427,10 @@ const {
           senderType: 'driver',
           senderName: currentUser?.name || 'You',
           message: messageText,
-          fileUrl: null,
-          fileName: null,
+          fileUrl: undefined,
+          fileName: undefined,
           fileType: undefined,
-          fileSize: null,
+          fileSize: undefined,
           readBy: [],
           createdAt: new Date().toISOString(),
           updatedAt: new Date().toISOString(),
@@ -546,40 +569,371 @@ const {
 
   const currentUserId = currentUserIdRef.current;
 
-  // WebRTC listeners are registered inside initializeChat after socket connects
+  // Stable named callbacks so cleanup can remove the exact same handler reference.
+  // Defined as refs so they're always current without needing deps arrays.
+  const onCallAnswered = useRef(({ answer, from }: any) => {
+    if (from) {
+      peerSocketRef.current = from;
+      updateICETarget(from); // redirect buffered + future ICE to dispatcher's real socket ID
+    }
+    handleAnswer(answer);
+    setCallState('connected');
+  }).current;
 
+  const onCallIce = useRef(({ candidate }: any) => {
+    handleICE(candidate);
+  }).current;
 
-const handleStartCall = async () => {
-  if (callState !== "idle") return;
-  setCallState("calling");
-  await startCall(driverId);
-};
+  const onCallEnded = useRef(() => {
+    forceHideMiniBar(); // imperative — bypasses stale closure around handleEndCall
+    handleEndCall(false);
+  }).current;
 
-const acceptCall = async () => {
-  if (!incomingCall) return;
-  peerSocketRef.current = incomingCall.from;
-  await handleIncomingCall(incomingCall.offer, incomingCall.from);
-  setCallState("connected");
-};
+  const onCallRejected = useRef(() => {
+    forceHideMiniBar();
+    postCallRecord('declined');
+    callStartTimeRef.current = null;
+    endCall();
+    peerSocketRef.current = null;
+    setIncomingCall(null);
+    setIsMuted(false);
+    setIsMinimized(false);
+    setCallState('declined');
+    setTimeout(() => setCallState('idle'), 2500);
+  }).current;
 
-const rejectCall = () => {
-  if (incomingCall?.from) {
-    socketService.getSocket()?.emit('call-end', { to: incomingCall.from });
-  }
-  setIncomingCall(null);
-  peerSocketRef.current = null;
-  setCallState("idle");
-};
+  const callStartTimeRef = useRef<number | null>(null);
+  const callStateRef     = useRef(callState);
+  useEffect(() => { callStateRef.current = callState; }, [callState]);
 
-const handleEndCall = (notifyPeer = true) => {
-  if (notifyPeer && peerSocketRef.current) {
-    socketService.getSocket()?.emit('call-end', { to: peerSocketRef.current });
-  }
-  endCall();
-  peerSocketRef.current = null;
-  setCallState("idle");
-  setIncomingCall(null);
-};
+  const postCallRecord = (type: 'ended' | 'cancelled' | 'declined', durationSecs = 0, initiatedBy: 'driver' | 'dispatcher' = 'driver') => {
+    if (!driverId) return;
+    const msg = JSON.stringify({ __callRecord: true, type, duration: durationSecs, initiatedBy });
+    chatService.sendDriverChatMessage(driverId, msg).catch(() => {});
+  };
+
+  const formatCallTime = (s: number) =>
+    `${String(Math.floor(s / 60)).padStart(2, '0')}:${String(s % 60).padStart(2, '0')}`;
+
+  // Timer — counts while connected; also captures start time for call records
+  useEffect(() => {
+    if (callState === 'connected') {
+      callStartTimeRef.current = Date.now();
+      setCallSeconds(0);
+      timerRef.current = setInterval(() => setCallSeconds(p => p + 1), 1000);
+    } else {
+      if (timerRef.current) { clearInterval(timerRef.current); timerRef.current = null; }
+      setCallSeconds(0);
+    }
+    return () => { if (timerRef.current) clearInterval(timerRef.current); };
+  }, [callState]);
+
+  // Vibration + audio ring for incoming / ringback for outgoing
+  useEffect(() => {
+    const tryICM = (fn: (m: any) => void) => {
+      try { fn(require('react-native-incall-manager').default); } catch {}
+    };
+    if (callState === 'incoming') {
+      Vibration.vibrate([0, 600, 400, 600], true);
+      tryICM(m => { m.start({ media: 'audio', auto: false }); m.startRingtone('_DEFAULT_'); });
+    } else if (callState === 'calling') {
+      tryICM(m => { m.start({ media: 'audio', auto: false }); m.startRingback('_DTMF_'); });
+    } else if (callState === 'connected') {
+      Vibration.cancel();
+      // Start AEC session and default to earpiece (Android can default to speaker without this)
+      tryICM(m => {
+        m.stopRingtone(); m.stopRingback();
+        m.start({ media: 'audio', auto: false });
+        m.setSpeakerphoneOn(false);
+        if (Platform.OS === 'android') { try { m.chooseAudioRoute?.('EARPIECE'); } catch {} }
+      });
+    } else {
+      Vibration.cancel();
+      tryICM(m => { m.stopRingtone(); m.stopRingback(); });
+      if (callState === 'idle') tryICM(m => m.stop());
+    }
+    return () => {
+      Vibration.cancel();
+      tryICM(m => { m.stopRingtone(); m.stopRingback(); });
+    };
+  }, [callState]);
+
+  const toggleMute = () => {
+    const track = localStreamRef.current?.getAudioTracks?.()[0];
+    if (track) { track.enabled = !track.enabled; }
+    setIsMuted(p => !p);
+  };
+
+  const selectAudioOutput = (output: 'earpiece' | 'speaker' | 'bluetooth') => {
+    try {
+      const ICM = require('react-native-incall-manager').default;
+      if (output === 'speaker') {
+        ICM.setSpeakerphoneOn(true);
+      } else if (output === 'earpiece') {
+        ICM.setSpeakerphoneOn(false);
+        // Android needs an explicit route; iOS honours setSpeakerphoneOn(false) alone
+        if (Platform.OS === 'android') {
+          try { ICM.chooseAudioRoute?.('EARPIECE'); } catch {}
+        }
+      } else if (output === 'bluetooth') {
+        ICM.setSpeakerphoneOn(false);
+        try { ICM.chooseAudioRoute?.('BLUETOOTH_HEADSET'); } catch {}
+      }
+    } catch {}
+    setAudioOutput(output);
+    setShowAudioPicker(false);
+  };
+
+  const handleStartCall = async () => {
+    if (callState !== "idle") return;
+    setCallState("calling");
+    await startCall(driverId);
+  };
+
+  const acceptCall = async () => {
+    if (!incomingCall) return;
+    Vibration.cancel();
+    peerSocketRef.current = incomingCall.from;
+    await handleIncomingCall(incomingCall.offer, incomingCall.from);
+    setCallState("connected");
+  };
+
+  const rejectCall = () => {
+    Vibration.cancel();
+    if (incomingCall?.from) {
+      socketService.getSocket()?.emit('call-rejected', { to: incomingCall.from });
+    }
+    setIncomingCall(null);
+    peerSocketRef.current = null;
+    setIsMuted(false);
+    setIsMinimized(false);
+    setCallState("idle");
+  };
+
+  const handleEndCall = (notifyPeer = true) => {
+    Vibration.cancel();
+    hideMiniBar();
+    // Post call record (driver is always the caller in this screen)
+    const cs  = callStateRef.current;
+    const dur = callStartTimeRef.current
+      ? Math.floor((Date.now() - callStartTimeRef.current) / 1000) : 0;
+    if (cs === 'connected') postCallRecord('ended', dur);
+    else if (cs === 'calling' && notifyPeer) postCallRecord('cancelled');
+    callStartTimeRef.current = null;
+    if (notifyPeer) {
+      if (peerSocketRef.current) {
+        socketService.getSocket()?.emit('call-end', { to: peerSocketRef.current });
+      } else if (cs === 'calling') {
+        // Call was never answered — dispatcher's socket ID is unknown.
+        // Server will route to the company dispatcher room via cancelRinging flag.
+        socketService.getSocket()?.emit('call-end', { cancelRinging: true });
+      }
+    }
+    endCall();
+    peerSocketRef.current = null;
+    setIsMuted(false);
+    setIsMinimized(false);
+    setCallState("idle");
+    setIncomingCall(null);
+  };
+
+  // Precompute per-message display metadata so renderItem doesn't need array index lookups
+  const messagesWithMeta = useMemo(() =>
+    messages.map((message, index) => ({
+      message,
+      prevSenderId: index > 0 ? messages[index - 1].senderId._id : null,
+      nextSenderId: index < messages.length - 1 ? messages[index + 1].senderId._id : null,
+      prevCreatedAt: index > 0 ? messages[index - 1].createdAt : null,
+      isLast: index === messages.length - 1,
+    })), [messages]);
+
+  const renderMessageItem = useCallback(({ item }: { item: (typeof messagesWithMeta)[0] }) => {
+    const { message, prevSenderId, nextSenderId, prevCreatedAt, isLast } = item;
+
+    // Call record pill
+    if (message.message?.startsWith('{"__callRecord"')) {
+      let rec: any = null;
+      try { rec = JSON.parse(message.message); } catch {}
+      if (rec?.__callRecord) {
+        const dur = rec.duration || 0;
+        const durStr = dur > 0
+          ? `${String(Math.floor(dur / 60)).padStart(2, '0')}:${String(dur % 60).padStart(2, '0')}`
+          : '';
+        const byDriver     = rec.initiatedBy === 'driver';
+        const byDispatcher = rec.initiatedBy === 'dispatcher';
+        let label = '';
+        let iconName: any = 'call-outline';
+        let color = '#6b7280';
+        let bgColor = 'rgba(107,114,128,0.12)';
+        if (rec.type === 'ended') {
+          label = byDriver ? `Outgoing call${durStr ? ' · ' + durStr : ''}` : byDispatcher ? `Incoming call${durStr ? ' · ' + durStr : ''}` : `Call ended${durStr ? ' · ' + durStr : ''}`;
+          iconName = byDriver ? 'arrow-up-circle-outline' : 'arrow-down-circle-outline';
+          color = '#16a34a'; bgColor = 'rgba(22,163,74,0.12)';
+        } else if (rec.type === 'cancelled') {
+          label = byDriver ? 'You cancelled' : byDispatcher ? 'Dispatcher cancelled' : 'Call cancelled';
+          iconName = 'close-circle-outline';
+          color = '#6b7280'; bgColor = 'rgba(107,114,128,0.12)';
+        } else if (rec.type === 'declined') {
+          label = byDriver ? 'Dispatcher declined' : byDispatcher ? 'You declined' : 'Call declined';
+          iconName = 'call-outline';
+          color = '#ef4444'; bgColor = 'rgba(239,68,68,0.12)';
+        } else {
+          label = 'Missed call';
+          iconName = 'call-outline';
+          color = '#ef4444'; bgColor = 'rgba(239,68,68,0.12)';
+        }
+        const timeStr = new Date(message.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+        return (
+          <View style={{ alignItems: 'center', marginVertical: 8 }}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 14, paddingVertical: 6, borderRadius: 20, backgroundColor: bgColor, borderWidth: 1, borderColor: color + '33' }}>
+              <Ionicons name={iconName} size={13} color={color} />
+              <Text style={{ fontSize: 12, color, fontWeight: '600', letterSpacing: 0.1 }}>{label}</Text>
+            </View>
+            <Text style={{ fontSize: 10, color: '#6b7280', marginTop: 3 }}>{timeStr}</Text>
+          </View>
+        );
+      }
+    }
+
+    const isRightSide = message.senderType === 'driver';
+    const showAvatar = !prevSenderId || prevSenderId !== message.senderId._id;
+    const isLastInGroup = isLast || nextSenderId !== message.senderId._id;
+    const showDateSep = shouldShowDateSeparator(message, prevCreatedAt ? { createdAt: prevCreatedAt } as any : undefined);
+    const tick = getTickIcon(message);
+
+    return (
+      <React.Fragment>
+        {showDateSep && (
+          <View style={styles.dateSeparator}>
+            <View style={styles.dateSeparatorLine} />
+            <Text style={styles.dateSeparatorText}>{formatDateLabel(message.createdAt)}</Text>
+            <View style={styles.dateSeparatorLine} />
+          </View>
+        )}
+        <View
+          style={[
+            styles.messageWrapper,
+            isRightSide ? styles.messageWrapperRight : styles.messageWrapperLeft,
+            !isLastInGroup && { marginBottom: 2 },
+          ]}
+        >
+          {!isRightSide && showAvatar && (
+            <View style={styles.avatar}>
+              <Text style={styles.avatarText}>
+                {(message.senderName || 'D').charAt(0).toUpperCase()}
+              </Text>
+            </View>
+          )}
+          {!isRightSide && !showAvatar && <View style={styles.avatarPlaceholder} />}
+
+          <View
+            style={[
+              styles.messageBubble,
+              isRightSide ? styles.messageBubbleRight : styles.messageBubbleLeft,
+              isRightSide && isLastInGroup && styles.bubbleTailRight,
+              !isRightSide && isLastInGroup && styles.bubbleTailLeft,
+            ]}
+          >
+            {!isRightSide && showAvatar && (
+              <Text style={styles.senderName}>{message.senderName}</Text>
+            )}
+            {message.message ? (
+              <Text
+                style={[
+                  styles.messageText,
+                  isRightSide ? styles.messageTextRight : styles.messageTextLeft,
+                ]}
+              >
+                {message.message}
+              </Text>
+            ) : null}
+            {message.fileUrl && (
+              <TouchableOpacity
+                onPress={() => handleOpenFile(message.fileUrl!, message._id)}
+                style={[
+                  styles.fileButton,
+                  isRightSide ? styles.fileButtonRight : styles.fileButtonLeft,
+                ]}
+              >
+                <Ionicons
+                  name={message.fileType === 'image' ? 'image' : 'document'}
+                  size={20}
+                  color={isRightSide ? '#fff' : '#8B5CF6'}
+                />
+                <Text
+                  style={[
+                    styles.fileName,
+                    isRightSide ? styles.fileNameRight : styles.fileNameLeft,
+                  ]}
+                >
+                  {message.fileName || 'File'}
+                </Text>
+                {message.fileSize && (
+                  <Text
+                    style={[
+                      styles.fileSize,
+                      isRightSide ? styles.fileSizeRight : styles.fileSizeLeft,
+                    ]}
+                  >
+                    {formatFileSize(message.fileSize)}
+                  </Text>
+                )}
+              </TouchableOpacity>
+            )}
+            <View style={[styles.messageFooter, isRightSide && styles.messageFooterRight]}>
+              <Text
+                style={[
+                  styles.messageTime,
+                  isRightSide ? styles.messageTimeRight : styles.messageTimeLeft,
+                ]}
+              >
+                {formatTime(message.createdAt)}
+              </Text>
+              {tick && (
+                <Ionicons
+                  name={tick.name}
+                  size={14}
+                  color={tick.color}
+                  style={styles.tickIcon}
+                />
+              )}
+            </View>
+          </View>
+        </View>
+      </React.Fragment>
+    );
+  }, []);
+
+  const listEmptyComponent = loading ? (
+    <View style={styles.loadingContainer}>
+      <ActivityIndicator size="large" color={COLORS.accentNavyBlue} />
+      <Text style={styles.loadingText}>Loading messages...</Text>
+    </View>
+  ) : (
+    <View style={styles.emptyContainer}>
+      <Ionicons name="chatbubbles-outline" size={64} color={COLORS.accentNavyBlue} />
+      <Text style={styles.emptyText}>No messages yet</Text>
+      <Text style={styles.emptySubtext}>Start the conversation with your dispatcher!</Text>
+    </View>
+  );
+
+  const listFooterComponent = typingUsers.size > 0 ? (
+    <View style={[styles.messageWrapper, styles.messageWrapperLeft]}>
+      <View style={styles.avatar}>
+        <Text style={styles.avatarText}>D</Text>
+      </View>
+      <View style={[styles.messageBubble, styles.messageBubbleLeft]}>
+        <View style={styles.typingIndicator}>
+          <View style={styles.typingDot} />
+          <View style={styles.typingDot} />
+          <View style={styles.typingDot} />
+        </View>
+        <Text style={styles.typingText}>
+          {Array.from(typingUsers).join(', ')} typing...
+        </Text>
+      </View>
+    </View>
+  ) : null;
 
   return (
     <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
@@ -615,161 +969,22 @@ const handleEndCall = (notifyPeer = true) => {
         </View>
 
         {/* Messages Container */}
-        <ScrollView
-          ref={scrollViewRef}
+        <FlatList
+          ref={flatListRef}
+          data={messagesWithMeta}
+          keyExtractor={(item) => item.message._id}
+          renderItem={renderMessageItem}
           style={styles.messagesContainer}
-          contentContainerStyle={styles.messagesContent}
-          onContentSizeChange={() => scrollToBottom()}
-        >
-          {loading ? (
-            <View style={styles.loadingContainer}>
-              <ActivityIndicator size="large" color={COLORS.accentNavyBlue} />
-              <Text style={styles.loadingText}>Loading messages...</Text>
-            </View>
-          ) : messages.length === 0 ? (
-            <View style={styles.emptyContainer}>
-              <Ionicons name="chatbubbles-outline" size={64} color={COLORS.accentNavyBlue} />
-              <Text style={styles.emptyText}>No messages yet</Text>
-              <Text style={styles.emptySubtext}>Start the conversation with your dispatcher!</Text>
-            </View>
-          ) : (
-            messages.map((message, index) => {
-              const isRightSide = message.senderType === 'driver';
-              const prevMessage = index > 0 ? messages[index - 1] : undefined;
-              const showAvatar = !prevMessage || prevMessage.senderId._id !== message.senderId._id;
-              const isLastInGroup = index === messages.length - 1 || messages[index + 1].senderId._id !== message.senderId._id;
-              const showDateSep = shouldShowDateSeparator(message, prevMessage);
-              const tick = getTickIcon(message);
-
-              return (
-                <React.Fragment key={message._id}>
-                  {/* Date Separator */}
-                  {showDateSep && (
-                    <View style={styles.dateSeparator}>
-                      <View style={styles.dateSeparatorLine} />
-                      <Text style={styles.dateSeparatorText}>{formatDateLabel(message.createdAt)}</Text>
-                      <View style={styles.dateSeparatorLine} />
-                    </View>
-                  )}
-
-                  <View
-                    style={[
-                      styles.messageWrapper,
-                      isRightSide ? styles.messageWrapperRight : styles.messageWrapperLeft,
-                      !isLastInGroup && { marginBottom: 2 },
-                    ]}
-                  >
-                    {!isRightSide && showAvatar && (
-                      <View style={styles.avatar}>
-                        <Text style={styles.avatarText}>
-                          {(message.senderName || 'D').charAt(0).toUpperCase()}
-                        </Text>
-                      </View>
-                    )}
-                    {!isRightSide && !showAvatar && <View style={styles.avatarPlaceholder} />}
-
-                    <View
-                      style={[
-                        styles.messageBubble,
-                        isRightSide ? styles.messageBubbleRight : styles.messageBubbleLeft,
-                        isRightSide && isLastInGroup && styles.bubbleTailRight,
-                        !isRightSide && isLastInGroup && styles.bubbleTailLeft,
-                      ]}
-                    >
-                      {!isRightSide && showAvatar && (
-                        <Text style={styles.senderName}>{message.senderName}</Text>
-                      )}
-
-                      {message.message ? (
-                        <Text
-                          style={[
-                            styles.messageText,
-                            isRightSide ? styles.messageTextRight : styles.messageTextLeft,
-                          ]}
-                        >
-                          {message.message}
-                        </Text>
-                      ) : null}
-
-                      {message.fileUrl && (
-                        <TouchableOpacity
-                          onPress={() => handleOpenFile(message.fileUrl!, message._id)}
-                          style={[
-                            styles.fileButton,
-                            isRightSide ? styles.fileButtonRight : styles.fileButtonLeft,
-                          ]}
-                        >
-                          <Ionicons
-                            name={message.fileType === 'image' ? 'image' : 'document'}
-                            size={20}
-                            color={isRightSide ? '#fff' : '#8B5CF6'}
-                          />
-                          <Text
-                            style={[
-                              styles.fileName,
-                              isRightSide ? styles.fileNameRight : styles.fileNameLeft,
-                            ]}
-                          >
-                            {message.fileName || 'File'}
-                          </Text>
-                          {message.fileSize && (
-                            <Text
-                              style={[
-                                styles.fileSize,
-                                isRightSide ? styles.fileSizeRight : styles.fileSizeLeft,
-                              ]}
-                            >
-                              {formatFileSize(message.fileSize)}
-                            </Text>
-                          )}
-                        </TouchableOpacity>
-                      )}
-
-                      {/* Time + Ticks row */}
-                      <View style={[styles.messageFooter, isRightSide && styles.messageFooterRight]}>
-                        <Text
-                          style={[
-                            styles.messageTime,
-                            isRightSide ? styles.messageTimeRight : styles.messageTimeLeft,
-                          ]}
-                        >
-                          {formatTime(message.createdAt)}
-                        </Text>
-                        {tick && (
-                          <Ionicons
-                            name={tick.name}
-                            size={14}
-                            color={tick.color}
-                            style={styles.tickIcon}
-                          />
-                        )}
-                      </View>
-                    </View>
-                  </View>
-                </React.Fragment>
-              );
-            })
-          )}
-
-          {/* Typing Indicator */}
-          {typingUsers.size > 0 && (
-            <View style={[styles.messageWrapper, styles.messageWrapperLeft]}>
-              <View style={styles.avatar}>
-                <Text style={styles.avatarText}>D</Text>
-              </View>
-              <View style={[styles.messageBubble, styles.messageBubbleLeft]}>
-                <View style={styles.typingIndicator}>
-                  <View style={styles.typingDot} />
-                  <View style={[styles.typingDot, { animationDelay: '150ms' }]} />
-                  <View style={[styles.typingDot, { animationDelay: '300ms' }]} />
-                </View>
-                <Text style={styles.typingText}>
-                  {Array.from(typingUsers).join(', ')} typing...
-                </Text>
-              </View>
-            </View>
-          )}
-        </ScrollView>
+          contentContainerStyle={messagesWithMeta.length === 0 ? styles.messagesContentEmpty : styles.messagesContent}
+          ListEmptyComponent={listEmptyComponent}
+          ListFooterComponent={listFooterComponent}
+          extraData={messages}
+          removeClippedSubviews={true}
+          initialNumToRender={20}
+          maxToRenderPerBatch={10}
+          windowSize={10}
+          onContentSizeChange={() => flatListRef.current?.scrollToEnd({ animated: false })}
+        />
 
         {/* File Preview */}
         {selectedFile && (
@@ -834,46 +1049,121 @@ const handleEndCall = (notifyPeer = true) => {
           </TouchableOpacity>
         </View>
       </KeyboardAvoidingView>
-      {(callState === "calling" || callState === "incoming" || callState === "connected" || callState === "declined") && (
-  <View style={styles.callOverlay}>
-    {callState === "declined" ? (
-      <>
-        <View style={[styles.callAvatar, { backgroundColor: '#ef4444' }]}>
-          <Ionicons name="call" size={40} color="#fff" style={{ transform: [{ rotate: "135deg" }] }} />
-        </View>
-        <Text style={styles.callName}>Call Declined</Text>
-        <Text style={styles.callStatusText}>The call was not accepted</Text>
-      </>
-    ) : (
-      <>
-        <View style={styles.callAvatar}>
-          <Text style={styles.callAvatarText}>D</Text>
-        </View>
-        <Text style={styles.callName}>Dispatcher</Text>
-        <Text style={styles.callStatusText}>
-          {callState === "calling" ? "Calling..." : callState === "incoming" ? "Incoming Call" : "● Connected"}
-        </Text>
-        <View style={styles.callButtons}>
-          {callState === "incoming" && (
-            <TouchableOpacity onPress={acceptCall} style={styles.acceptBtn}>
-              <Ionicons name="call" size={28} color="#fff" />
-              <Text style={styles.callBtnLabel}>Accept</Text>
-            </TouchableOpacity>
+      {/* ── Full call overlay — Modal so it persists above all screens ─────── */}
+      <Modal
+        visible={callState === 'calling' || callState === 'incoming' || (callState === 'connected' && !isMinimized) || callState === 'declined'}
+        transparent={false}
+        animationType="slide"
+        statusBarTranslucent={true}
+      >
+        <View style={csStyles.overlay}>
+          {callState === 'declined' ? (
+            <View style={csStyles.center}>
+              <View style={[csStyles.avatar, { backgroundColor: '#ef4444', borderColor: 'rgba(239,68,68,0.4)' }]}>
+                <Ionicons name="call" size={40} color="#fff" style={{ transform: [{ rotate: '135deg' }] }} />
+              </View>
+              <Text style={csStyles.name}>Call Declined</Text>
+              <Text style={csStyles.status}>The call was not accepted</Text>
+            </View>
+          ) : (
+            <>
+              {/* Top bar */}
+              <View style={csStyles.topBar}>
+                <View style={{ width: 36 }} />
+                <Text style={csStyles.topLabel}>
+                  {callState === 'incoming' ? 'Incoming Call' : callState === 'connected' ? 'On Call' : 'Calling...'}
+                </Text>
+                {callState === 'connected' ? (
+                  <TouchableOpacity onPress={() => setIsMinimized(true)} style={csStyles.iconBtn}>
+                    <Ionicons name="chevron-down" size={20} color="rgba(255,255,255,0.7)" />
+                  </TouchableOpacity>
+                ) : <View style={{ width: 36 }} />}
+              </View>
+
+              {/* Center */}
+              <View style={csStyles.center}>
+                <View style={[csStyles.avatar, callState === 'incoming' && { borderColor: '#22c55e', borderWidth: 3 }]}>
+                  <Text style={csStyles.avatarText}>D</Text>
+                </View>
+                <Text style={csStyles.name}>Dispatcher</Text>
+                <Text style={[csStyles.status, callState === 'connected' && { color: '#22c55e' }]}>
+                  {callState === 'connected' ? formatCallTime(callSeconds) : callState === 'incoming' ? 'Incoming…' : 'Calling…'}
+                </Text>
+              </View>
+
+              {/* Bottom controls */}
+              <View style={csStyles.bottom}>
+                {callState === 'connected' && (
+                  <View style={csStyles.controlRow}>
+                    <View style={csStyles.controlWrap}>
+                      <TouchableOpacity style={[csStyles.controlBtn, isMuted && csStyles.controlBtnOn]} onPress={toggleMute}>
+                        <Ionicons name={isMuted ? 'mic-off' : 'mic'} size={24} color="#fff" />
+                      </TouchableOpacity>
+                      <Text style={csStyles.controlLabel}>{isMuted ? 'Unmute' : 'Mute'}</Text>
+                    </View>
+                    <View style={csStyles.controlWrap}>
+                      <TouchableOpacity style={[csStyles.controlBtn, audioOutput !== 'earpiece' && csStyles.controlBtnOn]} onPress={() => setShowAudioPicker(true)}>
+                        <Ionicons name={audioOutput === 'speaker' ? 'volume-high' : audioOutput === 'bluetooth' ? 'bluetooth' : 'volume-medium'} size={24} color="#fff" />
+                      </TouchableOpacity>
+                      <Text style={csStyles.controlLabel}>{audioOutput === 'speaker' ? 'Speaker' : audioOutput === 'bluetooth' ? 'Bluetooth' : 'Earpiece'}</Text>
+                    </View>
+                  </View>
+                )}
+                <View style={csStyles.actionRow}>
+                  {callState === 'incoming' && (
+                    <View style={csStyles.controlWrap}>
+                      <TouchableOpacity style={csStyles.acceptBtn} onPress={acceptCall}>
+                        <Ionicons name="call" size={30} color="#fff" />
+                      </TouchableOpacity>
+                      <Text style={csStyles.actionLabel}>Accept</Text>
+                    </View>
+                  )}
+                  <View style={csStyles.controlWrap}>
+                    <TouchableOpacity
+                      style={csStyles.rejectBtn}
+                      onPress={callState === 'incoming' ? rejectCall : () => handleEndCall()}
+                    >
+                      <Ionicons name="call" size={30} color="#fff" style={{ transform: [{ rotate: '135deg' }] }} />
+                    </TouchableOpacity>
+                    <Text style={csStyles.actionLabel}>{callState === 'incoming' ? 'Decline' : 'End Call'}</Text>
+                  </View>
+                </View>
+              </View>
+            </>
           )}
-          <TouchableOpacity
-            onPress={callState === "incoming" ? rejectCall : () => handleEndCall()}
-            style={styles.rejectBtn}
-          >
-            <Ionicons name="call" size={28} color="#fff" style={{ transform: [{ rotate: "135deg" }] }} />
-            <Text style={styles.callBtnLabel}>{callState === "incoming" ? "Decline" : "End"}</Text>
-          </TouchableOpacity>
         </View>
-      </>
-    )}
-  </View>
-)}
+      </Modal>
+
+      {/* ── Audio Output Picker ────────────────────────────────────────────── */}
+      <Modal visible={showAudioPicker} transparent animationType="fade" onRequestClose={() => setShowAudioPicker(false)}>
+        <TouchableOpacity style={csStyles.pickerBackdrop} activeOpacity={1} onPress={() => setShowAudioPicker(false)}>
+          <View style={csStyles.pickerSheet}>
+            <View style={csStyles.pickerHandle} />
+            <Text style={csStyles.pickerTitle}>Audio Output</Text>
+            {([
+              { id: 'earpiece',  label: 'Earpiece',  sub: 'Phone speaker',  icon: 'phone-portrait-outline' },
+              { id: 'speaker',   label: 'Speaker',   sub: 'Loud speaker',   icon: 'volume-high-outline'    },
+              { id: 'bluetooth', label: 'Bluetooth', sub: 'Wireless audio', icon: 'bluetooth-outline'      },
+            ] as const).map(opt => {
+              const active = audioOutput === opt.id;
+              return (
+                <TouchableOpacity key={opt.id} style={[csStyles.pickerOption, active && csStyles.pickerOptionActive]} onPress={() => selectAudioOutput(opt.id)}>
+                  <View style={[csStyles.pickerIcon, active && csStyles.pickerIconActive]}>
+                    <Ionicons name={opt.icon} size={20} color={active ? '#fff' : '#8b9cb6'} />
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <Text style={[csStyles.pickerLabel, active && { color: '#fff' }]}>{opt.label}</Text>
+                    <Text style={csStyles.pickerSub}>{opt.sub}</Text>
+                  </View>
+                  {active && <Ionicons name="checkmark-circle" size={22} color="#1976D2" />}
+                </TouchableOpacity>
+              );
+            })}
+          </View>
+        </TouchableOpacity>
+      </Modal>
     </SafeAreaView>
-    
+
   );
 };
 
@@ -972,6 +1262,10 @@ const styles = StyleSheet.create({
   messagesContent: {
     padding: 12,
     paddingBottom: 8,
+  },
+  messagesContentEmpty: {
+    flex: 1,
+    padding: 12,
   },
   dateSeparator: {
     flexDirection: 'row',
@@ -1325,6 +1619,91 @@ const styles = StyleSheet.create({
     borderRadius: 35,
     justifyContent: 'center',
   },
+});
+
+const csStyles = StyleSheet.create({
+  overlay: {
+    position: 'absolute', top: 0, left: 0, right: 0, bottom: 0,
+    backgroundColor: '#0f0f1a', zIndex: 999, flex: 1,
+  },
+  topBar: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+    paddingHorizontal: 20, paddingTop: 52, paddingBottom: 12,
+  },
+  topLabel: { color: 'rgba(255,255,255,0.6)', fontSize: 14, fontWeight: '600', letterSpacing: 0.5 },
+  iconBtn: {
+    width: 36, height: 36, borderRadius: 18,
+    backgroundColor: 'rgba(255,255,255,0.1)', justifyContent: 'center', alignItems: 'center',
+  },
+  center: { flex: 1, justifyContent: 'center', alignItems: 'center' },
+  avatar: {
+    width: 110, height: 110, borderRadius: 55, backgroundColor: '#1976D2',
+    justifyContent: 'center', alignItems: 'center', marginBottom: 20,
+    borderWidth: 3, borderColor: 'rgba(255,255,255,0.2)',
+    shadowColor: '#1976D2', shadowOffset: { width: 0, height: 8 }, shadowOpacity: 0.5, shadowRadius: 20, elevation: 12,
+  },
+  avatarText: { color: '#fff', fontSize: 44, fontWeight: '700' },
+  name: { color: '#fff', fontSize: 28, fontWeight: '700', marginBottom: 8, letterSpacing: 0.3 },
+  status: { color: 'rgba(255,255,255,0.55)', fontSize: 18, fontWeight: '500', letterSpacing: 1 },
+  bottom: { paddingBottom: 48, paddingHorizontal: 24, alignItems: 'center' },
+  controlRow: { flexDirection: 'row', gap: 28, marginBottom: 32 },
+  controlWrap: { alignItems: 'center', gap: 8 },
+  controlBtn: {
+    width: 60, height: 60, borderRadius: 30, alignItems: 'center', justifyContent: 'center',
+    backgroundColor: 'rgba(255,255,255,0.12)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.1)',
+  },
+  controlBtnOn: { backgroundColor: 'rgba(255,255,255,0.28)', borderColor: 'rgba(255,255,255,0.3)' },
+  controlLabel: { color: 'rgba(255,255,255,0.6)', fontSize: 11 },
+  actionRow: { flexDirection: 'row', gap: 48 },
+  acceptBtn: {
+    width: 72, height: 72, borderRadius: 36, backgroundColor: '#22c55e',
+    justifyContent: 'center', alignItems: 'center',
+    shadowColor: '#22c55e', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.4, shadowRadius: 8, elevation: 6,
+  },
+  rejectBtn: {
+    width: 72, height: 72, borderRadius: 36, backgroundColor: '#ef4444',
+    justifyContent: 'center', alignItems: 'center',
+    shadowColor: '#ef4444', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.4, shadowRadius: 8, elevation: 6,
+  },
+  actionLabel: { color: 'rgba(255,255,255,0.7)', fontSize: 13, marginTop: 2 },
+  miniBar: {
+    position: 'absolute', bottom: 70, left: 12, right: 12,
+    backgroundColor: '#1a1a2e', borderRadius: 14,
+    flexDirection: 'row', alignItems: 'center', paddingHorizontal: 14, paddingVertical: 10, gap: 10,
+    elevation: 10, shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.4, shadowRadius: 8,
+    borderWidth: 1, borderColor: 'rgba(255,255,255,0.08)', zIndex: 999,
+  },
+  miniAvatar: {
+    width: 34, height: 34, borderRadius: 17, backgroundColor: '#1976D2',
+    justifyContent: 'center', alignItems: 'center',
+  },
+  miniName: { color: '#fff', fontSize: 13, fontWeight: '600' },
+  miniTimer: { color: '#22c55e', fontSize: 11, fontWeight: '500' },
+  miniBtn: {
+    width: 32, height: 32, borderRadius: 16,
+    backgroundColor: 'rgba(255,255,255,0.15)', justifyContent: 'center', alignItems: 'center',
+  },
+  // Audio output picker
+  pickerBackdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.6)', justifyContent: 'flex-end' },
+  pickerSheet: {
+    backgroundColor: '#141428', borderTopLeftRadius: 24, borderTopRightRadius: 24,
+    paddingHorizontal: 20, paddingBottom: 36, paddingTop: 12,
+  },
+  pickerHandle: { width: 40, height: 4, borderRadius: 2, backgroundColor: 'rgba(255,255,255,0.2)', alignSelf: 'center', marginBottom: 20 },
+  pickerTitle: { color: '#fff', fontSize: 16, fontWeight: '700', marginBottom: 16, letterSpacing: 0.3 },
+  pickerOption: {
+    flexDirection: 'row', alignItems: 'center', gap: 14,
+    paddingVertical: 14, paddingHorizontal: 14, borderRadius: 14, marginBottom: 8,
+    backgroundColor: 'rgba(255,255,255,0.06)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.08)',
+  },
+  pickerOptionActive: { backgroundColor: 'rgba(25,118,210,0.15)', borderColor: '#1976D2' },
+  pickerIcon: {
+    width: 44, height: 44, borderRadius: 22,
+    backgroundColor: 'rgba(255,255,255,0.1)', justifyContent: 'center', alignItems: 'center',
+  },
+  pickerIconActive: { backgroundColor: '#1976D2' },
+  pickerLabel: { color: 'rgba(255,255,255,0.85)', fontSize: 15, fontWeight: '600' },
+  pickerSub: { color: 'rgba(255,255,255,0.4)', fontSize: 12, marginTop: 2 },
 });
 
 export default DriverChatScreen;

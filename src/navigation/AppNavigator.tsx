@@ -12,6 +12,7 @@ import { authManager } from '../types/AuthManager';
 import { apiService } from '../services/api/apiService';
 import { socketService } from '../services/socket/socketService';
 import { notificationService } from '../services/notificationService';
+import { useCallMiniBar, forceHideMiniBar } from '../contexts/CallMiniBarContext';
 
 // Import screens
 import DashboardScreen from '../screens/dashboard/DashboardScreen';
@@ -251,23 +252,88 @@ const ScreenWithHeaderFooter: React.FC<{
 
 // Main Tab Navigator with Authentication Context
 function MainTabNavigator({ onLogout, navigation }: MainTabNavigatorProps) {
+    const { showMiniBar, updateMiniBar, hideMiniBar } = useCallMiniBar();
     const [globalCallState, setGlobalCallState] = useState<'idle' | 'incoming' | 'connected' | 'declined'>('idle');
     const [globalIncomingCall, setGlobalIncomingCall] = useState<{ from: string; offer: any } | null>(null);
     const [isMuted, setIsMuted] = useState(false);
-    const [isSpeaker, setIsSpeaker] = useState(false);
+    const [audioOutput, setAudioOutput] = useState<'earpiece' | 'speaker' | 'bluetooth'>('earpiece');
+    const [showAudioPicker, setShowAudioPicker] = useState(false);
+    const [isMinimized, setIsMinimized] = useState(false);
+    const [callSeconds, setCallSeconds] = useState(0);
     const globalPcRef = useRef<any>(null);
     const globalStreamRef = useRef<any>(null);
     const localAudioStreamRef = useRef<any>(null);
     const peerSocketIdRef = useRef<string | null>(null);
+    const timerRef = useRef<any>(null);
+    // Ref mirror so socket-listener closures can check live state
+    const globalCallStateRef = useRef<'idle' | 'incoming' | 'connected' | 'declined'>('idle');
+    useEffect(() => { globalCallStateRef.current = globalCallState; }, [globalCallState]);
 
-    // Vibration ring pattern — fires whenever incoming call arrives
+    // Stable handler refs — store each socket listener so we can remove exactly
+    // OUR handler on reconnect without touching DriverChatScreen's handlers
+    const handlerIncomingCall = useRef<((...args: any[]) => void) | null>(null);
+    const handlerCallAnswered = useRef<((...args: any[]) => void) | null>(null);
+    const handlerCallIce      = useRef<((...args: any[]) => void) | null>(null);
+    const handlerCallEnded    = useRef<((...args: any[]) => void) | null>(null);
+    const handlerCallRejected = useRef<((...args: any[]) => void) | null>(null);
+
+    const formatTime = (s: number) =>
+        `${String(Math.floor(s / 60)).padStart(2, '0')}:${String(s % 60).padStart(2, '0')}`;
+
     useEffect(() => {
+        if (globalCallState === 'connected') {
+            setCallSeconds(0);
+            timerRef.current = setInterval(() => setCallSeconds(p => p + 1), 1000);
+        } else {
+            if (timerRef.current) { clearInterval(timerRef.current); timerRef.current = null; }
+            setCallSeconds(0);
+        }
+        return () => { if (timerRef.current) clearInterval(timerRef.current); };
+    }, [globalCallState]);
+
+    // Sync global mini bar (rendered above ALL screens via CallMiniBarContext)
+    useEffect(() => {
+        if (globalCallState === 'connected' && isMinimized) {
+            showMiniBar({
+                seconds: callSeconds,
+                isMuted,
+                callerLabel: 'Dispatcher',
+                onEnd: () => endGlobalCall(),
+                onToggleMute: toggleMute,
+                onExpand: () => setIsMinimized(false),
+            });
+        } else {
+            hideMiniBar();
+        }
+    }, [globalCallState, isMinimized]);
+
+    useEffect(() => {
+        if (globalCallState === 'connected' && isMinimized) {
+            updateMiniBar({ seconds: callSeconds, isMuted });
+        }
+    }, [callSeconds, isMuted]);
+
+    // Ringtone + vibration for incoming calls
+    useEffect(() => {
+        const tryICM = (fn: (m: any) => void) => {
+            try { fn(require('react-native-incall-manager').default); } catch {}
+        };
         if (globalCallState === 'incoming') {
             Vibration.vibrate([0, 600, 400, 600], true);
+            tryICM(m => { m.start({ media: 'audio', auto: false }); m.startRingtone('_DEFAULT_'); });
+        } else if (globalCallState === 'connected') {
+            Vibration.cancel();
+            // Ensure AEC-enabled audio session is active during the call
+            tryICM(m => { m.stopRingtone(); m.stopRingback(); m.start({ media: 'audio', auto: false }); });
         } else {
             Vibration.cancel();
+            tryICM(m => { m.stopRingtone(); m.stopRingback(); });
+            if (globalCallState === 'idle') tryICM(m => m.stop());
         }
-        return () => Vibration.cancel();
+        return () => {
+            Vibration.cancel();
+            tryICM(m => { m.stopRingtone(); m.stopRingback(); });
+        };
     }, [globalCallState]);
 
     const toggleMute = () => {
@@ -278,18 +344,27 @@ function MainTabNavigator({ onLogout, navigation }: MainTabNavigatorProps) {
         }
     };
 
-    const toggleSpeaker = async () => {
+    const selectAudioOutput = (output: 'earpiece' | 'speaker' | 'bluetooth') => {
         try {
-            // eslint-disable-next-line @typescript-eslint/no-var-requires
-            const InCallManager = require('react-native-incall-manager').default;
-            InCallManager.setSpeakerphoneOn(!isSpeaker);
-            setIsSpeaker(prev => !prev);
-        } catch {
-            console.warn('react-native-incall-manager not installed — speaker toggle unavailable');
-        }
+            const ICM = require('react-native-incall-manager').default;
+            if (output === 'speaker') {
+                ICM.setSpeakerphoneOn(true);
+            } else if (output === 'earpiece') {
+                ICM.setSpeakerphoneOn(false);
+                if (Platform.OS === 'android') {
+                    try { ICM.chooseAudioRoute?.('EARPIECE'); } catch {}
+                }
+            } else if (output === 'bluetooth') {
+                ICM.setSpeakerphoneOn(false);
+                try { ICM.chooseAudioRoute?.('BLUETOOTH_HEADSET'); } catch {}
+            }
+        } catch {}
+        setAudioOutput(output);
+        setShowAudioPicker(false);
     };
 
     const cleanupCall = () => {
+        hideMiniBar();
         globalPcRef.current?.close();
         globalPcRef.current = null;
         localAudioStreamRef.current?.getTracks().forEach((t: any) => t.stop());
@@ -297,7 +372,8 @@ function MainTabNavigator({ onLogout, navigation }: MainTabNavigatorProps) {
         globalStreamRef.current = null;
         peerSocketIdRef.current = null;
         setIsMuted(false);
-        setIsSpeaker(false);
+        setAudioOutput('earpiece');
+        setIsMinimized(false);
         setGlobalIncomingCall(null);
     };
 
@@ -329,6 +405,9 @@ function MainTabNavigator({ onLogout, navigation }: MainTabNavigatorProps) {
             if (Platform.OS === 'android') {
                 await PermissionsAndroid.request(PermissionsAndroid.PERMISSIONS.RECORD_AUDIO);
             }
+            // Start InCallManager BEFORE getUserMedia so Android uses MODE_IN_COMMUNICATION
+            // when the audio renderer is created — required for earpiece to work.
+            try { require('react-native-incall-manager').default.start({ media: 'audio', auto: false }); } catch {}
             const pc: any = new RTCPeerConnection({
                 iceServers: [
                     { urls: 'stun:stun.l.google.com:19302' },
@@ -345,7 +424,9 @@ function MainTabNavigator({ onLogout, navigation }: MainTabNavigatorProps) {
             pc.ontrack = (e: any) => {
                 if (e.streams?.[0]) globalStreamRef.current = e.streams[0];
             };
-            const stream = await mediaDevices.getUserMedia({ audio: true, video: false });
+            const stream = await mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true } as any, video: false });
+            // Default to earpiece immediately after stream is captured
+            try { require('react-native-incall-manager').default.setSpeakerphoneOn(false); } catch {}
             localAudioStreamRef.current = stream;
             globalStreamRef.current = stream;
             if (pc.addStream) {
@@ -420,28 +501,68 @@ function MainTabNavigator({ onLogout, navigation }: MainTabNavigatorProps) {
 
                 const rawSocket = socketService.getSocket();
                 if (rawSocket) {
-                    // Global incoming call listener — works on any screen
-                    rawSocket.off('incoming-call-global');
-                    rawSocket.on('incoming-call', async ({ from, offer }: any) => {
+                    // Remove only OUR previous handlers (by ref) — never wipe all listeners,
+                    // because DriverChatScreen may have registered its own call-answered etc.
+                    if (handlerIncomingCall.current) rawSocket.off('incoming-call', handlerIncomingCall.current);
+                    if (handlerCallAnswered.current) rawSocket.off('call-answered', handlerCallAnswered.current);
+                    if (handlerCallIce.current)      rawSocket.off('call-ice',      handlerCallIce.current);
+                    if (handlerCallEnded.current)    rawSocket.off('call-ended',    handlerCallEnded.current);
+                    if (handlerCallRejected.current) rawSocket.off('call-rejected', handlerCallRejected.current);
+
+                    // Define and store fresh handlers
+                    handlerIncomingCall.current = async ({ from, offer }: any) => {
                         if (!isMounted) return;
+                        peerSocketIdRef.current = from;
                         setGlobalIncomingCall({ from, offer });
                         setGlobalCallState('incoming');
-                        notificationService.sendLocalNotification(
-                            '📞 Incoming Call',
-                            'Dispatcher is calling you',
-                            { type: 'incoming_call', from }
-                        );
-                    });
-                    rawSocket.on('call-answered', ({ answer, from }: any) => {
+                        // Only fire a local notification when the app is in the background;
+                        // when in the foreground the full-screen call overlay is shown instead.
+                        const appState = (await import('react-native')).AppState.currentState;
+                        if (appState !== 'active') {
+                            notificationService.sendLocalNotification(
+                                '📞 Incoming Call',
+                                'Dispatcher is calling you',
+                                { type: 'incoming_call', from }
+                            );
+                        }
+                    };
+                    handlerCallAnswered.current = ({ answer, from }: any) => {
+                        // Only handle if AppNavigator has an active call (incoming from dispatcher).
+                        // Driver-initiated outgoing calls are handled by DriverChatScreen.
+                        if (globalCallStateRef.current === 'idle') return;
                         if (from) peerSocketIdRef.current = from;
                         globalPcRef.current?.setRemoteDescription(new RTCSessionDescription(answer));
                         setGlobalCallState('connected');
-                    });
-                    rawSocket.on('call-ended', () => endGlobalCall(false));
-                    rawSocket.on('call-rejected', () => showDeclined());
-                    rawSocket.on('call-ice', ({ candidate }: any) => {
-                        globalPcRef.current?.addIceCandidate(new RTCIceCandidate(candidate));
-                    });
+                    };
+                    handlerCallEnded.current = () => {
+                        if (globalCallStateRef.current === 'idle') return;
+                        const wasMissed = globalCallStateRef.current === 'incoming';
+                        forceHideMiniBar();
+                        endGlobalCall(false);
+                        if (wasMissed) {
+                            notificationService.sendLocalNotification(
+                                '📵 Missed Call',
+                                'You missed a call from Dispatcher',
+                                { type: 'missed_call' }
+                            );
+                        }
+                    };
+                    handlerCallRejected.current = () => {
+                        if (globalCallStateRef.current === 'idle') return;
+                        forceHideMiniBar();
+                        showDeclined();
+                    };
+                    handlerCallIce.current = ({ candidate }: any) => {
+                        if (!globalPcRef.current) return;
+                        globalPcRef.current.addIceCandidate(new RTCIceCandidate(candidate));
+                    };
+
+                    rawSocket.on('incoming-call', handlerIncomingCall.current);
+                    rawSocket.on('call-answered', handlerCallAnswered.current);
+                    rawSocket.on('call-ended',    handlerCallEnded.current);
+                    rawSocket.on('call-rejected', handlerCallRejected.current);
+                    rawSocket.on('call-ice',      handlerCallIce.current);
+
                     rawSocket.once('disconnect', (reason: string) => {
                         if (!isMounted) return;
                         setTimeout(() => {
@@ -477,63 +598,115 @@ function MainTabNavigator({ onLogout, navigation }: MainTabNavigatorProps) {
             </View>
             <Footer onLogout={onLogout} />
 
-            {/* Global call overlay — visible on ANY screen */}
-            <Modal visible={globalCallState !== 'idle'} transparent animationType="fade">
+            {/* Full screen call — hidden when minimized */}
+            <Modal visible={globalCallState !== 'idle' && !isMinimized} transparent={false} animationType="slide">
                 <View style={navStyles.callOverlay}>
                     {globalCallState === 'declined' ? (
-                        <>
+                        <View style={navStyles.callCenter}>
                             <View style={[navStyles.callAvatar, { backgroundColor: '#ef4444' }]}>
                                 <Ionicons name="call" size={40} color="#fff" style={{ transform: [{ rotate: '135deg' }] }} />
                             </View>
                             <Text style={navStyles.callName}>Call Declined</Text>
                             <Text style={navStyles.callStatus}>The call was not accepted</Text>
-                        </>
+                        </View>
                     ) : (
                         <>
-                            <View style={navStyles.callAvatar}>
-                                <Text style={navStyles.callAvatarText}>D</Text>
+                            {/* Top bar — minimize */}
+                            <View style={navStyles.callTopBar}>
+                                <View style={{ width: 36 }} />
+                                <Text style={navStyles.callTopLabel}>
+                                    {globalCallState === 'incoming' ? 'Incoming Call' : globalCallState === 'connected' ? 'On Call' : 'Calling...'}
+                                </Text>
+                                {globalCallState === 'connected' ? (
+                                    <TouchableOpacity onPress={() => setIsMinimized(true)} style={navStyles.minimizeBtn}>
+                                        <Ionicons name="chevron-down" size={22} color="rgba(255,255,255,0.7)" />
+                                    </TouchableOpacity>
+                                ) : <View style={{ width: 36 }} />}
                             </View>
-                            <Text style={navStyles.callName}>Dispatcher</Text>
-                            <Text style={navStyles.callStatus}>
-                                {globalCallState === 'incoming' ? 'Incoming Call' : '● Connected'}
-                            </Text>
 
-                            {/* Mute + Speaker controls (connected only) */}
-                            {globalCallState === 'connected' && (
-                                <View style={navStyles.controlRow}>
-                                    <TouchableOpacity style={[navStyles.controlBtn, isMuted && navStyles.controlBtnOn]} onPress={toggleMute}>
-                                        <Ionicons name={isMuted ? 'mic-off' : 'mic'} size={22} color="#fff" />
-                                        <Text style={navStyles.controlLabel}>{isMuted ? 'Unmute' : 'Mute'}</Text>
-                                    </TouchableOpacity>
-                                    <TouchableOpacity style={[navStyles.controlBtn, isSpeaker && navStyles.controlBtnOn]} onPress={toggleSpeaker}>
-                                        <Ionicons name={isSpeaker ? 'volume-high' : 'volume-medium'} size={22} color="#fff" />
-                                        <Text style={navStyles.controlLabel}>{isSpeaker ? 'Speaker' : 'Earpiece'}</Text>
-                                    </TouchableOpacity>
+                            {/* Center — avatar + name + status */}
+                            <View style={navStyles.callCenter}>
+                                <View style={[navStyles.callAvatar, globalCallState === 'incoming' && { borderColor: '#22c55e', borderWidth: 3 }]}>
+                                    <Text style={navStyles.callAvatarText}>D</Text>
                                 </View>
-                            )}
+                                <Text style={navStyles.callName}>Dispatcher</Text>
+                                <Text style={[navStyles.callStatus, globalCallState === 'connected' && { color: '#22c55e' }]}>
+                                    {globalCallState === 'connected' ? formatTime(callSeconds) : globalCallState === 'incoming' ? 'Incoming Call' : 'Calling...'}
+                                </Text>
+                            </View>
 
-                            <View style={navStyles.callButtons}>
-                                {globalCallState === 'incoming' && (
-                                    <View style={navStyles.callBtnWrap}>
-                                        <TouchableOpacity style={navStyles.acceptBtn} onPress={acceptGlobalCall}>
-                                            <Ionicons name="call" size={28} color="#fff" />
-                                        </TouchableOpacity>
-                                        <Text style={navStyles.callBtnLabel}>Accept</Text>
+                            {/* Bottom — controls + action buttons */}
+                            <View style={navStyles.callBottom}>
+                                {globalCallState === 'connected' && (
+                                    <View style={navStyles.controlRow}>
+                                        <View style={navStyles.callBtnWrap}>
+                                            <TouchableOpacity style={[navStyles.controlBtn, isMuted && navStyles.controlBtnOn]} onPress={toggleMute}>
+                                                <Ionicons name={isMuted ? 'mic-off' : 'mic'} size={24} color="#fff" />
+                                            </TouchableOpacity>
+                                            <Text style={navStyles.controlLabel}>{isMuted ? 'Unmute' : 'Mute'}</Text>
+                                        </View>
+                                        <View style={navStyles.callBtnWrap}>
+                                            <TouchableOpacity style={[navStyles.controlBtn, audioOutput !== 'earpiece' && navStyles.controlBtnOn]} onPress={() => setShowAudioPicker(true)}>
+                                                <Ionicons name={audioOutput === 'speaker' ? 'volume-high' : audioOutput === 'bluetooth' ? 'bluetooth' : 'volume-medium'} size={24} color="#fff" />
+                                            </TouchableOpacity>
+                                            <Text style={navStyles.controlLabel}>{audioOutput === 'speaker' ? 'Speaker' : audioOutput === 'bluetooth' ? 'Bluetooth' : 'Earpiece'}</Text>
+                                        </View>
                                     </View>
                                 )}
-                                <View style={navStyles.callBtnWrap}>
-                                    <TouchableOpacity
-                                        style={navStyles.rejectBtn}
-                                        onPress={globalCallState === 'incoming' ? rejectGlobalCall : endGlobalCall}
-                                    >
-                                        <Ionicons name="call" size={28} color="#fff" style={{ transform: [{ rotate: '135deg' }] }} />
-                                    </TouchableOpacity>
-                                    <Text style={navStyles.callBtnLabel}>{globalCallState === 'incoming' ? 'Decline' : 'End'}</Text>
+                                <View style={navStyles.callButtons}>
+                                    {globalCallState === 'incoming' && (
+                                        <View style={navStyles.callBtnWrap}>
+                                            <TouchableOpacity style={navStyles.acceptBtn} onPress={acceptGlobalCall}>
+                                                <Ionicons name="call" size={30} color="#fff" />
+                                            </TouchableOpacity>
+                                            <Text style={navStyles.callBtnLabel}>Accept</Text>
+                                        </View>
+                                    )}
+                                    <View style={navStyles.callBtnWrap}>
+                                        <TouchableOpacity
+                                            style={navStyles.rejectBtn}
+                                            onPress={globalCallState === 'incoming' ? rejectGlobalCall : () => endGlobalCall()}
+                                        >
+                                            <Ionicons name="call" size={30} color="#fff" style={{ transform: [{ rotate: '135deg' }] }} />
+                                        </TouchableOpacity>
+                                        <Text style={navStyles.callBtnLabel}>{globalCallState === 'incoming' ? 'Decline' : 'End Call'}</Text>
+                                    </View>
                                 </View>
                             </View>
                         </>
                     )}
                 </View>
+            </Modal>
+
+            {/* Mini bar is now rendered globally via CallMiniBarContext in App.tsx */}
+
+            {/* ── Audio Output Picker ─────────────────────────────────────── */}
+            <Modal visible={showAudioPicker} transparent animationType="fade" onRequestClose={() => setShowAudioPicker(false)}>
+                <TouchableOpacity style={navStyles.pickerBackdrop} activeOpacity={1} onPress={() => setShowAudioPicker(false)}>
+                    <View style={navStyles.pickerSheet}>
+                        <View style={navStyles.pickerHandle} />
+                        <Text style={navStyles.pickerTitle}>Audio Output</Text>
+                        {([
+                            { id: 'earpiece',  label: 'Earpiece',  sub: 'Phone speaker',  icon: 'phone-portrait-outline' },
+                            { id: 'speaker',   label: 'Speaker',   sub: 'Loud speaker',   icon: 'volume-high-outline'    },
+                            { id: 'bluetooth', label: 'Bluetooth', sub: 'Wireless audio', icon: 'bluetooth-outline'      },
+                        ] as const).map(opt => {
+                            const active = audioOutput === opt.id;
+                            return (
+                                <TouchableOpacity key={opt.id} style={[navStyles.pickerOption, active && navStyles.pickerOptionActive]} onPress={() => selectAudioOutput(opt.id)}>
+                                    <View style={[navStyles.pickerIcon, active && navStyles.pickerIconActive]}>
+                                        <Ionicons name={opt.icon} size={20} color={active ? '#fff' : '#8b9cb6'} />
+                                    </View>
+                                    <View style={{ flex: 1 }}>
+                                        <Text style={[navStyles.pickerLabel, active && { color: '#fff' }]}>{opt.label}</Text>
+                                        <Text style={navStyles.pickerSub}>{opt.sub}</Text>
+                                    </View>
+                                    {active && <Ionicons name="checkmark-circle" size={22} color="#1976D2" />}
+                                </TouchableOpacity>
+                            );
+                        })}
+                    </View>
+                </TouchableOpacity>
             </Modal>
         </View>
     );
@@ -657,7 +830,7 @@ export default function AppNavigator() {
     // Show authentication flow for non-authenticated users
     if (!authState.isAuthenticated) {
         return (
-            <RootStack.Navigator screenOptions={{ headerShown: false }}>
+            <RootStack.Navigator screenOptions={{ headerShown: false, freezeOnBlur: true }}>
                 <RootStack.Screen name="Login">
                     {(props) => (
                         <LoginScreen
@@ -681,7 +854,11 @@ export default function AppNavigator() {
     // Show main app for authenticated users
     return (
         <RootStack.Navigator
-            screenOptions={{ headerShown: false }}
+            screenOptions={{
+                headerShown: false,
+                freezeOnBlur: true,
+                animation: 'slide_from_right',
+            }}
             initialRouteName="MainTabs"
         >
             {/* Main Tabs - declared FIRST so it is always the initial screen */}
@@ -916,20 +1093,44 @@ export default function AppNavigator() {
 }
 
 const navStyles = StyleSheet.create({
-    callOverlay: { flex: 1, backgroundColor: '#1a1a2e', justifyContent: 'center', alignItems: 'center' },
-    callAvatar: { width: 100, height: 100, borderRadius: 50, backgroundColor: '#1976D2', justifyContent: 'center', alignItems: 'center', marginBottom: 20, borderWidth: 3, borderColor: 'rgba(255,255,255,0.3)' },
-    callAvatarText: { color: '#fff', fontSize: 40, fontWeight: '700' },
-    callName: { color: '#fff', fontSize: 26, fontWeight: '700', marginBottom: 8 },
-    callStatus: { color: 'rgba(255,255,255,0.6)', fontSize: 16, marginBottom: 60 },
-    callButtons: { flexDirection: 'row', gap: 40 },
-    callBtnWrap: { alignItems: 'center', gap: 8 },
-    callBtnLabel: { color: '#fff', fontSize: 12 },
-    acceptBtn: { width: 70, height: 70, borderRadius: 35, backgroundColor: '#22c55e', justifyContent: 'center', alignItems: 'center' },
-    rejectBtn: { width: 70, height: 70, borderRadius: 35, backgroundColor: '#ef4444', justifyContent: 'center', alignItems: 'center' },
-    controlRow: { flexDirection: 'row', gap: 20, marginBottom: 32 },
-    controlBtn: { alignItems: 'center', backgroundColor: 'rgba(255,255,255,0.15)', borderRadius: 50, width: 64, height: 64, justifyContent: 'center' },
-    controlBtnOn: { backgroundColor: 'rgba(255,255,255,0.35)' },
-    controlLabel: { color: 'rgba(255,255,255,0.7)', fontSize: 10, marginTop: 4 },
+    callOverlay: { flex: 1, backgroundColor: '#0f0f1a' },
+    callTopBar: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 20, paddingTop: 52, paddingBottom: 12 },
+    callTopLabel: { color: 'rgba(255,255,255,0.6)', fontSize: 14, fontWeight: '600', letterSpacing: 0.5 },
+    minimizeBtn: { width: 36, height: 36, borderRadius: 18, backgroundColor: 'rgba(255,255,255,0.1)', justifyContent: 'center', alignItems: 'center' },
+    callCenter: { flex: 1, justifyContent: 'center', alignItems: 'center' },
+    callAvatar: { width: 110, height: 110, borderRadius: 55, backgroundColor: '#1976D2', justifyContent: 'center', alignItems: 'center', marginBottom: 20, borderWidth: 3, borderColor: 'rgba(255,255,255,0.2)', shadowColor: '#1976D2', shadowOffset: { width: 0, height: 8 }, shadowOpacity: 0.5, shadowRadius: 20, elevation: 12 },
+    callAvatarText: { color: '#fff', fontSize: 44, fontWeight: '700' },
+    callName: { color: '#fff', fontSize: 28, fontWeight: '700', marginBottom: 8, letterSpacing: 0.3 },
+    callStatus: { color: 'rgba(255,255,255,0.55)', fontSize: 18, fontWeight: '500', letterSpacing: 1 },
+    callBottom: { paddingBottom: 48, paddingHorizontal: 24, alignItems: 'center' },
+    callButtons: { flexDirection: 'row', gap: 48, marginTop: 8 },
+    callBtnWrap: { alignItems: 'center', gap: 10 },
+    callBtnLabel: { color: 'rgba(255,255,255,0.7)', fontSize: 13 },
+    acceptBtn: { width: 72, height: 72, borderRadius: 36, backgroundColor: '#22c55e', justifyContent: 'center', alignItems: 'center', shadowColor: '#22c55e', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.4, shadowRadius: 8, elevation: 6 },
+    rejectBtn: { width: 72, height: 72, borderRadius: 36, backgroundColor: '#ef4444', justifyContent: 'center', alignItems: 'center', shadowColor: '#ef4444', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.4, shadowRadius: 8, elevation: 6 },
+    controlRow: { flexDirection: 'row', gap: 28, marginBottom: 32 },
+    controlBtn: { alignItems: 'center', backgroundColor: 'rgba(255,255,255,0.12)', borderRadius: 50, width: 60, height: 60, justifyContent: 'center', borderWidth: 1, borderColor: 'rgba(255,255,255,0.1)' },
+    controlBtnOn: { backgroundColor: 'rgba(255,255,255,0.28)', borderColor: 'rgba(255,255,255,0.3)' },
+    controlLabel: { color: 'rgba(255,255,255,0.6)', fontSize: 11, marginTop: 6 },
+    // Full-screen transparent container — touches pass through except on miniBar itself
+    miniBarOverlay: { flex: 1, justifyContent: 'flex-end' },
+    // No position:'absolute' needed — Modal provides the layer above all screens
+    miniBar: { backgroundColor: '#1a1a2e', borderRadius: 14, flexDirection: 'row', alignItems: 'center', paddingHorizontal: 14, paddingVertical: 10, gap: 10, margin: 12, marginBottom: 70, elevation: 10, shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.4, shadowRadius: 8, borderWidth: 1, borderColor: 'rgba(255,255,255,0.08)' },
+    miniAvatar: { width: 34, height: 34, borderRadius: 17, backgroundColor: '#1976D2', justifyContent: 'center', alignItems: 'center' },
+    miniName: { color: '#fff', fontSize: 13, fontWeight: '600' },
+    miniTimer: { color: '#22c55e', fontSize: 11, fontWeight: '500' },
+    miniIconBtn: { width: 32, height: 32, borderRadius: 16, backgroundColor: 'rgba(255,255,255,0.15)', justifyContent: 'center', alignItems: 'center' },
+    // Audio output picker
+    pickerBackdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.6)', justifyContent: 'flex-end' },
+    pickerSheet: { backgroundColor: '#141428', borderTopLeftRadius: 24, borderTopRightRadius: 24, paddingHorizontal: 20, paddingBottom: 36, paddingTop: 12 },
+    pickerHandle: { width: 40, height: 4, borderRadius: 2, backgroundColor: 'rgba(255,255,255,0.2)', alignSelf: 'center', marginBottom: 20 },
+    pickerTitle: { color: '#fff', fontSize: 16, fontWeight: '700', marginBottom: 16, letterSpacing: 0.3 },
+    pickerOption: { flexDirection: 'row', alignItems: 'center', gap: 14, paddingVertical: 14, paddingHorizontal: 14, borderRadius: 14, marginBottom: 8, backgroundColor: 'rgba(255,255,255,0.06)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.08)' },
+    pickerOptionActive: { backgroundColor: 'rgba(25,118,210,0.15)', borderColor: '#1976D2' },
+    pickerIcon: { width: 44, height: 44, borderRadius: 22, backgroundColor: 'rgba(255,255,255,0.1)', justifyContent: 'center', alignItems: 'center' },
+    pickerIconActive: { backgroundColor: '#1976D2' },
+    pickerLabel: { color: 'rgba(255,255,255,0.85)', fontSize: 15, fontWeight: '600' },
+    pickerSub: { color: 'rgba(255,255,255,0.4)', fontSize: 12, marginTop: 2 },
 });
 
 const styles = StyleSheet.create({

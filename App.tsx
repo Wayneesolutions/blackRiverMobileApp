@@ -6,6 +6,7 @@ import { Platform } from 'react-native';
 import Constants from 'expo-constants';
 import * as Notifications from 'expo-notifications';
 import AppNavigator from './src/navigation/AppNavigator';
+import { CallMiniBarProvider } from './src/contexts/CallMiniBarContext';
 import ErrorBoundary from './src/components/ErrorBoundary';
 import Logger from './src/utils/Logger';
 import { notificationService } from './src/services/notificationService';
@@ -91,6 +92,7 @@ export default function App() {
   return (
     <ErrorBoundary>
       <SafeAreaProvider>
+        <CallMiniBarProvider>
         <NavigationContainer
           ref={navigationRef}
           documentTitle={{
@@ -102,6 +104,7 @@ export default function App() {
           <StatusBar style="light" backgroundColor="transparent" translucent={false} />
           <AppNavigator />
         </NavigationContainer>
+        </CallMiniBarProvider>
       </SafeAreaProvider>
     </ErrorBoundary>
   );

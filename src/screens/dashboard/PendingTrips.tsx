@@ -3,7 +3,7 @@ import {
   View,
   Text,
   StyleSheet,
-  ScrollView,
+  FlatList,
   TouchableOpacity,
   ActivityIndicator,
   RefreshControl,
@@ -497,28 +497,34 @@ const PendingTrips = () => {
         </View>
       )}
 
-      <ScrollView
+      <FlatList
+        data={displayedTrips}
+        keyExtractor={(item) => item._id}
         style={styles.scrollView}
         refreshControl={
           <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
         }
-      >
-        {activeTab === 'requests' && assignmentRequests.length === 0 && (
-          <View style={styles.emptyContainer}>
-            <Ionicons name="notifications-off-outline" size={ri(48)} color={COLORS.textSecondary} />
-            <Text style={styles.emptyText}>No pending requests</Text>
-            <Text style={styles.emptySubtext}>New trip assignments will appear here.</Text>
-          </View>
-        )}
-        {activeTab === 'accepted' && acceptedTrips.length === 0 && (
-          <View style={styles.emptyContainer}>
-            <Ionicons name="calendar-outline" size={ri(48)} color={COLORS.textSecondary} />
-            <Text style={styles.emptyText}>No accepted trips</Text>
-            <Text style={styles.emptySubtext}>Accept an assignment to see it here.</Text>
-          </View>
-        )}
-        {displayedTrips.map((trip) => (
-          <View key={trip._id} style={styles.tripCard}>
+        ListEmptyComponent={
+          activeTab === 'requests' ? (
+            <View style={styles.emptyContainer}>
+              <Ionicons name="notifications-off-outline" size={ri(48)} color={COLORS.textSecondary} />
+              <Text style={styles.emptyText}>No pending requests</Text>
+              <Text style={styles.emptySubtext}>New trip assignments will appear here.</Text>
+            </View>
+          ) : (
+            <View style={styles.emptyContainer}>
+              <Ionicons name="calendar-outline" size={ri(48)} color={COLORS.textSecondary} />
+              <Text style={styles.emptyText}>No accepted trips</Text>
+              <Text style={styles.emptySubtext}>Accept an assignment to see it here.</Text>
+            </View>
+          )
+        }
+        removeClippedSubviews={true}
+        initialNumToRender={10}
+        maxToRenderPerBatch={5}
+        windowSize={5}
+        renderItem={({ item: trip }) => (
+          <View style={styles.tripCard}>
             <View style={styles.tripHeader}>
               <View>
                 <Text style={styles.tripNumber}>{trip.tripNumber}</Text>
@@ -983,8 +989,8 @@ const PendingTrips = () => {
               </View>
             )}
           </View>
-        ))}
-      </ScrollView>
+        )}
+      />
     </SafeAreaView>
   );
 };

@@ -1,9 +1,9 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import {
   View,
   Text,
   StyleSheet,
-  ScrollView,
+  FlatList,
   TextInput,
   TouchableOpacity,
   SafeAreaView,
@@ -41,7 +41,7 @@ const TripChatScreen = () => {
   const [sending, setSending] = useState(false);
   const [selectedFile, setSelectedFile] = useState<any>(null);
   const [typingUsers, setTypingUsers] = useState<Set<string>>(new Set());
-  const scrollViewRef = useRef<ScrollView>(null);
+  const flatListRef = useRef<FlatList<ChatMessage>>(null);
   const typingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const currentUserIdRef = useRef<string | null>(null);
 
@@ -135,7 +135,7 @@ const TripChatScreen = () => {
   // Scroll to bottom
   const scrollToBottom = () => {
     setTimeout(() => {
-      scrollViewRef.current?.scrollToEnd({ animated: true });
+      flatListRef.current?.scrollToEnd({ animated: true });
     }, 100);
   };
 
@@ -450,7 +450,102 @@ const TripChatScreen = () => {
     return date.toLocaleDateString();
   };
 
-  const currentUserId = currentUserIdRef.current;
+  const renderMessageItem = useCallback(({ item: message }: { item: ChatMessage }) => {
+    const senderId = message.senderId?._id || message.senderId || '';
+    const userId = currentUserIdRef.current || '';
+    const isOwn = String(senderId) === String(userId);
+
+    return (
+      <View
+        style={[styles.messageContainer, isOwn ? styles.messageOwn : styles.messageOther]}
+      >
+        {!isOwn && (
+          <Text style={styles.senderName}>{message.senderName}</Text>
+        )}
+        {message.message && (
+          <Text style={[styles.messageText, isOwn && styles.messageTextOwn]}>
+            {message.message}
+          </Text>
+        )}
+        {message.fileUrl && (
+          <TouchableOpacity
+            style={styles.fileContainer}
+            onPress={async () => {
+              try {
+                const response = await chatService.getChatMessageFileSignedUrl(message._id, 'inline');
+                if (response.success && response.url) {
+                  const canOpen = await Linking.canOpenURL(response.url);
+                  if (canOpen) {
+                    await Linking.openURL(response.url);
+                  } else if (message.fileUrl) {
+                    await Linking.openURL(message.fileUrl);
+                  } else {
+                    Alert.alert('Error', 'Unable to open file URL.');
+                  }
+                } else if (message.fileUrl) {
+                  const canOpen = await Linking.canOpenURL(message.fileUrl);
+                  if (canOpen) {
+                    await Linking.openURL(message.fileUrl);
+                  } else {
+                    Alert.alert('Error', `Unable to open file.`);
+                  }
+                } else {
+                  Alert.alert('Error', 'Unable to get file URL.');
+                }
+              } catch (error: any) {
+                logger.error('Error opening file', error);
+                if (message.fileUrl) {
+                  Linking.openURL(message.fileUrl).catch(() => {
+                    Alert.alert('Error', `Unable to open file: ${error?.message || 'Unknown error'}`);
+                  });
+                } else {
+                  Alert.alert('Error', `Unable to open file: ${error?.message || 'Unknown error'}`);
+                }
+              }
+            }}
+          >
+            <Ionicons
+              name={message.fileType === 'image' ? 'image' : 'document'}
+              size={20}
+              color={isOwn ? '#ffffff' : '#2563eb'}
+            />
+            <Text style={[styles.fileName, isOwn && styles.fileNameOwn]}>
+              {message.fileName || 'File'}
+            </Text>
+            {message.fileSize && (
+              <Text style={[styles.fileSize, isOwn && styles.fileSizeOwn]}>
+                ({formatFileSize(message.fileSize)})
+              </Text>
+            )}
+          </TouchableOpacity>
+        )}
+        <Text style={[styles.messageTime, isOwn && styles.messageTimeOwn]}>
+          {formatDate(message.createdAt)}
+        </Text>
+      </View>
+    );
+  }, []);
+
+  const listEmptyComponent = loading ? (
+    <View style={styles.centerContainer}>
+      <ActivityIndicator size="large" color="#2563eb" />
+      <Text style={styles.loadingText}>Loading messages...</Text>
+    </View>
+  ) : (
+    <View style={styles.centerContainer}>
+      <Ionicons name="chatbubbles-outline" size={64} color="#9ca3af" />
+      <Text style={styles.emptyText}>No messages yet</Text>
+      <Text style={styles.emptySubtext}>Start the conversation!</Text>
+    </View>
+  );
+
+  const listFooterComponent = typingUsers.size > 0 ? (
+    <View style={[styles.messageContainer, styles.messageOther]}>
+      <Text style={styles.typingText}>
+        {Array.from(typingUsers).join(', ')} typing...
+      </Text>
+    </View>
+  ) : null;
 
   return (
     <SafeAreaView style={styles.container}>
@@ -471,189 +566,21 @@ const TripChatScreen = () => {
         </View>
 
         {/* Messages */}
-        <ScrollView
-          ref={scrollViewRef}
+        <FlatList
+          ref={flatListRef}
+          data={messages}
+          keyExtractor={(item) => item._id}
+          renderItem={renderMessageItem}
           style={styles.messagesContainer}
-          contentContainerStyle={styles.messagesContent}
-        >
-          {loading ? (
-            <View style={styles.centerContainer}>
-              <ActivityIndicator size="large" color="#2563eb" />
-              <Text style={styles.loadingText}>Loading messages...</Text>
-            </View>
-          ) : messages.length === 0 ? (
-            <View style={styles.centerContainer}>
-              <Ionicons name="chatbubbles-outline" size={64} color="#9ca3af" />
-              <Text style={styles.emptyText}>No messages yet</Text>
-              <Text style={styles.emptySubtext}>Start the conversation!</Text>
-            </View>
-          ) : (
-            messages.map((message, index) => {
-              // Handle different senderId formats
-              const senderId = message.senderId?._id || message.senderId || '';
-              const currentUserId = currentUserIdRef.current || '';
-              const isOwn = String(senderId) === String(currentUserId);
-              
-              // Debug log for first message
-              if (index === 0) {
-                logger.info('Rendering first message', {
-                  messageId: message._id,
-                  senderId: senderId,
-                  currentUserId: currentUserId,
-                  isOwn,
-                  hasMessage: !!message.message,
-                  hasFile: !!message.fileUrl,
-                  senderName: message.senderName
-                });
-              }
-              return (
-                <View
-                  key={message._id}
-                  style={[styles.messageContainer, isOwn ? styles.messageOwn : styles.messageOther]}
-                >
-                  {!isOwn && (
-                    <Text style={styles.senderName}>{message.senderName}</Text>
-                  )}
-                  {message.message && (
-                    <Text style={[styles.messageText, isOwn && styles.messageTextOwn]}>
-                      {message.message}
-                    </Text>
-                  )}
-                  {message.fileUrl && (
-                    <TouchableOpacity
-                      style={styles.fileContainer}
-                      onPress={async () => {
-                        try {
-                          console.log('📄 ===== OPENING DOCUMENT (Mobile App) =====');
-                          console.log('📄 Message ID:', message._id);
-                          console.log('📄 File Name:', message.fileName);
-                          console.log('📄 File Type:', message.fileType);
-                          console.log('📄 File Size:', message.fileSize);
-                          console.log('📄 Original fileUrl (full):', message.fileUrl);
-                          console.log('📄 File URL length:', message.fileUrl?.length || 0);
-                          
-                          logger.info('Opening chat file', { 
-                            messageId: message._id,
-                            fileName: message.fileName,
-                            fileUrl: message.fileUrl,
-                            fileType: message.fileType,
-                            fileSize: message.fileSize
-                          });
-                          
-                          // Get signed URL first
-                          console.log('📄 Attempting to get signed URL for message:', message._id);
-                          const response = await chatService.getChatMessageFileSignedUrl(message._id, 'inline');
-                          
-                          console.log('📄 Signed URL response:', {
-                            success: response.success,
-                            hasUrl: !!response.url,
-                            urlLength: response.url?.length || 0,
-                            urlPreview: response.url?.substring(0, 100) || 'N/A'
-                          });
-                          
-                          logger.info('Signed URL response', { 
-                            success: response.success,
-                            hasUrl: !!response.url,
-                            urlLength: response.url?.length || 0
-                          });
-                          
-                          if (response.success && response.url) {
-                            console.log('📄 Using signed URL:', response.url);
-                            logger.info('Opening signed URL');
-                            const canOpen = await Linking.canOpenURL(response.url);
-                            console.log('📄 Can open signed URL?', canOpen);
-                            if (canOpen) {
-                              await Linking.openURL(response.url);
-                              console.log('📄 ✅ Successfully opened signed URL');
-                            } else {
-                              console.log('📄 ⚠️ Cannot open signed URL, trying fallback original URL');
-                              logger.warn('Cannot open URL, trying fallback');
-                              if (message.fileUrl) {
-                                console.log('📄 Opening fallback original URL:', message.fileUrl);
-                                await Linking.openURL(message.fileUrl);
-                                console.log('📄 ✅ Successfully opened original URL (fallback)');
-                              } else {
-                                console.log('📄 ❌ No original URL available');
-                                Alert.alert('Error', 'Unable to open file URL.');
-                              }
-                            }
-                          } else {
-                            console.log('📄 ⚠️ Signed URL failed, using original URL');
-                            logger.warn('Signed URL failed, using fallback', { 
-                              responseSuccess: response.success,
-                              hasUrl: !!response.url,
-                              originalUrl: !!message.fileUrl
-                            });
-                            // Fallback to original URL
-                            if (message.fileUrl) {
-                              console.log('📄 Attempting to open original URL:', message.fileUrl);
-                              const canOpen = await Linking.canOpenURL(message.fileUrl);
-                              console.log('📄 Can open original URL?', canOpen);
-                              if (canOpen) {
-                                await Linking.openURL(message.fileUrl);
-                                console.log('📄 ✅ Successfully opened original URL');
-                              } else {
-                                console.log('📄 ❌ Cannot open original URL - URL may be invalid');
-                                Alert.alert('Error', `Unable to open file. URL: ${message.fileUrl.substring(0, 50)}...`);
-                              }
-                            } else {
-                              console.log('📄 ❌ No fileUrl available');
-                              Alert.alert('Error', 'Unable to get file URL.');
-                            }
-                          }
-                        } catch (error: any) {
-                          console.log('📄 ❌ Error opening file:', error.message);
-                          console.log('📄 Error stack:', error.stack);
-                          console.log('📄 Error details:', JSON.stringify(error, null, 2));
-                          logger.error('Error opening file', error);
-                          console.error('Error opening file:', error);
-                          const errorMessage = error?.message || 'Unknown error';
-                          // Fallback to original URL
-                          if (message.fileUrl) {
-                            console.log('📄 Attempting final fallback to original URL:', message.fileUrl);
-                            Linking.openURL(message.fileUrl).catch((linkError) => {
-                              console.log('📄 ❌ Failed to open URL even as fallback:', linkError.message);
-                              Alert.alert('Error', `Unable to open file: ${errorMessage}`);
-                            });
-                          } else {
-                            Alert.alert('Error', `Unable to open file: ${errorMessage}`);
-                          }
-                        }
-                        console.log('📄 ==========================================');
-                      }}
-                    >
-                      <Ionicons
-                        name={message.fileType === 'image' ? 'image' : 'document'}
-                        size={20}
-                        color={isOwn ? '#ffffff' : '#2563eb'}
-                      />
-                      <Text style={[styles.fileName, isOwn && styles.fileNameOwn]}>
-                        {message.fileName || 'File'}
-                      </Text>
-                      {message.fileSize && (
-                        <Text style={[styles.fileSize, isOwn && styles.fileSizeOwn]}>
-                          ({formatFileSize(message.fileSize)})
-                        </Text>
-                      )}
-                    </TouchableOpacity>
-                  )}
-                  <Text style={[styles.messageTime, isOwn && styles.messageTimeOwn]}>
-                    {formatDate(message.createdAt)}
-                  </Text>
-                </View>
-              );
-            })
-          )}
-
-          {/* Typing indicator */}
-          {typingUsers.size > 0 && (
-            <View style={[styles.messageContainer, styles.messageOther]}>
-              <Text style={styles.typingText}>
-                {Array.from(typingUsers).join(', ')} typing...
-              </Text>
-            </View>
-          )}
-        </ScrollView>
+          contentContainerStyle={messages.length === 0 ? styles.messagesContentEmpty : styles.messagesContent}
+          ListEmptyComponent={listEmptyComponent}
+          ListFooterComponent={listFooterComponent}
+          removeClippedSubviews={true}
+          initialNumToRender={20}
+          maxToRenderPerBatch={10}
+          windowSize={10}
+          onContentSizeChange={() => flatListRef.current?.scrollToEnd({ animated: false })}
+        />
 
         {/* File preview */}
         {selectedFile && (
@@ -749,6 +676,10 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   messagesContent: {
+    padding: 16,
+  },
+  messagesContentEmpty: {
+    flex: 1,
     padding: 16,
   },
   centerContainer: {

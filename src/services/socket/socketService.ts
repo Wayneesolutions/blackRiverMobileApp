@@ -107,10 +107,10 @@ class SocketService {
           console.error(`   Troubleshooting steps:`);
           console.error(`   1. Verify backend server is running on ${socketUrl}`);
           console.error(`   2. Check if mobile device and server are on SAME Wi-Fi network`);
-          console.error(`   3. Test in browser: Open http://192.168.31.161:3000/api/v1/health on your phone's browser`);
+          console.error(`   3. Test in browser: Open ${socketUrl}/api/v1/health on your phone's browser`);
           console.error(`   4. Windows Firewall: Allow port 3000 for incoming connections`);
           console.error(`   5. Android: Check if network_security_config.xml allows cleartext traffic`);
-          console.error(`   6. Try ping: ping 192.168.31.161 from mobile device`);
+          console.error(`   6. Try ping from mobile device to the server IP`);
           // Don't throw - let socket.io try anyway
         }
       }

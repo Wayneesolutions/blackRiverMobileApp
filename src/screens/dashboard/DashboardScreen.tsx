@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback, useMemo } from "react";
 import { useFocusEffect, useRoute } from '@react-navigation/native';
 import {
     View,
@@ -121,7 +121,7 @@ export default function DashboardScreen() {
     const [loading, setLoading] = useState(true);
     const [refreshing, setRefreshing] = useState(false);
 
-    const callNumber = (phone: string) => {
+    const callNumber = useCallback((phone: string) => {
         const url = `tel:${phone.replace(/\s+/g, '')}`;
         Linking.canOpenURL(url).then(supported => {
             if (supported) {
@@ -130,7 +130,7 @@ export default function DashboardScreen() {
                 Alert.alert('Call Failed', `Cannot place a call to ${phone}`);
             }
         });
-    };
+    }, []);
 
     const handleCallDispatch = async () => {
         try {
@@ -164,7 +164,7 @@ export default function DashboardScreen() {
         }
     };
 
-    const wishListItems = [
+    const wishListItems = useMemo(() => [
         { id: 1, name: "Chat",          icon: <Ionicons name="chatbubbles"     size={26} color="#fff" />, color: "#00C2A6", route: "DriverChat" },
         { id: 2, name: "Settings",      icon: <Ionicons name="settings"        size={26} color="#fff" />, color: "#2CDBFA", route: "Settings" },
         { id: 3, name: "Load Map",      icon: <Ionicons name="map"             size={26} color="#fff" />, color: "#831775", route: "LoadMap" },
@@ -172,7 +172,8 @@ export default function DashboardScreen() {
         { id: 5, name: "ELD Documents", icon: <Ionicons name="document-text"   size={26} color="#fff" />, color: "#8B5CF6", route: "ELDDocuments" },
         { id: 6, name: "Mileage Sheet", icon: <Ionicons name="speedometer"     size={26} color="#fff" />, color: "#FF6B35", route: "MileageSheet" },
         { id: 7, name: "Call Dispatch", icon: <Ionicons name="call"            size={26} color="#fff" />, color: "#16a34a", onPress: handleCallDispatch },
-    ];
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    ], [handleCallDispatch]);
 
     useEffect(() => {
         fetchDashboardData();
@@ -198,12 +199,6 @@ export default function DashboardScreen() {
         }, [refreshDashboardIfNeeded])
     );
 
-    useEffect(() => {
-        const unsubscribe = navigation.addListener('focus', () => {
-            setTimeout(() => { refreshDashboardIfNeeded(); }, 200);
-        });
-        return unsubscribe;
-    }, [navigation, refreshDashboardIfNeeded]);
 
     const fetchDashboardData = async () => {
         try {
@@ -259,10 +254,10 @@ export default function DashboardScreen() {
         fetchDashboardData();
     };
 
-    const handleWishItemPress = (item: any) => {
+    const handleWishItemPress = useCallback((item: any) => {
         if (item.onPress) { item.onPress(); return; }
         if (item.route) { navigation.navigate(item.route as any); }
-    };
+    }, [navigation]);
 
     // ─── Render helpers ────────────────────────────────────────────────────────
 
