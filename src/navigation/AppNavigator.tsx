@@ -3,7 +3,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { Ionicons } from '@expo/vector-icons';
-import { View, Text, StyleSheet, ActivityIndicator, Image, Animated, TouchableOpacity, Modal, Vibration } from 'react-native';
+import { View, Text, StyleSheet, ActivityIndicator, Image, Animated, TouchableOpacity, Modal, Vibration, AppState } from 'react-native';
 import { RTCPeerConnection, RTCSessionDescription, RTCIceCandidate, mediaDevices } from 'react-native-webrtc';
 import { PermissionsAndroid, Platform } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -466,13 +466,29 @@ function MainTabNavigator({ onLogout, navigation }: MainTabNavigatorProps) {
         registerToken();
 
         // Keep socket connected for real-time chat updates (no in-app banner)
+        let isConnecting = false;
+        let hasConnectedBefore = false;
+        let retryDelay = 2000;
+        let retryTimer: ReturnType<typeof setTimeout> | null = null;
+
+        // Keep retrying until the connection is back, waiting longer each time
+        const scheduleRetry = () => {
+            if (!isMounted || retryTimer) return;
+            retryTimer = setTimeout(() => {
+                retryTimer = null;
+                initSocketAndListen();
+            }, retryDelay);
+            retryDelay = Math.min(retryDelay * 2, 30000);
+        };
+
         const initSocketAndListen = async () => {
+            if (isConnecting || !isMounted) return;
+            isConnecting = true;
             try {
                 const token = await apiService.getStoredToken();
                 if (!token || !isMounted) return;
 
-                const alreadyConnected = socketService.isSocketConnected();
-                if (!alreadyConnected) {
+                if (!socketService.isSocketConnected()) {
                     await socketService.initialize();
                 }
                 if (!isMounted) return;
@@ -480,24 +496,13 @@ function MainTabNavigator({ onLogout, navigation }: MainTabNavigatorProps) {
                 await socketService.authenticateChat(token);
                 if (!isMounted) return;
 
-                await new Promise(resolve => setTimeout(resolve, 500));
-                if (!isMounted) return;
-
                 console.log('[NotifSocket] joining driver chat room for driverId:', driverId);
-                try {
-                    await socketService.joinDriverChat(driverId);
-                    console.log('[NotifSocket] joined driver chat room ✅');
-                } catch (joinErr: any) {
-                    console.warn('[NotifSocket] join attempt 1 failed:', joinErr?.message);
-                    await new Promise(resolve => setTimeout(resolve, 1500));
-                    if (!isMounted) return;
-                    try {
-                        await socketService.joinDriverChat(driverId);
-                        console.log('[NotifSocket] joined driver chat room on retry ✅');
-                    } catch (retryErr: any) {
-                        console.error('[NotifSocket] join retry also failed:', retryErr?.message);
-                    }
-                }
+                await socketService.joinDriverChat(driverId);
+                console.log('[NotifSocket] joined driver chat room ✅');
+
+                retryDelay = 2000;
+                if (hasConnectedBefore) socketService.notifySessionRestored();
+                hasConnectedBefore = true;
 
                 const rawSocket = socketService.getSocket();
                 if (rawSocket) {
@@ -562,23 +567,39 @@ function MainTabNavigator({ onLogout, navigation }: MainTabNavigatorProps) {
                     rawSocket.on('call-ended',    handlerCallEnded.current);
                     rawSocket.on('call-rejected', handlerCallRejected.current);
                     rawSocket.on('call-ice',      handlerCallIce.current);
-
-                    rawSocket.once('disconnect', (reason: string) => {
-                        if (!isMounted) return;
-                        setTimeout(() => {
-                            if (isMounted) initSocketAndListen();
-                        }, 3000);
-                    });
                 }
+
+                socketService.getSocket()?.once('disconnect', () => {
+                    scheduleRetry();
+                });
             } catch (err: any) {
                 console.error('[NotifSocket] initSocketAndListen error:', err?.message);
+                scheduleRetry();
+            } finally {
+                isConnecting = false;
             }
         };
 
         initSocketAndListen();
 
+        // Phones drop the connection in the background, so reconnect on return
+        const appStateSubscription = AppState.addEventListener('change', (nextState) => {
+            if (nextState === 'active' && !socketService.isSocketConnected()) {
+                if (retryTimer) {
+                    clearTimeout(retryTimer);
+                    retryTimer = null;
+                }
+                retryDelay = 2000;
+                initSocketAndListen();
+            }
+        });
+
         return () => {
             isMounted = false;
+            if (retryTimer) clearTimeout(retryTimer);
+            appStateSubscription.remove();
+            // Logged out: do not keep receiving this driver's messages
+            socketService.disconnect();
         };
     }, []);
 

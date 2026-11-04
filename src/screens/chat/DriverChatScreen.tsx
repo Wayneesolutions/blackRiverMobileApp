@@ -364,10 +364,16 @@ const DriverChatScreen = () => {
 
     initializeChat();
 
+    // Fetch anything that arrived while the connection was down
+    const stopSessionRestored = socketService.onSessionRestored(() => {
+      loadMessages();
+    });
+
     // Cleanup — only remove the specific callbacks this screen owns.
     // NEVER call socket.off('incoming-call') here: that listener belongs to
     // AppNavigator and removing it would silently kill incoming call alerts.
     return () => {
+      stopSessionRestored();
       socketService.offNewChatMessage(handleNewMessage);
       socketService.offUserTyping(handleTyping);
       const socket = socketService.getSocket();
@@ -394,6 +400,8 @@ const DriverChatScreen = () => {
 
     const messageText = newMessage.trim();
     const fileToSend = selectedFile;
+    const clientMessageId = `${driverId}-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+    const optimisticId = `temp-${clientMessageId}`;
 
     try {
       setSending(true);
@@ -412,12 +420,14 @@ const DriverChatScreen = () => {
           setNewMessage('');
           setSelectedFile(null);
           scrollToBottom();
+        } else {
+          throw new Error(response.message || 'Failed to send file');
         }
       } else {
         // Create optimistic message for immediate display
         const currentUser = authManager.getCurrentUser();
         const optimisticMessage: ChatMessage = {
-          _id: `temp-${Date.now()}-${Math.random()}`,
+          _id: optimisticId,
           driverId: driverId,
           senderId: {
             _id: currentUser?.id || currentUserIdRef.current || '',
@@ -441,20 +451,48 @@ const DriverChatScreen = () => {
         setNewMessage('');
         scrollToBottom();
 
-        // Send via socket for real-time
-        // The backend will emit the message back via socket, which will be caught by handleNewMessage
-        // The real message will replace the optimistic one
-        socketService.sendDriverChatMessage({
-          driverId,
-          message: messageText,
+        // The bubble only stays once the server confirms the message was saved.
+        // The socket also creates the trip status update for the office, so it is tried
+        // first. If it is down, the HTTP API sends the message instead, and
+        // clientMessageId stops a slow confirmation from creating a duplicate.
+        let savedMessage: any = null;
+        try {
+          savedMessage = await socketService.sendDriverChatMessage({
+            driverId,
+            message: messageText,
+            clientMessageId,
+          });
+        } catch (socketError: any) {
+          logger.warn('Socket send failed, using HTTP API', { error: socketError?.message });
+          const response = await chatService.sendDriverChatMessage(
+            driverId,
+            messageText,
+            undefined,
+            undefined,
+            undefined,
+            clientMessageId
+          );
+          if (!response.success || !response.data) {
+            throw new Error(response.message || 'Failed to send message');
+          }
+          savedMessage = response.data;
+        }
+
+        const confirmed = normalizeMessage(savedMessage);
+        setMessages((prev) => {
+          const withoutOptimistic = prev.filter(msg => msg._id !== optimisticId);
+          return withoutOptimistic.some(msg => msg._id === confirmed._id)
+            ? withoutOptimistic
+            : [...withoutOptimistic, confirmed];
         });
       }
     } catch (error: any) {
       logger.error('Error sending driver chat message', error);
       Alert.alert('Error', 'Failed to send message. Please try again.');
-      // Remove optimistic message on error
       if (!fileToSend) {
-        setMessages((prev) => prev.filter(msg => !msg._id.startsWith('temp-')));
+        // Give the text back so the driver does not have to retype it
+        setMessages((prev) => prev.filter(msg => msg._id !== optimisticId));
+        setNewMessage((current) => current || messageText);
       }
     } finally {
       setSending(false);

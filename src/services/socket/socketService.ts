@@ -44,8 +44,22 @@ class SocketService {
   private reconnectAttempts: number = 0;
   private maxReconnectAttempts: number = 3; // Reduced to prevent endless retries
   private messageCallbackWrappers = new Map<Function, Function>();
+  private typingCallbacks = new Set<(data: any) => void>();
+  private sessionRestoredCallbacks = new Set<() => void>();
+  private initializePromise: Promise<void> | null = null;
 
-  async initialize(timeout: number = 10000): Promise<void> {
+  // The navigator and chat screen can both connect at once. They share one attempt,
+  // otherwise the second call destroys the socket the first is still opening.
+  initialize(timeout: number = 10000): Promise<void> {
+    if (!this.initializePromise) {
+      this.initializePromise = this.openConnection(timeout).finally(() => {
+        this.initializePromise = null;
+      });
+    }
+    return this.initializePromise;
+  }
+
+  private async openConnection(timeout: number): Promise<void> {
     if (this.socket?.connected) {
       logger.info('Socket already connected');
       return;
@@ -57,7 +71,7 @@ class SocketService {
       this.socket.disconnect();
       this.socket = null;
       this.isConnected = false;
-      this.messageCallbackWrappers.clear();
+      // Chat listeners are kept: they are attached to the new socket below
     }
 
     try {
@@ -163,6 +177,14 @@ class SocketService {
         };
 
         this.socket = io(socketUrl, socketOptions);
+
+        // An open chat screen must keep receiving messages after a reconnect
+        this.messageCallbackWrappers.forEach((wrapper) => {
+          this.socket?.on('newChatMessage', wrapper as any);
+        });
+        this.typingCallbacks.forEach((callback) => {
+          this.socket?.on('userTyping', callback);
+        });
 
         // Set up event handlers with connection promise
         const connectHandler = () => {
@@ -484,15 +506,10 @@ class SocketService {
 
   // Listen to new messages
   onNewChatMessage(callback: (message: any) => void): void {
-    if (!this.socket) {
-      logger.warn('Cannot listen for chat messages - socket not initialized');
-      return;
-    }
-
     // Remove existing wrapper for this callback if previously registered
     const existingWrapper = this.messageCallbackWrappers.get(callback);
     if (existingWrapper) {
-      this.socket.off('newChatMessage', existingWrapper as any);
+      this.socket?.off('newChatMessage', existingWrapper as any);
       this.messageCallbackWrappers.delete(callback);
     }
 
@@ -507,26 +524,23 @@ class SocketService {
       });
       callback(message);
     };
+    // Stored even without a socket: initialize() attaches stored listeners to each new socket
     this.messageCallbackWrappers.set(callback, wrapper);
-    this.socket.on('newChatMessage', wrapper);
+    this.socket?.on('newChatMessage', wrapper);
 
     logger.info('✅ Registered newChatMessage listener');
   }
 
   // Remove new message listener
   offNewChatMessage(callback?: (message: any) => void): void {
-    if (!this.socket) {
-      return;
-    }
-
     if (callback) {
       const wrapper = this.messageCallbackWrappers.get(callback);
       if (wrapper) {
-        this.socket.off('newChatMessage', wrapper as any);
+        this.socket?.off('newChatMessage', wrapper as any);
         this.messageCallbackWrappers.delete(callback);
       }
     } else {
-      this.socket.off('newChatMessage');
+      this.socket?.off('newChatMessage');
       this.messageCallbackWrappers.clear();
     }
   }
@@ -538,24 +552,31 @@ class SocketService {
     tripId: string;
     isTyping: boolean;
   }) => void): void {
-    if (!this.socket) {
-      return;
-    }
-
-    this.socket.on('userTyping', callback);
+    this.typingCallbacks.add(callback);
+    this.socket?.on('userTyping', callback);
   }
 
   // Remove typing listener
   offUserTyping(callback?: (data: any) => void): void {
-    if (!this.socket) {
-      return;
-    }
-
     if (callback) {
-      this.socket.off('userTyping', callback);
+      this.typingCallbacks.delete(callback);
+      this.socket?.off('userTyping', callback);
     } else {
-      this.socket.off('userTyping');
+      this.typingCallbacks.clear();
+      this.socket?.off('userTyping');
     }
+  }
+
+  // Called by the navigator after a lost connection is back and the chat room rejoined
+  notifySessionRestored(): void {
+    this.sessionRestoredCallbacks.forEach((callback) => callback());
+  }
+
+  onSessionRestored(callback: () => void): () => void {
+    this.sessionRestoredCallbacks.add(callback);
+    return () => {
+      this.sessionRestoredCallbacks.delete(callback);
+    };
   }
 
   // Listen to errors
@@ -631,21 +652,34 @@ class SocketService {
   }
 
   // Send driver chat message
+  // Resolves only when the server confirms the message was saved. Rejects otherwise,
+  // so the caller can fall back to the HTTP API instead of losing the message.
   sendDriverChatMessage(data: {
     driverId: string;
     message: string;
+    clientMessageId: string;
     fileUrl?: string;
     fileName?: string;
     fileType?: string;
     fileSize?: number;
-  }): void {
-    if (!this.socket || !this.isConnected) {
-      logger.warn('Cannot send driver chat message - socket not connected');
-      return;
-    }
+  }, timeoutMs: number = 6000): Promise<any> {
+    return new Promise((resolve, reject) => {
+      if (!this.socket?.connected) {
+        reject(new Error('Socket not connected'));
+        return;
+      }
 
-    logger.info('Sending driver chat message', { driverId: data.driverId });
-    this.socket.emit('sendDriverChatMessage', data);
+      logger.info('Sending driver chat message', { driverId: data.driverId });
+      this.socket.timeout(timeoutMs).emit('sendDriverChatMessage', data, (error: Error | null, response: any) => {
+        if (error) {
+          reject(error);
+        } else if (!response?.success || !response.data) {
+          reject(new Error(response?.message || 'Message was not saved'));
+        } else {
+          resolve(response.data);
+        }
+      });
+    });
   }
 
   // ==================== WEBRTC ====================

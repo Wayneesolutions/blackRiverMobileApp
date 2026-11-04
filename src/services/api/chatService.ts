@@ -316,11 +316,15 @@ class ChatService {
     message: string,
     fileUri?: string,
     fileName?: string,
-    fileType?: string
+    fileType?: string,
+    clientMessageId?: string
   ): Promise<{ success: boolean; data?: ChatMessage; message: string }> {
     try {
       const formData = new FormData();
       formData.append('message', message);
+      if (clientMessageId) {
+        formData.append('clientMessageId', clientMessageId);
+      }
       
       if (fileUri) {
         // @ts-ignore - FormData in React Native

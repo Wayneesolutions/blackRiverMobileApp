@@ -79,8 +79,8 @@ class NotificationService {
             console.log('[Notifications] Push token:', this._expoPushToken);
             return this._expoPushToken;
         } catch (err) {
-            // Simulator or Expo Go — push token unavailable but local notifications still work
-            console.warn('[Notifications] Push token unavailable (simulator or Expo Go):', err);
+            // Simulator, Expo Go, or an Android build made without google-services.json
+            console.error('[Notifications] Could not get a push token. This device will not receive push notifications:', err);
             return null;
         }
     }
