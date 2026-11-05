@@ -70,10 +70,41 @@ export default function MileageSheetScreen() {
   }, [filterType, startDate, endDate]);
 
   useEffect(() => {
-    // Backend handles grouping, so we just use the data directly
-    // Ensure filteredMileageData is always an array
-    setFilteredMileageData(Array.isArray(allMileageData) ? allMileageData : []);
-  }, [allMileageData]);
+    if (!Array.isArray(allMileageData)) {
+      setFilteredMileageData([]);
+      return;
+    }
+
+    let filtered = [...allMileageData];
+
+    // Client-side date filter (guards against backend inconsistencies)
+    if (startDate && endDate) {
+      filtered = filtered.map(period => {
+        const filteredTrips = period.trips.filter(trip => {
+          const tripDate = new Date(trip.startDate);
+          return tripDate >= startDate && tripDate <= endDate;
+        });
+        if (filteredTrips.length === 0) return null;
+        const totalMiles = filteredTrips.reduce((sum, trip) => sum + trip.distance, 0);
+        return {
+          ...period,
+          totalMiles,
+          loadedMiles: totalMiles * 0.85,
+          emptyMiles: totalMiles * 0.15,
+          iftaMiles: totalMiles,
+          trips: filteredTrips,
+        };
+      }).filter((item): item is MileageData => item !== null);
+    }
+
+    // Apply weekly grouping client-side
+    if (filterType === 'weekly') {
+      const allTrips = filtered.flatMap(period => period.trips);
+      filtered = groupTripsByWeek(allTrips);
+    }
+
+    setFilteredMileageData(filtered);
+  }, [allMileageData, filterType, startDate, endDate]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const initializeDates = async () => {
     try {
@@ -288,52 +319,15 @@ export default function MileageSheetScreen() {
     });
   };
 
-  const applyFilters = () => {
-    let filtered = [...allMileageData];
-
-    // Apply date range filter
-    if (startDate && endDate) {
-      filtered = filtered.map(period => {
-        const filteredTrips = period.trips.filter(trip => {
-          const tripDate = new Date(trip.startDate);
-          return tripDate >= startDate && tripDate <= endDate;
-        });
-
-        if (filteredTrips.length === 0) return null;
-
-        const totalMiles = filteredTrips.reduce((sum, trip) => sum + trip.distance, 0);
-        const loadedMiles = filteredTrips.reduce((sum, trip) => sum + trip.distance * 0.85, 0);
-        const emptyMiles = filteredTrips.reduce((sum, trip) => sum + trip.distance * 0.15, 0);
-
-        return {
-          ...period,
-          totalMiles,
-          loadedMiles,
-          emptyMiles,
-          iftaMiles: totalMiles,
-          trips: filteredTrips,
-        };
-      }).filter((item): item is MileageData => item !== null);
-    }
-
-    // Apply weekly grouping if needed
-    if (filterType === 'weekly') {
-      const allTrips = filtered.flatMap(period => period.trips);
-      filtered = groupTripsByWeek(allTrips);
-    }
-
-    setFilteredMileageData(filtered);
-  };
-
   const handleDateSelect = (date: Date) => {
-    const selectedDate = new Date(date);
-    selectedDate.setHours(0, 0, 0, 0);
+    const dayStart = new Date(date);
+    dayStart.setHours(0, 0, 0, 0);
 
     // Validate against min and max dates
     if (minDate) {
       const minDateStart = new Date(minDate);
       minDateStart.setHours(0, 0, 0, 0);
-      if (selectedDate < minDateStart) {
+      if (dayStart < minDateStart) {
         Alert.alert('Invalid Date', `Date cannot be before ${minDateStart.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}`);
         return;
       }
@@ -341,28 +335,34 @@ export default function MileageSheetScreen() {
 
     const maxDateStart = new Date(maxDate);
     maxDateStart.setHours(0, 0, 0, 0);
-    if (selectedDate > maxDateStart) {
+    if (dayStart > maxDateStart) {
       Alert.alert('Invalid Date', 'Date cannot be after today');
       return;
     }
 
     if (showDatePicker === 'start') {
-      setStartDate(selectedDate);
-      if (endDate && selectedDate > endDate) {
+      const startSelected = new Date(date);
+      startSelected.setHours(0, 0, 0, 0);
+      setStartDate(startSelected);
+      if (endDate && startSelected > endDate) {
         setEndDate(null);
       }
+      // Auto-switch to end date picker after selecting start
+      setShowDatePicker('end');
     } else if (showDatePicker === 'end') {
-      if (startDate && selectedDate < startDate) {
+      if (startDate && dayStart < new Date(startDate.getFullYear(), startDate.getMonth(), startDate.getDate())) {
         Alert.alert('Invalid Date', 'End date must be after start date');
         return;
       }
-      setEndDate(selectedDate);
+      const endSelected = new Date(date);
+      endSelected.setHours(23, 59, 59, 999); // Include full end day
+      setEndDate(endSelected);
+      setShowDatePicker(null);
+      setShowCalendarModal(false); // Auto-close after end date selected
     }
-    setShowDatePicker(null);
   };
 
   const resetFilters = () => {
-    // Reset to default dates (joining date to today)
     if (minDate) {
       const defaultStart = new Date(minDate);
       defaultStart.setHours(0, 0, 0, 0);
@@ -372,6 +372,8 @@ export default function MileageSheetScreen() {
     today.setHours(23, 59, 59, 999);
     setEndDate(today);
     setFilterType('monthly');
+    setShowCalendarModal(false);
+    setShowDatePicker(null);
   };
 
   const renderCalendarModal = () => {

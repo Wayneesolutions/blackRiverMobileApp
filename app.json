@@ -2,7 +2,7 @@
   "expo": {
     "name": "Logistiq Innovations",
     "slug": "black-river-logistics",
-    "version": "1.0.6",
+    "version": "1.0.7",
     "orientation": "portrait",
     "icon": "./assets/app-icon.png",
     "userInterfaceStyle": "light",
@@ -26,7 +26,11 @@
         "NSPhotoLibraryUsageDescription": "This app needs access to your photos to upload document images.",
         "NSCameraUsageDescription": "This app needs access to your camera to take photos of documents.",
         "ITSAppUsesNonExemptEncryption": false,
-        "UIBackgroundModes": ["location", "remote-notification", "fetch"],
+        "UIBackgroundModes": [
+          "location",
+          "remote-notification",
+          "fetch"
+        ],
         "NSMicrophoneUsageDescription": "Required for voice calls"
       },
       "entitlements": {
@@ -82,7 +86,6 @@
     },
     "plugins": [
       "expo-font",
-     
       [
         "expo-build-properties",
         {
@@ -115,9 +118,9 @@
       "socketUrl": "https://portal.logistiqinnovations.ca",
       "googleMapsApiKey": "AIzaSyCv8vuE1jOgt-F6Szqvfn1DPrQdbPn5aEI",
       "eas": {
-        "projectId": "fefcce40-3b76-4b8d-b7c8-c74644f42676"
+        "projectId": "1cdd16b1-89fc-4d47-983c-29e2e8e17848"
       }
     },
-    "owner": "royaltally"
+    "owner": "wayneesolutionss-team"
   }
 }
